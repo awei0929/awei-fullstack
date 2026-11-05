@@ -1,0 +1,46 @@
+{
+  "installed_on": "2026-11-05",
+  "scope": "repository",
+  "directory": ".agents/skills",
+  "openspec": {
+    "package": "@fission-ai/openspec",
+    "version": "1.16.0",
+    "profile": "core",
+    "schema": "nest-existing-spec",
+    "skills": [
+      "openspec-apply-change",
+      "openspec-archive-change",
+      "openspec-explore",
+      "openspec-propose",
+      "openspec-sync-specs",
+      "openspec-update-change"
+    ],
+    "source": "https://github.com/Fission-AI/OpenSpec"
+  },
+  "superpowers": {
+    "version": "7.0.2",
+    "repository": "https://github.com/obra/superpowers",
+    "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+    "installation": "skill-installer project-local copies; not marketplace plugin",
+    "skills": [
+      "brainstorming",
+      "diagnosing-superpowers",
+      "dispatching-parallel-agents",
+      "executing-plans",
+      "finishing-a-development-branch",
+      "receiving-code-review",
+      "requesting-code-review",
+      "subagent-driven-development",
+      "systematic-debugging",
+      "test-driven-development",
+      "using-git-worktrees",
+      "using-superpowers",
+      "verification-before-completion",
+      "writing-plans",
+      "writing-skills"
+    ],
+    "upstream_content_verified_files": 80,
+    "restored_upstream_executable_modes": 10
+  },
+  "local_adaptation": "AGENT.md and SPEC.md only; upstream skill files unmodified; no plugin hooks installed"
+}

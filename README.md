@@ -1,11 +1,20 @@
 # awei 全栈练习：任务管理与跨模块统计
 
-这是给有前端经验、刚开始学习 NestJS 的开发者准备的全栈练习。前后端在同一个仓库中，各自安装依赖和运行。
+这是给有前端经验、已完成 NestJS 基础学习的开发者准备的全栈练习。前后端在同一个仓库中，各自安装依赖和运行；后续重点是工程设计、功能规格和验证。
 
 - `frontend/`：React 18、TypeScript、Vite、MobX、React Router、Ant Design、Less Modules。
 - `backend/`：NestJS、TypeScript、Mongoose、TasksModule、SystemModule、StatsModule。
 - 当前支持查询、创建、编辑、删除和任务统计，任务保存在 MongoDB 中，重启后端后仍保留。
 - `compose.yaml`：使用 Docker Compose 启动本地 MongoDB，数据保存在命名卷中。
+
+## AI 开发与跨会话接续
+
+- [AGENT.md](AGENT.md)：通用工作规则、读取顺序、验证与交接方式；[AGENTS.md](AGENTS.md) 是工具入口。
+- [文档导航](docs/README.md) / [架构概览](docs/architecture/overview.md)：按职责读取项目知识。
+- [SPEC 规范](SPEC.md) / [功能模板](docs/specs/TEMPLATE.md) / [当前系统基线](docs/specs/000-current-system.md)：定义功能范围和验收标准。
+- [STATE](docs/ai/STATE.md)：当前任务、实际验证结果、未决事项与下一步。
+
+开启新会话或切换模型时，以整个项目根目录为工作区，让工具读取 `AGENT.md`、`docs/ai/STATE.md`、当前 SPEC 和涉及目录的 `AGENTS.md`，先核对 Git 状态再继续。完整启动提示在 AGENT.md。文档保存在工作区并随代码版本管理；不同工具需要访问同一版本文件，不能假定它们自动共享聊天历史。
 
 ## 目录与改动记录
 
@@ -87,6 +96,8 @@ npm run dev
 
 编辑接口已经补上具体 DTO 校验、404 异常以及允许修改字段的限制，相关装饰器均附有中文注释。
 
+下表的参数与业务校验以写入守卫已放行为前提；已匹配写入方法但缺失或错误的演示请求头会先返回 403。完整契约与验收以 [系统基线](docs/specs/000-current-system.md) 为准。
+
 | 请求情况 | 后端响应 |
 | --- | --- |
 | id、标题合法，任务存在 | 200，返回更新后的任务 |
@@ -104,7 +115,7 @@ npm run dev
 
 ### 删除与统计练习
 
-新增接口：
+当前删除与统计接口：
 
 - `DELETE /api/tasks/:id`：删除成功返回 200 和被删除的任务；任务不存在返回 404。
 - `GET /api/stats`：返回 `{ "total": 0, "uptimeSeconds": 0 }`，聚合任务模块的数量和系统模块的后端运行时长。
@@ -135,7 +146,7 @@ SystemModule 通过同样的方式公开 SystemService。StatsService 可以在�
 
 只在 AppModule 中导入两个模块，并不会自动使它们的服务互相可用。StatsModule 仍然要显式导入 TasksModule。不要再把 TasksService 注册进 StatsModule.providers；应复用 TasksModule 导出的服务，避免重复实例或依赖解析错误。
 
-本课的实际请求链：
+统计接口的实际请求链：
 
 ```text
 GET /api/stats
@@ -171,14 +182,15 @@ GET /api/stats
 | `backend/src/stats/stats.module.ts` | 导入 TasksModule，注册统计能力 |
 | `backend/src/stats/stats.service.ts` | 同时注入 TasksService、SystemService，聚合两个模块的数据 |
 | `backend/src/system/system.service.ts` | 提供后端运行时长 |
-| `backend/src/app.module.ts` | 组合 TasksModule、SystemModule 和 StatsModule |
+| `backend/src/app.module.ts` | 组合配置、数据库与业务模块，注册中间件和全局异常过滤器 |
 | `backend/src/main.ts` | 创建 Nest 应用并监听端口 |
 
 ### Module 在应用启动时组织依赖
 
 ```text
 main.ts 调用 NestFactory.create(AppModule)
-  └─ AppModule.imports: [TasksModule, SystemModule, StatsModule]
+  └─ AppModule.imports: [ConfigModule.forRoot(...), DatabaseModule, TasksModule, SystemModule, StatsModule]
+       ├─ ConfigModule 读取 backend/.env，DatabaseModule 建立数据库连接
        ├─ TasksModule 注册并导出 TasksService
        ├─ SystemModule 注册并导出 SystemService
        └─ StatsModule 导入上面两个模块
@@ -210,26 +222,27 @@ Nest 读取模块声明，创建 TasksService，并把它注入 TasksController�
   → observer 组件重新渲染
 ```
 
-`main.ts` 中配置的 `/api` 前缀，加上 `@Controller('tasks')` 和 `@Get()`，组合为 `GET /api/tasks`。
+`main.ts` 调用 `app.setup.ts` 中的 `configureApp()` 设置 `/api` 前缀，加上 `@Controller('tasks')` 和 `@Get()`，组合为 `GET /api/tasks`。
 
 ### POST 创建请求怎样流转
 
 ```text
 填写标题，提交表单
   → frontend store.createTask(title)
-  → POST /api/tasks，携带 JSON 请求体
+  → POST /api/tasks，携带 JSON 请求体和 X-Learning-Key 演示头
   → Nest 解析 JSON，匹配 Controller 路由
+  → 请求日志中间件记录开始；TaskWriteGuard 检查演示头
   → @Body() 取得请求体，ValidationPipe 按 CreateTaskDto 校验
   → TasksController.create(input)
   → TasksService.create(input)
   → Mongoose 按 Schema 生成 id 和时间，把任务写入 MongoDB
   → Nest 返回新任务，状态 201
+  → 请求日志中间件记录最终状态与耗时
   → MobX 将新任务加入列表
   → 页面显示新任务
 ```
 
-本课已加上最小输入校验：标题会去除两端空白，长度 1–120，拒绝多余字段。
-DTO 和 Pipe 可以留到下一课细读。TypeScript 类型本身不能校验网络请求。
+当前输入校验会去除标题两端空白，限制长度为 1–120，拒绝多余字段。TypeScript 类型本身不能校验网络请求，DTO 装饰器与 ValidationPipe 提供运行时校验。
 
 ## 用终端直接验证 HTTP
 
@@ -244,7 +257,7 @@ curl -i http://localhost:3000/api/tasks \
 
 GET 返回 200，成功 POST 返回 201。写入接口需要上述公开的学习演示请求头；缺少时返回 403，通过守卫后空白标题会返回 400。
 
-## 本课建议阅读顺序
+## 建议阅读顺序
 
 1. `backend/src/tasks/tasks.controller.ts`
 2. `backend/src/tasks/tasks.service.ts`
@@ -268,11 +281,14 @@ GET 返回 200，成功 POST 返回 201。写入接口需要上述公开的学�
 ```bash
 # 从项目根目录执行，MongoDB 需已启动且本地配置可用。
 npm test --prefix backend
+npm run lint --prefix frontend
 npm run build --prefix frontend
 ```
 
 后端测试会构建实际代码，在临时端口启动 HTTP 服务，验证查询、创建、数据共享和非法输入。
 它不会占用开发服务器的 3000 端口；每个用例使用独立的临时数据库，完成后清理，不修改开发数据库。
+
+前端 `build` 包含类型检查；只需要类型检查时可执行 `npm run check --prefix frontend`，无需在构建前重复执行。当前没有前端自动化交互测试，构建成功不等于页面行为全部通过。每次实际结果记录在对应 SPEC 与 STATE 中；命令列在 README 中不代表已经执行。
 
 ## 官方参考
 

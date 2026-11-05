@@ -1,0 +1,27 @@
+schema: nest-existing-spec
+
+context: |
+  使用中文。先读取项目根 AGENT.md、SPEC.md、docs/ai/STATE.md，遵循现有读取顺序。
+  docs/specs/NNN-short-name.md 是功能规格、设计决策、实施清单和验收记录的唯一正文；
+  docs/specs/000-current-system.md 是现有系统基线，仍有未验证项。
+  本项目使用 nest-existing-spec 引用模式：变更目录只保存 spec-reference.md，
+  其中的 SPEC 路径始终相对项目根目录，归档后也不改变解释方式。
+  不复制另一套 proposal/design/tasks/specs，不迁移已有规格。
+  OpenSpec 的产物存在、0/0 任务或归档成功均不代表业务验收通过。
+  Superpowers 是项目级技能库；按 AGENT.md 的工具协作约定使用，宿主实际约束优先。
+
+rules:
+  spec-reference:
+    - 先创建或更新实际的 docs/specs/NNN-short-name.md，再写引用；引用目标必须存在且位于本仓库 docs/specs/ 内，不能引用模板。
+    - 仅保存变更标识和项目根相对 SPEC 路径；不复制需求、设计、任务、状态或验证结果。
+
+operations:
+  apply:
+    guidance:
+      - 读取 spec-reference.md 指向的现有 SPEC 和涉及目录的 AGENTS.md；实际任务以 SPEC 的实施清单为准。
+      - 使用相关 Superpowers 技能执行和验证，直接更新同一份 SPEC 与 STATE，复用已确认的设计和授权。
+      - 本 schema 不启用 CLI 勾选进度；报告来自 SPEC 的真实完成情况，不能将空 tasks 数组视为实现完成。
+  archive:
+    guidance:
+      - 归档前读取引用的 SPEC，核对其必要验收、验证证据、基线更新和 STATE 交接；未完成时保留未验证状态并说明原因。
+      - 本 schema 未声明 specs 产物，没有 delta spec 可同步；不生成 openspec/specs 下的第二套合同。

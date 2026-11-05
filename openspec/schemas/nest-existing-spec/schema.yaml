@@ -1,0 +1,37 @@
+name: nest-existing-spec
+version: 1
+description: Reuse Nest's existing canonical SPEC and STATE without duplicate specifications.
+
+artifacts:
+  - id: spec-reference
+    generates: spec-reference.md
+    description: A project-root-relative reference to the canonical project SPEC.
+    template: spec-reference.md
+    instruction: |
+      先读取项目根 AGENT.md、SPEC.md、docs/ai/STATE.md 和当前相关 SPEC。
+      按 SPEC.md 决定新建还是更新 docs/specs/NNN-short-name.md；
+      在该权威文件中维护范围、接口、设计、AC 编号、实施清单和验证记录。
+      已明确且获授权的需求可直接整理；只澄清会影响结果的歧义。
+      对多步骤任务按需使用 Superpowers writing-plans，直接细化同一 SPEC 的实施清单，
+      不创建默认 docs/superpowers/plans，也不重复已有设计确认。
+      完成以上准备后，本产物只写变更标识和 SPEC 的项目根相对路径。
+      确认引用文件真实存在、位于 docs/specs/、不是 TEMPLATE.md；
+      不在引用中复制目标正文、checkbox、状态或验证结果。
+      纯文档等轻量任务仍按 AGENT.md 直接处理，不为使用工具而虚构业务变更。
+    requires: []
+
+apply:
+  requires: [spec-reference]
+  tracks: null
+  instruction: |
+    本工作流将任务保存在外部权威 SPEC，未配置 CLI checkbox 跟踪。
+    CLI tasks 为空或进度为 0/0 只代表未跟踪，不能据此跳过实施或宣称完成。
+    从 spec-reference.md 解析项目根相对 SPEC 路径，确认目标在本仓库 docs/specs/ 内且存在。
+    读取 AGENT.md、该 SPEC、STATE 和涉及目录的 AGENTS.md。
+    以该 SPEC 的实施清单、验收条件与技术决策执行；按需使用 Superpowers 的
+    executing-plans/subagent-driven-development、systematic-debugging、
+    test-driven-development、requesting-code-review、verification-before-completion。
+    上游 superpowers:<name> 引用对应本地同名技能；工具与模型约束以宿主实际提供为准。
+    只在真实实现和必要验证完成后勾选 SPEC 的对应项；验证失败或未执行如实记录。
+    更新同一 SPEC 的验证记录和 STATE；按 SPEC.md 判断真实状态，报告未决项。
+    保留已有未提交改动，遵守 AGENT.md 对分支、提交、推送、部署和全局配置的边界。

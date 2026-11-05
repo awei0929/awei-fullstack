@@ -1,79 +1,61 @@
-# awei 后端
+# NestJS 后端
 
-NestJS 学习项目：任务管理、删除与跨模块统计。
+本项目提供任务管理与跨模块统计，包含 DTO 校验、写入守卫、请求日志、全局异常处理，以及 MongoDB 持久化。这里保留后端实现的阅读说明，适合已完成 NestJS 基础学习、具有前端经验的开发者。
 
-```bash
-npm ci
-npm run start:dev
-```
+- [根 README](../README.md)：唯一的环境准备与启动入口，包含 Node.js、Docker Compose、MongoDB 和环境变量配置。
+- [系统基线 SPEC](../docs/specs/000-current-system.md)：当前接口、输入输出、状态码、数据规则和验收标准。
+- [后端工作约定](./AGENTS.md)：修改后端前需读取的规则。
+- [当前工作状态](../docs/ai/STATE.md)：任务进度、验证记录与接续入口。
 
-- `GET /api/tasks`：返回任务数组，成功为 200。
-- `POST /api/tasks`：请求体 `{ "title": "学习 NestJS" }`，成功为 201。
-- `PUT /api/tasks/:id`：id 放在路径，请求体 `{ "title": "新标题" }`，成功为 200。
-- `DELETE /api/tasks/:id`：删除指定任务，成功为 200，返回被删除的任务。
-- `GET /api/stats`：统计模块聚合任务模块和系统模块，返回 `{ "total": 任务数量, "uptimeSeconds": 后端运行秒数 }`。
-- `src/tasks/tasks.controller.ts`：接收请求。
-- `src/tasks/tasks.service.ts`：通过 Mongoose Model 读写 MongoDB 中的任务。
-- `src/tasks/tasks.module.ts`：注册并组织 Controller 和 Service。
+## 运行前提
 
-任务保存在 MongoDB，重启后端后仍然保留。标题两端空白会被去除，长度为 1–120，守卫放行后的非法参数返回 400。
+启动后端前，先按根 README 准备 MongoDB，并配置 `backend/.env` 中的 `MONGODB_URI`；变量示例见 [`.env.example`](./.env.example)。`DatabaseModule` 使用 `ConfigService.getOrThrow` 取得连接地址，缺少配置会阻止启动，仅安装 npm 依赖并不足以运行后端。
 
-编辑接口要求路径 id 和请求体 title：id 通过 ParseUUIDPipe 校验 UUID v4，title 通过 EditTaskDto 校验。请求体只接受 title；重复传 id 或额外提交 completed、createdAt 等字段会返回 400。合法 id 对应的任务不存在时返回 404。缺少路径 id 时，编辑和删除请求不匹配路由，返回 404。
+任务已存入 MongoDB，重启后端不会清空任务。当前写入守卫使用公开的学习演示值，不代表已实现用户登录或用户级权限。
 
-删除由 `@Delete(':id')` 匹配请求，Service 使用 findOneAndDelete 原子查找并删除；没有找到任务则返回 404。删除失败不会误删其他任务，也不会改变统计数量。
+## 请求和数据的职责边界
 
-## 守卫学习：控制任务写入
+| 入口 | 职责 |
+| --- | --- |
+| [main.ts](./src/main.ts) | 创建 Nest 应用、应用公共配置并监听本机端口 |
+| [app.setup.ts](./src/app.setup.ts) | 设置 `/api` 前缀、全局 ValidationPipe 和退出钩子；测试复用此配置 |
+| [tasks.controller.ts](./src/tasks/tasks.controller.ts) | 声明 HTTP 路由、参数来源和方法级守卫 |
+| [tasks.service.ts](./src/tasks/tasks.service.ts) | 通过 Mongoose Model 查询和修改任务，并映射公开响应 |
+| [tasks.module.ts](./src/tasks/tasks.module.ts) | 注册任务模型、Controller、Service 和 Guard，导出 TasksService |
+| [database.module.ts](./src/database/database.module.ts) | 根据环境配置建立 MongoDB 连接 |
+| [task.schema.ts](./src/tasks/schemas/task.schema.ts) | 定义 MongoDB 文档字段、默认值和模型层校验 |
 
-中文文档位置：[概述 → 守卫](https://docs.nestjs.cn/overview/guards/)，重点阅读授权守卫、执行上下文和绑定守卫。
+DTO 描述 HTTP 输入，Schema 描述数据库存储，公开响应描述客户端能够看到的数据。`TasksService.toTask()` 保留公开 UUID 和前端使用的字段，不直接返回 MongoDB 的内部字段。数据库查询是异步的，Controller 返回 Promise 后由 Nest 等待完成并发送响应。
 
-- `src/tasks/guards/task-write.guard.ts`：canActivate 读取请求头，返回 true 放行，false 由 Nest 转换为 403。
-- `src/tasks/tasks.module.ts`：在 providers 中注册 TaskWriteGuard。
-- `src/tasks/tasks.controller.ts`：用方法级 @UseGuards 绑定创建、编辑、删除接口；查询任务和统计保持开放。
-- 任务写入请求需要 `X-Learning-Key: awei-learning`。这是公开学习演示值，用来观察执行流程，后续登录课程再替换为真实凭证校验。
-- 前端已在写入请求中携带该请求头；手动 curl 测试时需要自己添加。
+编辑与删除通过路径参数取得任务标识；请求体由具体 DTO 类负责校验。`EditTaskDto` 继承 `CreateTaskDto` 的运行时校验规则，而 `Partial<T>` 仅在 TypeScript 编译阶段存在，不能验证网络输入。输入边界的具体规则统一见系统基线 SPEC。
 
-先发送不带演示密钥的请求，观察 403 和终端中的“守卫拒绝”日志：
+建议结合源码阅读：[CreateTaskDto](./src/tasks/dto/create-task.dto.ts) → [EditTaskDto](./src/tasks/dto/edit-task.dto.ts) → [Controller](./src/tasks/tasks.controller.ts) → [Service](./src/tasks/tasks.service.ts) → [公共配置](./src/app.setup.ts)。
 
-```bash
-curl -i -X POST http://127.0.0.1:3000/api/tasks \
-  -H 'Content-Type: application/json' \
-  -d '{"title":"学习守卫"}'
-```
+## 守卫与请求日志
 
-再添加 `-H 'X-Learning-Key: awei-learning'` 发送同样请求，观察 201 和“守卫放行”日志。日志顺序是“中间件请求开始 → 守卫检查 → 中间件请求结束”，通过相同请求编号关联。
+[TaskWriteGuard](./src/tasks/guards/task-write.guard.ts) 读取请求头，决定是否继续执行；它不处理任务业务。[TasksController](./src/tasks/tasks.controller.ts) 通过方法级 `@UseGuards` 将它用于写入操作，查询保持开放。演示请求头与错误状态以系统基线 SPEC 为准。
 
-把 title 改成数字：不带密钥时先被守卫拒绝为 403；带正确密钥时继续执行 ValidationPipe，返回 400。这说明守卫在管道之前运行。
+守卫在参数管道之前执行，因此同一个非法请求可能先被守卫拒绝，只有放行后才进入 DTO 和路径参数校验。这个顺序已由 [HTTP 测试](./test/tasks.e2e.test.mjs) 覆盖。
 
-## 全局异常过滤器学习
+[RequestLoggerMiddleware](./src/common/middleware/request-logger.middleware.ts) 为请求生成编号，写入 `X-Request-Id` 响应头，记录开始与结束日志。它使用响应的 `finish` 事件获取最终状态码和耗时；调用 `next()` 只是放行，不能据此判断业务已执行完成。
 
-中文文档位置：[概述 → 异常过滤器](https://docs.nestjs.cn/overview/exception-filters/)，重点阅读绑定过滤器和捕获所有异常。
+## 全局异常处理
 
-1. `src/common/filters/all-exceptions.filter.ts`：@Catch() 接住 HTTP 请求中未被处理的异常；catch 方法保留 HttpException 的状态码和错误字段，补充 path、requestId。
-2. `src/app.module.ts`：使用 APP_FILTER 和 useClass 注册全局过滤器，所有 Controller 都生效。
-3. `src/common/middleware/request-logger.middleware.ts`：正常复用其中生成的 X-Request-Id；未经过此中间件的错误请求由过滤器补编号，响应头和错误响应体中的编号一致。
+[AllExceptionsFilter](./src/common/filters/all-exceptions.filter.ts) 通过 `@Catch()` 捕获 HTTP 请求中未处理的异常，并在 [AppModule](./src/app.module.ts) 中使用 `APP_FILTER` 注册为全局过滤器。
 
-成功响应保持原来的数据结构；错误响应保留原来的 message 字符串或数组，前端可以继续使用现有错误处理。未知异常响应 500 和通用错误消息，内部堆栈记录在后端。
+过滤器保留已知 HTTP 异常的状态码与消息，补充请求路径和请求编号。未知异常的内部堆栈留在后端日志，客户端收到通用错误信息；没有经过请求日志中间件的异常也会补上请求编号。成功响应不经过额外的数据包装。
 
-可以自行验证：不带演示密钥创建任务返回 403；带正确密钥但 title 为数字返回 400；查询 `/api/not-found` 返回 404。每个错误响应都增加 path、requestId，可以用请求编号关联终端里的日志。
+## 多模块协作
 
-## 多模块阅读顺序
-
-1. `src/tasks/tasks.module.ts`：exports 公开 TasksService。
-2. `src/system/system.module.ts`：注册并导出 SystemService，这个模块可以只提供服务。
-3. `src/stats/stats.module.ts`：imports 同时导入 TasksModule、SystemModule，只注册自己的 StatsService。
-4. `src/stats/stats.service.ts`：构造函数用两个参数分别注入服务，调用 count() 和 getUptimeSeconds()。
-5. `src/stats/stats.controller.ts`：GET /api/stats 的 HTTP 入口。
-6. `src/app.module.ts`：组合三个模块。
+[StatsModule](./src/stats/stats.module.ts) 显式导入 TasksModule 和 SystemModule，只注册自己的 StatsService。[StatsService](./src/stats/stats.service.ts) 分别注入两个模块导出的 Service，聚合任务数量和后端运行时长。
 
 ```text
 StatsController → StatsService → TasksService.count()
-                                 ↑
+                              └→ SystemService.getUptimeSeconds()
 TasksController → TasksService.create/edit/remove()
 ```
 
-两条调用链共享同一个 TasksService 实例，所以创建两条任务后统计为 2，编辑后仍为 2，删除一条后为 1。统计模块不额外保存任务数组。
-
-多参数构造函数是标准的依赖注入用法：
+统计与任务接口复用 TasksService，查询同一个 MongoDB 集合。统计模块不保存任务副本，也不重新注册其他模块的 Service。仅在 AppModule 导入这些模块，并不能代替 StatsModule 对其依赖的显式声明。
 
 ```ts
 constructor(
@@ -82,10 +64,19 @@ constructor(
 ) {}
 ```
 
-每个参数都会被保存为实例属性。Nest 根据参数类型解析依赖并传入现有的 Service 实例，不是把 Module 类当作参数传入。
+这里注入的是 Service 实例，`private readonly` 参数属性将实例保存到当前对象。Module 在启动时组织依赖，不是每次 HTTP 请求都要经过的一层业务处理。
 
-装饰器和全局校验配置均已添加中文注释。建议按顺序阅读：`src/tasks/dto/create-task.dto.ts` → `edit-task.dto.ts` → `src/tasks/tasks.controller.ts` → `src/tasks/tasks.service.ts` → `src/app.setup.ts`。
+## 验证方式
 
-`npm test` 会构建项目并使用独立临时数据库验证实际 HTTP 接口，结束后清理测试数据库；`npm run build` 生成生产构建，`npm run start:prod` 运行构建结果。
+在 `backend/` 目录执行：
 
-默认端口 3000，可用环境变量 PORT 修改。完整课程见上一级 README。
+```bash
+npm run build
+npm test
+```
+
+`npm test` 本身会先构建，再用 Node.js 测试运行器执行 [tasks.e2e.test.mjs](./test/tasks.e2e.test.mjs)；只需验证 HTTP 行为时直接运行 `npm test`，无需重复构建。`npm run test:e2e` 调用同一测试入口。可用脚本以 [package.json](./package.json) 为准。
+
+测试连接 `MONGODB_URI` 指定的 MongoDB 服务，每个用例使用随机命名的 `awei_e2e_*` 数据库和临时 HTTP 端口。结束时先核对数据库名称，再删除该用例数据库并关闭连接。运行前需要可访问的开发或测试 MongoDB，以及创建和删除这些临时数据库的权限。
+
+现有测试覆盖任务增删改查、输入校验、守卫执行顺序、错误响应和跨模块统计；测试文件的存在不代表本次变更已验证。每次执行的结果和未验证项按根规范记录到对应任务，不能用构建通过代替 HTTP 测试通过。

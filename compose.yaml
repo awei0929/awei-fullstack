@@ -1,0 +1,33 @@
+name: awei
+
+services:
+  mongodb:
+    # 固定版本系列，避免 latest 自动切换到另一个大版本。
+    image: mongo:8.0
+    restart: unless-stopped
+    ports:
+      # 只映射到本机；本机运行的 NestJS 通过 127.0.0.1:27017 连接。
+      - "127.0.0.1:27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:?set MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD}
+    volumes:
+      # 数据放在命名卷中，重建容器或重启后端不会清空数据。
+      - mongodb_data:/data/db
+    healthcheck:
+      # $$ 表示留给容器内的 shell 展开环境变量，而不是让 Compose 提前替换。
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --host 127.0.0.1
+          --username "$${MONGO_INITDB_ROOT_USERNAME}"
+          --password "$${MONGO_INITDB_ROOT_PASSWORD}"
+          --authenticationDatabase admin
+          --eval 'quit(db.adminCommand({ ping: 1 }).ok ? 0 : 1)'
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+volumes:
+  mongodb_data:

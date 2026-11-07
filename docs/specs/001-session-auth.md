@@ -1,6 +1,6 @@
 # SPEC-001：弹窗注册登录与私有任务
 
-- 状态：已验证；原认证功能、模块整理及用户确认的3–5位账号规则均已完成必要验证，准备提交推送。
+- 状态：已验证；认证功能、模块整理及3–5位账号规则已提交并推送GitHub，功能提交6680afe。
 - 更新日期：2026-11-07（Asia/Shanghai）。
 - 基准：bd2b983，开始时工作区干净。前置：[SPEC-000](000-current-system.md)。
 - OpenSpec：add-session-auth；本文件是需求、设计、实施清单和验证的唯一正文。
@@ -155,7 +155,7 @@ User = `{ id: UUID, account: string }`；SessionView = `{ user: User | null, csr
 - 兼容性：账号继续是保留前导零的字符串。已有数据库不清空、不改名；1–2位历史账号不满足新登录输入要求，本次不执行数据迁移。
 - [x] T4a：统一后端与前端3–5位规则，测试覆盖3/4/5位通过、1/2/6位拒绝、前导零保持独立、用户隔离回归。
 - [x] T4b：运行后端完整HTTP、前端lint/build和针对本次表单/解析边界的检查；独立审查本次差异，更新当前文档和STATE。
-- [ ] T4c：核对提交范围与敏感文件，提交到当前main并普通推送origin/main，验证远程提交与本地一致；不归档OpenSpec、不部署。
+- [x] T4c：核对提交范围与敏感文件，提交到当前main并普通推送origin/main，验证远程提交与本地一致；不归档OpenSpec、不部署。
 
 原提交前测试：42项中40通过、2失败；失败原因是测试仍用1位合法账号，而DTO已是3–5位。修订后仍保留42项HTTP测试并全部通过（`npm test --prefix backend`，日志 `/tmp/nest-github-account-3-5-backend.log`）；增加1/2位拒绝及3/4/5位合法数据，保留前导零与用户隔离覆盖。
 
@@ -164,3 +164,5 @@ User = `{ id: UUID, account: string }`；SessionView = `{ user: User | null, csr
 - 本轮日期跨至2026-11-07；提交与远程同步结果见STATE及Git记录。
 
 - 3–5位规则最终独立审查通过：DTO、Schema、账号限流、响应解析、表单提示与HTTP夹具一致，无遗漏或阻塞，未重复运行测试。
+
+- 提交结果（2026-11-07）：功能提交 `6680afe` 已普通推送至 `awei0929/awei-fullstack` 的 `main`；真实环境配置未入库，无部署、强制推送或OpenSpec归档。

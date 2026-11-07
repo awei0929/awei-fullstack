@@ -1,6 +1,8 @@
 import { Transform } from 'class-transformer';
 import { IsString, MaxLength, MinLength } from 'class-validator';
 
+// DTO 是运行时类：全局 ValidationPipe 读取装饰器，拒绝未声明字段并返回 400。
+// 这里只声明用户可以填写的标题；id、ownerId、状态和时间都由服务端决定。
 export class CreateTaskDto {
   // @Transform 登记字段转换逻辑：请求体转换成 DTO 时，去掉标题两端空白。
   // ({ value }) 是参数解构，value 是当前字段值；回调的返回值就是转换后的字段值。

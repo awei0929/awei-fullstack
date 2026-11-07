@@ -1,10 +1,32 @@
-export async function request<T>(path: string, options?: RequestInit): Promise<T> {
+export class HttpError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'HttpError'
+    this.status = status
+  }
+}
+
+interface RequestOptions extends RequestInit {
+  csrfToken?: string
+}
+
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { csrfToken, ...init } = options
+  const headers = new Headers(init.headers)
+  if (csrfToken) headers.set('X-CSRF-Token', csrfToken)
   let response: Response
 
   try {
-    response = await fetch(`/api${path}`, options)
+    response = await fetch(`/api${path}`, {
+      ...init,
+      headers,
+      credentials: 'same-origin',
+      cache: 'no-store',
+    })
   } catch {
-    throw new Error('无法连接服务，请确认前后端都已启动')
+    throw new Error('无法连接服务，请检查网络后重试')
   }
 
   const body: unknown = await response.json().catch(() => null)
@@ -13,12 +35,13 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     const message = body && typeof body === 'object' && 'message' in body
       ? body.message
       : null
-    throw new Error(
+    throw new HttpError(
       Array.isArray(message)
         ? message.join('；')
         : typeof message === 'string'
           ? message
-          : `请求失败（${response.status}），请检查后端服务`,
+          : `请求失败（${response.status}），请稍后重试`,
+      response.status,
     )
   }
 

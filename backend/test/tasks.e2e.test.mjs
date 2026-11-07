@@ -3,59 +3,33 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { HttpException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { getConnectionToken } from '@nestjs/mongoose';
-import { Test } from '@nestjs/testing';
-import { createConnection } from 'mongoose';
-import { AppModule } from '../dist/app.module.js';
-import { configureApp } from '../dist/app.setup.js';
-import { TASK_WRITE_DEMO_KEY } from '../dist/tasks/guards/task-write.guard.js';
+import { startApp, stopApp, client } from './helpers/app.mjs';
 import { TasksService } from '../dist/tasks/tasks.service.js';
 
-const writeHeaders = { 'X-Learning-Key': TASK_WRITE_DEMO_KEY };
+let writeHeaders;
 
+// 保留原任务CRUD的输入/错误回归，但所有私有请求都先使用真实注册会话。
 describe('任务 HTTP 接口', () => {
   let app;
   let baseUrl;
-  let connection;
-  let testDatabaseName;
+  let state;
+  let user;
+  // Node fetch不会像浏览器那样自动管理Cookie，这个局部包装仅补上当前测试用户的Cookie。
+  const rawFetch = globalThis.fetch;
+  const fetch = (url, options = {}) => rawFetch(url, {
+    ...options, headers: { Cookie: user.cookie, ...options.headers },
+  });
 
+  // 每个用例从干净的个人清单开始，避免测试执行顺序影响结果。
   beforeEach(async () => {
-    app = undefined;
-    connection = undefined;
-    // 每个用例使用独立的临时数据库，不依赖“重启后内存清空”，也不修改 awei 数据库。
-    testDatabaseName = `awei_e2e_${randomUUID().replaceAll('-', '')}`;
-    const testingModule = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(getConnectionToken())
-      .useFactory({
-        inject: [ConfigService],
-        factory: async (configService) => {
-          connection = await createConnection(configService.getOrThrow('MONGODB_URI'), {
-            dbName: testDatabaseName,
-            serverSelectionTimeoutMS: 5000,
-          }).asPromise();
-          return connection;
-        },
-      })
-      .compile();
-    app = testingModule.createNestApplication({ logger: false });
-    configureApp(app);
-    await app.listen(0, '127.0.0.1');
-    baseUrl = await app.getUrl();
+    state = await startApp();
+    ({ app, baseUrl } = state);
+    user = client(state);
+    await user.register();
+    writeHeaders = { 'X-CSRF-Token': user.csrfToken };
   });
 
-  afterEach(async () => {
-    try {
-      if (connection) {
-        // 只清理本用例随机生成的数据库，连接不匹配时直接报错。
-        assert.equal(connection.name, testDatabaseName);
-        await connection.dropDatabase();
-      }
-    } finally {
-      if (app) await app.close();
-      else await connection?.close();
-    }
-  });
+  afterEach(async () => { await stopApp(state); });
 
   async function createTask(body) {
     return fetch(`${baseUrl}/api/tasks`, {
@@ -93,6 +67,7 @@ describe('任务 HTTP 接口', () => {
     });
   }
 
+  // 统一断言错误合同与请求编号，防止只断言状态码而漏掉异常过滤器回归。
   async function readError(response, status, path) {
     assert.equal(response.status, status);
     const error = await response.json();
@@ -110,10 +85,10 @@ describe('任务 HTTP 接口', () => {
     assert.equal((await getStats()).total, 0);
   });
 
-  it('缺少或错误的演示密钥拒绝所有任务写入，已有数据和统计保持不变', async () => {
+  it('缺少或错误的CSRF令牌拒绝所有任务写入，已有数据和统计保持不变', async () => {
     const original = await createTask({ title: '守卫需要保护的任务' }).then((response) => response.json());
 
-    for (const headers of [{}, { 'X-Learning-Key': 'wrong-key' }]) {
+    for (const headers of [{}, { 'X-CSRF-Token': 'wrong-token' }]) {
       for (const method of ['POST', 'PUT', 'DELETE']) {
         const path = method === 'POST' ? '/api/tasks' : `/api/tasks/${original.id}`;
         const response = await fetch(`${baseUrl}${path}`, {
@@ -122,7 +97,7 @@ describe('任务 HTTP 接口', () => {
           ...(method === 'DELETE' ? {} : { body: JSON.stringify({ title: '不应写入' }) }),
         });
         const error = await readError(response, 403, path);
-        assert.equal(error.message, 'Forbidden resource');
+        assert.equal(error.message, 'CSRF令牌无效');
         // 中间件先于守卫执行，因此拒绝响应也带有请求编号。
         assert.ok(response.headers.get('x-request-id'));
         assert.deepEqual(await listTasks(), [original]);
@@ -133,7 +108,7 @@ describe('任务 HTTP 接口', () => {
 
   it('守卫先于参数管道执行，放行后才校验请求体和路径 id', async () => {
     for (const headers of [{}, writeHeaders]) {
-      const expectedStatus = headers['X-Learning-Key'] ? 400 : 403;
+      const expectedStatus = headers['X-CSRF-Token'] ? 400 : 403;
       const invalidBody = await fetch(`${baseUrl}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers },

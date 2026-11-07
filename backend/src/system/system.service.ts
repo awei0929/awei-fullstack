@@ -8,6 +8,7 @@ export class SystemService {
 
   getUptimeSeconds(): number {
     // 返回后端应用本次运行的秒数，重启后会重新计时。
+    // 每次调用按时间差即时计算，无需定时器；这与 MongoDB 中任务和 Session 的持久化无关。
     return Math.floor((Date.now() - this.startedAt) / 1000);
   }
 }

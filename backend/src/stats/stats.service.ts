@@ -16,12 +16,14 @@ export class StatsService {
     private readonly systemService: SystemService,
   ) {}
 
-  async getOverview(): Promise<TaskStats> {
+  async getOverview(ownerId: string): Promise<TaskStats> {
     // 通过任务模块公开的方法查询数据库，不在统计模块额外保存任务副本。
     // 统计服务在这里聚合两个模块公开的能力，返回给同一个统计接口。
+    // ownerId 必须继续传给任务服务；跨模块复用 Service 不会自动附带当前请求的身份。
     return {
       // 必须 await：否则 total 会变成一个 Promise，而不是接口需要的数字。
-      total: await this.tasksService.count(),
+      total: await this.tasksService.count(ownerId),
+      // 运行时长是本次应用实例的数据，不是当前用户在线时长，也不是持久化数据。
       uptimeSeconds: this.systemService.getUptimeSeconds(),
     };
   }

@@ -1,60 +1,51 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, UseGuards } from '@nestjs/common';
-import { TaskWriteGuard } from './guards/task-write.guard.js';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
+import { SessionGuard } from '../auth/guards/session.guard.js';
+import { CsrfGuard } from '../auth/guards/csrf.guard.js';
 import { CreateTaskDto } from './dto/create-task.dto.js';
 import { EditTaskDto } from './dto/edit-task.dto.js';
 import { TasksService } from './tasks.service.js';
 import type { Task } from './task.type.js';
 
-// @Controller 声明这个类处理 tasks 路径，结合全局前缀得到 /api/tasks。
+// Controller 负责把 HTTP 输入交给业务服务；全局 /api 前缀与这里组合成 /api/tasks。
+// 类上的守卫覆盖全部方法，先确认会话并写入 request.authUser，游客不能读取个人任务。
 @Controller('tasks')
+@UseGuards(SessionGuard)
 export class TasksController {
-  // Nest 根据构造参数类型注入 TasksService，无需手动 new。
-  // private readonly 同时声明并保存一个实例属性，限制重新赋值这个属性。
+  // Nest 注入 TasksModule 注册的服务，Controller 不自行 new 服务，也不直接操作数据库。
   constructor(private readonly tasksService: TasksService) {}
 
-  // @Get 将下面的方法绑定到 GET /api/tasks；方法名可以自行命名。
-  // 查询没有绑定写入守卫，因此不需要携带演示密钥。
+  // @Get() 匹配 GET /api/tasks；@Req() 读取已通过守卫的请求对象。
   @Get()
-  // 数据库操作是异步的；Nest 会等待 Promise 完成，再把结果作为 JSON 返回。
-  findAll(): Promise<Task[]> {
-    return this.tasksService.findAll();
+  findAll(@Req() request: Request): Promise<Task[]> {
+    // 用户身份来自服务端 Session，不能从客户端查询参数或请求体指定。
+    return this.tasksService.findAll(request.authUser!.id);
   }
 
-  // @Post 绑定 POST /api/tasks，默认成功状态码为 201。
-  // @Body 指定参数来自整个 JSON 请求体；校验由 ValidationPipe 按 DTO 规则执行。
+  // 类级认证先于方法级CSRF，最后才执行DTO/路径校验。
+  // @Post() 默认成功状态为 201；@Body() 配合 DTO 类让全局管道执行转换和校验。
   @Post()
-  // @UseGuards 将守卫绑定到当前方法；只有守卫放行，才校验参数并执行 create。
-  @UseGuards(TaskWriteGuard)
-  create(@Body() input: CreateTaskDto): Promise<Task> {
-    return this.tasksService.create(input);
+  @UseGuards(CsrfGuard)
+  create(@Req() request: Request, @Body() input: CreateTaskDto): Promise<Task> {
+    return this.tasksService.create(request.authUser!.id, input);
   }
 
-  // @Put 绑定 PUT /api/tasks/:id，默认成功状态码为 200。
-  // 它负责路由匹配，实际查找和修改任务由 Service 完成。
+  // 路径 id 和请求体各有职责：ParseUUIDPipe 检查定位参数，EditTaskDto 检查可编辑字段。
+  // UUID 格式正确不代表属于当前用户，归属检查仍由 Service 的数据库过滤完成。
   @Put(':id')
-  // 编辑与创建共用同一个守卫，避免在各个业务方法中重复检查访问资格。
-  @UseGuards(TaskWriteGuard)
+  @UseGuards(CsrfGuard)
   edit(
-    // @Param('id') 提取路径中的 id；ParseUUIDPipe 校验这个路径参数是否为 UUID v4。
-    // 路径参数与请求体是两份输入，校验 Body 的 DTO 不会顺便校验这里的 id。
+    @Req() request: Request,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    // 编辑 DTO 只校验请求体中的 title，id 已经放在路径中。
     @Body() input: EditTaskDto,
   ): Promise<Task> {
-    return this.tasksService.edit(id, input);
+    return this.tasksService.edit(request.authUser!.id, id, input);
   }
 
-  // @Delete 的首字母大写，其余小写；它匹配 HTTP DELETE /api/tasks/:id。
-  // HTTP 方法名叫 DELETE，但 NestJS 导出的装饰器名叫 Delete。
+  // DELETE 只接收路径 id，返回被删除的公开任务，前端据此移除对应列表项。
   @Delete(':id')
-  // 方法级绑定仅保护当前接口；如果放在 Controller 类上，则保护该类的所有接口。
-  @UseGuards(TaskWriteGuard)
-  remove(
-    // 删除同样从 URL 取得 id，格式错误会在进入业务方法前返回 400。
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-  ): Promise<Task> {
-    // Controller 只处理 HTTP 参数，删除和“不存在”的判断交给 Service。
-    // 返回任务对象，因此成功状态码使用默认的 200，而不是无响应体的 204。
-    return this.tasksService.remove(id);
+  @UseGuards(CsrfGuard)
+  remove(@Req() request: Request, @Param('id', new ParseUUIDPipe({ version: '4' })) id: string): Promise<Task> {
+    return this.tasksService.remove(request.authUser!.id, id);
   }
 }

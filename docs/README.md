@@ -13,6 +13,8 @@
 | 后端/前端具体约定 | [后端](../backend/AGENTS.md) / [前端](../frontend/AGENTS.md) |
 | 如何编写功能规格 | [SPEC 规范](../SPEC.md) / [模板](specs/TEMPLATE.md) |
 | 当前接口与行为基线 | [SPEC-000](specs/000-current-system.md) |
+| 弹窗注册登录、会话与私有任务 | [SPEC-001](specs/001-session-auth.md) |
+| 用户/认证模块边界与目录组织 | [SPEC-002](specs/002-auth-module-organization.md) |
 | 当前进度、已验证事项与下一步 | [STATE](ai/STATE.md) |
 
 项目事实变化时更新对应文档，再更新 STATE 的摘要与核对日期。

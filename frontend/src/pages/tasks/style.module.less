@@ -11,7 +11,11 @@
 .brand { display: flex; gap: 13px; align-items: center; text-decoration: none; font-weight: 600; font-size: 16px; }
 .brandIcon { width: 34px; height: 34px; display: grid; place-items: center; background: #21634d; color: #fff; border-radius: 10px; font-size: 25px; font-family: Georgia, serif; font-style: italic; }
 .brandDivider { padding: 0 8px; color: #bcc6bf; font-weight: 400; }
-.lesson { color: #6c7c72; font-size: 11px; font-weight: 600; letter-spacing: .13em; }
+.accountControls { display: flex; align-items: center; gap: 14px; }
+.account { color: #5d7064; font-size: 13px; font-variant-numeric: tabular-nums; }
+.sessionAlert { margin-bottom: 24px; }
+.sessionState { min-height: 240px; padding: 40px 26px; display: grid; align-content: center; gap: 16px; text-align: center; color: #758077; }
+.sessionState p { margin: 0; }
 .main { max-width: 1168px; margin: 0 auto; padding: 60px 24px 32px; }
 .intro { margin-bottom: 34px; }
 .eyebrow { color: #21634d; font-size: 13px; font-weight: 600; margin: 0 0 12px; }
@@ -23,7 +27,7 @@
 .statsValue span { font-size: 13px; font-weight: 400; color: #849085; }
 .statsDescription { color: #7a857c; font-size: 12px; line-height: 1.8; text-align: right; }
 .statsDescription p { margin: 0 0 5px; }
-.statsDescription code { color: #50725a; font-size: 11px; }
+.statsDescription :global(.ant-tag) { margin: 0 0 8px; }
 .statsError { flex-basis: 100%; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; align-items: start; }
 .panel { background: #fff; border: 1px solid #e1e7df; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 22px #1c3a2c03; }
@@ -40,20 +44,15 @@
 .taskDot { width: 10px; height: 10px; flex-shrink: 0; border: 2px solid #b2c9b9; border-radius: 50%; }
 .taskContent { flex: 1; min-width: 0; }
 .taskActions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px; flex-shrink: 0; max-width: 160px; }
-.taskActions :global(.ant-tag) { margin-inline-end: 0; }
 .deleteDescription { overflow-wrap: anywhere; line-height: 1.8; }
 .taskTitle { margin: 0 0 6px; font-weight: 500; line-height: 1.7; overflow-wrap: anywhere; }
 .time { color: #8b948c; font-size: 11px; }
-.panelFooter { border-top: 1px solid #edf0eb; background: #fbfcfa; padding: 14px 26px; display: flex; gap: 10px; align-items: center; color: #839086; font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.method { font-weight: 700; font-size: 10px; color: #367151; background: #eaf2e9; padding: 3px 6px; border-radius: 4px; }
-.post { color: #8b6b27; background: #f5f0df; }
+.panelFooter { border-top: 1px solid #edf0eb; background: #fbfcfa; padding: 14px 26px; display: flex; gap: 10px; align-items: center; color: #839086; font-size: 12px; line-height: 1.8; }
 .formBody { padding: 24px 26px 18px; }
 .formDescription { color: #7a857c; margin: 0 0 25px; line-height: 1.7; }
 .hint { font-size: 12px; color: #8b948c; line-height: 1.9; margin: 20px 0 0; }
 .alert { margin: 16px; }
 .formBody .alert { margin: 0 0 16px; }
-.footer { margin-top: 30px; color: #909b92; line-height: 2; font-size: 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-.footer span { color: #b0bbb2; }
 @media (max-width: 760px) {
   .header { height: 68px; padding: 0 20px; }
   .main { padding: 36px 16px 24px; }
@@ -66,5 +65,18 @@
   .panelFooter { padding: 14px 20px; }
   .brand { gap: 9px; font-size: 14px; }
   .brandDivider { padding: 0 4px; }
-  .lesson { font-size: 10px; }
+  .accountControls { gap: 8px; }
+  .account { font-size: 12px; }
+}
+@media (max-width: 400px) {
+  .header { padding: 0 16px; }
+  .brand { font-size: 12px; gap: 7px; }
+  .brandIcon { width: 28px; height: 28px; font-size: 21px; }
+  .brandDivider { padding: 0 2px; }
+  .accountControls { gap: 5px; }
+  .accountControls :global(.ant-btn) { padding-inline: 10px; }
+  .taskRow { gap: 9px; }
+  .taskActions { gap: 0; max-width: 94px; }
+  .sessionState { padding: 24px 16px; }
+  .sessionState :global(.ant-alert) { flex-wrap: wrap; text-align: left; row-gap: 12px; }
 }

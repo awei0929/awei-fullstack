@@ -1,16 +1,18 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
+import { SessionGuard } from '../auth/guards/session.guard.js';
 import { StatsService } from './stats.service.js';
 import type { TaskStats } from './stats.type.js';
 
-// @Controller 为统计接口声明路径，结合全局前缀得到 /api/stats。
+// GET /api/stats 是个人统计；会话守卫先确认用户，未登录时不执行统计查询。
 @Controller('stats')
+@UseGuards(SessionGuard)
 export class StatsController {
-  // 注入统计模块自己的 Service，跨模块调用放在 Service 中完成。
+  // Controller 只负责 HTTP 入口，组合多个数据来源的工作交给 StatsService。
   constructor(private readonly statsService: StatsService) {}
-
-  // @Get() 匹配 GET /api/stats，默认成功状态为 200。
   @Get()
-  getOverview(): Promise<TaskStats> {
-    return this.statsService.getOverview();
+  getOverview(@Req() request: Request): Promise<TaskStats> {
+    // authUser 由守卫写入，客户端不能通过参数统计他人的任务数量。
+    return this.statsService.getOverview(request.authUser!.id);
   }
 }

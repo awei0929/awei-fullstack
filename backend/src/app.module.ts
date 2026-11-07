@@ -1,3 +1,7 @@
+import { AuthModule } from './auth/auth.module.js';
+import { AuthController } from './auth/auth.controller.js';
+import { PublicModule } from './public/public.module.js';
+import { PublicController } from './public/public.controller.js';
 import { Module } from '@nestjs/common';
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -14,7 +18,7 @@ import { SystemModule } from './system/system.module.js';
 
 // @Module 标记应用根模块，NestFactory.create(AppModule) 从这里开始组织依赖。
 @Module({
-  // imports：把任务模块的功能接入应用；模块主要负责组装，不是每次请求的处理步骤。
+  // imports：接入数据库、认证、公共示例与任务模块；声明的是依赖关系，不是请求执行顺序。
   imports: [
     // forRoot 读取 backend/.env；isGlobal 使各模块可以注入 ConfigService。
     ConfigModule.forRoot({
@@ -22,6 +26,8 @@ import { SystemModule } from './system/system.module.js';
       envFilePath: fileURLToPath(new URL('../.env', import.meta.url)),
     }),
     DatabaseModule,
+    AuthModule,
+    PublicModule,
     TasksModule,
     SystemModule,
     StatsModule,
@@ -41,8 +47,8 @@ export class AppModule implements NestModule {
     consumer
       // apply 指定要执行的中间件；绑定后由 Nest 管理它的实例。
       .apply(RequestLoggerMiddleware)
-      // forRoutes 指定生效的 Controller，包含它们的 GET、POST、PUT、DELETE 等路由。声明全局是 "*""，但不推荐，因为会记录健康检查等无关请求。
+      // forRoutes 指定需要记录的 Controller，包含它们全部HTTP方法；不打印密码、Cookie或请求体。
       // 全局 /api 前缀由 Nest 统一处理，不需要在这里重复拼写。
-      .forRoutes(TasksController, StatsController);
+      .forRoutes(TasksController, StatsController, AuthController, PublicController);
   }
 }

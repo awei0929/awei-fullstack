@@ -1,297 +1,159 @@
-# awei 全栈练习：任务管理与跨模块统计
+# awei：个人任务管理
 
-这是给有前端经验、已完成 NestJS 基础学习的开发者准备的全栈练习。前后端在同一个仓库中，各自安装依赖和运行；后续重点是工程设计、功能规格和验证。
+React + NestJS + MongoDB 全栈练习。游客可以浏览只读示例；注册或登录后管理自己的任务。
 
-- `frontend/`：React 18、TypeScript、Vite、MobX、React Router、Ant Design、Less Modules。
-- `backend/`：NestJS、TypeScript、Mongoose、TasksModule、SystemModule、StatsModule。
-- 当前支持查询、创建、编辑、删除和任务统计，任务保存在 MongoDB 中，重启后端后仍保留。
-- `compose.yaml`：使用 Docker Compose 启动本地 MongoDB，数据保存在命名卷中。
+- 单一普通用户角色，数字账号、密码注册登录；登录与注册使用同一个弹窗。
+- 注册成功自动登录；页面刷新恢复会话；退出后回到公共示例。
+- 每个用户只查看和管理自己的任务，任务列表和统计均由后端按用户过滤。
+- 使用 MongoDB 保存用户、任务与 Session；不接入验证码、邮箱、短信或自助找回密码。
+- 新功能的完整合同、边界和实际验收状态见 [SPEC-001](docs/specs/001-session-auth.md)。当前进度见 [STATE](docs/ai/STATE.md)。
 
-## AI 开发与跨会话接续
+## 开发入口
 
-- [AGENT.md](AGENT.md)：通用工作规则、读取顺序、验证与交接方式；[AGENTS.md](AGENTS.md) 是工具入口。
-- [文档导航](docs/README.md) / [架构概览](docs/architecture/overview.md)：按职责读取项目知识。
-- [SPEC 规范](SPEC.md) / [功能模板](docs/specs/TEMPLATE.md) / [当前系统基线](docs/specs/000-current-system.md)：定义功能范围和验收标准。
-- [STATE](docs/ai/STATE.md)：当前任务、实际验证结果、未决事项与下一步。
+- [AGENT](AGENT.md) / [AGENTS](AGENTS.md)：项目规范和工具入口。
+- [文档导航](docs/README.md) / [架构概览](docs/architecture/overview.md)。
+- [SPEC 规范](SPEC.md) / [当前系统基线](docs/specs/000-current-system.md)。
+- [OpenSpec 与 Superpowers 配置](docs/ai/TOOLING.md)：引用同一份 SPEC，不维护重复规格。
 
-开启新会话或切换模型时，以整个项目根目录为工作区，让工具读取 `AGENT.md`、`docs/ai/STATE.md`、当前 SPEC 和涉及目录的 `AGENTS.md`，先核对 Git 状态再继续。完整启动提示在 AGENT.md。文档保存在工作区并随代码版本管理；不同工具需要访问同一版本文件，不能假定它们自动共享聊天历史。
+## 环境准备
 
-## 目录与改动记录
-
-```text
-frontend/                 前端项目
-  src/pages/tasks/        任务页面
-  src/api/                接口请求
-  src/store/              状态管理
-backend/                  后端项目
-  src/tasks/              任务接口、业务、校验和数据库 Schema
-  src/database/           MongoDB 连接
-  src/stats/              任务统计
-  src/system/             后端运行时长
-  src/common/             请求日志、异常处理
-  test/                   HTTP 接口测试
-compose.yaml              本地数据库配置
-.env.example              环境变量示例，不含真实密码
-```
-
-在项目根目录查看新增文件、修改和提交记录：
-
-```bash
-git status --short --untracked-files=all
-git diff --name-status
-git log --oneline
-```
-
-第一条会列出新文件的完整路径，未跟踪文件标记为 `??`。第二条查看尚未暂存的已跟踪文件改动；已暂存的改动可用 `git diff --cached --name-status` 查看。第三条查看已提交的版本记录。
-
-VS Code 的“源代码管理”中，`U` 表示未跟踪的新文件，`A` 表示已暂存的新文件，`M` 表示已修改文件。Git 记录文件而不单独记录空文件夹；新增文件路径能显示它所在的新文件夹。提交并推送后，也能在 GitHub 的提交记录中查看每次新增和修改的文件。
-
-## 启动
-
-使用 Node.js 22.22.3 或更高的兼容版本，并安装和启动 Docker。首次下载项目后，在项目根目录准备本地配置；已有 `.env` 时不会覆盖：
+使用 Node.js 22.22.3 或更高的兼容版本，安装 Docker。前后端为独立 npm 项目。
+从项目根目录准备配置；已有文件不会覆盖：
 
 ```bash
 test -f .env || cp .env.example .env
 test -f backend/.env || cp backend/.env.example backend/.env
-```
-
-把根目录 `.env` 中的 `MONGO_PASSWORD` 改为自己生成的随机十六进制密码，并在 `backend/.env` 的 `MONGODB_URI` 中填入相同密码。若修改用户名，两处也要一致。真实 `.env` 文件被 Git 忽略，只上传 `.env.example`。数据库初始化账号只在首次创建数据卷时生效；已有数据库继续使用原配置。
-
-从项目根目录启动数据库并安装依赖：
-
-```bash
-docker compose up -d
 npm ci --prefix backend
 npm ci --prefix frontend
 ```
 
-终端一从项目根目录启动后端：
+根 `.env` 的 MongoDB 密码与 `backend/.env` 中的 MONGODB_URI 必须对应。已有数据库卷不因修改环境变量自动更换密码。真实配置不进入 Git。
+
+后端还需要 SESSION_SECRET，至少32字符，并在重启间保持稳定。可用以下命令在缺失或仍为模板值时生成随机值到本地文件，不打印密钥：
 
 ```bash
-cd backend
-npm run start:dev
+python3 - <<'PYSECRET'
+from pathlib import Path
+import secrets
+p = Path('backend/.env')
+text = p.read_text()
+lines = text.splitlines()
+for i, line in enumerate(lines):
+    if line.strip().startswith('SESSION_SECRET='):
+        value = line.split('=', 1)[1].strip()
+        if not value or value == 'replace_with_a_random_secret_at_least_32_characters':
+            lines[i] = 'SESSION_SECRET=' + secrets.token_hex(32)
+        break
+else:
+    lines.append('SESSION_SECRET=' + secrets.token_hex(32))
+p.write_text('\n'.join(lines) + '\n')
+PYSECRET
 ```
 
-终端二从项目根目录启动前端：
+配置名称和默认值以 [backend/.env.example](backend/.env.example) 为准。生产启用 HTTPS 与 Secure Cookie；部署在反向代理后时只信任实际代理，不无条件信任转发来源。
+
+## 启动
 
 ```bash
-cd frontend
-npm run dev
+# 若已有可用 MongoDB，可直接复用配置中的连接，不再启动第二个占用相同端口的实例。
+docker compose up -d
 ```
 
-打开 http://localhost:5173 。前端通过 Vite 将 `/api` 代理到 http://127.0.0.1:3000 。
-页面可以管理任务并查看后端统计，开发者工具 Network 面板可以看到实际请求。
-
-## 先操作，再跟着请求读代码
-
-1. 打开页面，Network 中会出现 `GET /api/tasks`；数据库中还没有任务时响应是 `[]`。
-2. 输入“理解 Controller”，点击创建，观察 `POST /api/tasks`。
-3. 请求体是 `{"title":"理解 Controller"}`，成功状态是 `201`。
-4. 点击刷新，再次查询能够看到刚刚创建的任务。
-5. 刷新浏览器或重启后端后，数据仍在 MongoDB 中。
-
-### 编辑练习
-
-点击任务旁的“编辑”，修改标题后保存。前端调用 `PUT /api/tasks/:id`，id 放在路径，请求体只传 title。成功后更新列表中的对应任务。再次刷新列表，标题仍为修改后的内容，任务数量不变。
-
-编辑接口已经补上具体 DTO 校验、404 异常以及允许修改字段的限制，相关装饰器均附有中文注释。
-
-下表的参数与业务校验以写入守卫已放行为前提；已匹配写入方法但缺失或错误的演示请求头会先返回 403。完整契约与验收以 [系统基线](docs/specs/000-current-system.md) 为准。
-
-| 请求情况 | 后端响应 |
-| --- | --- |
-| id、标题合法，任务存在 | 200，返回更新后的任务 |
-| 路径 id 不是 UUID v4 | 400 |
-| 编辑或删除缺少路径 id，未匹配路由 | 404 |
-| 标题缺失、null、类型错误、空白或过长 | 400 |
-| 携带 completed、createdAt 等额外字段 | 400 |
-| id 格式合法，任务不存在 | 404，“任务不存在” |
-
-`EditTaskDto` 是运行时存在的具体类，继承 CreateTaskDto 的标题转换与校验规则。路径中的 id 由 `@Param('id', new ParseUUIDPipe({ version: '4' }))` 单独校验。两个输入来源分开处理，请求体再传 id 会被视为额外字段而拒绝。
-
-装饰器是带 `@` 的函数调用，作用是登记元数据；Nest 或相关库随后读取元数据来完成具体工作。例如 `@Put()` 登记路由，`@Body()` 指定请求参数来源，`@IsString()` 登记字段校验规则。`Partial<T>` 则属于 TypeScript 类型运算，编译后消失，不会执行网络参数校验。
-
-这一步要练的后端思路：先定义输入边界，再明确成功与失败的响应，最后保证失败请求不改变数据。
-
-### 删除与统计练习
-
-当前删除与统计接口：
-
-- `DELETE /api/tasks/:id`：删除成功返回 200 和被删除的任务；任务不存在返回 404。
-- `GET /api/stats`：返回 `{ "total": 0, "uptimeSeconds": 0 }`，聚合任务模块的数量和系统模块的后端运行时长。
-
-NestJS 的装饰器名为 `@Delete(':id')`，HTTP 方法名为 DELETE。删除服务通过 MongoDB 的 `findOneAndDelete` 删除并返回任务；没有找到时返回 404。
-
-前端删除按钮会先弹出确认框。确认后调用接口，成功时移除列表项并重新请求统计；取消时不发送删除请求。
-
-### 多模块如何协作
-
-```text
-AppModule
-├─ TasksModule
-│  ├─ providers: [TasksService]
-│  └─ exports: [TasksService]
-├─ SystemModule
-│  ├─ providers: [SystemService]
-│  └─ exports: [SystemService]
-└─ StatsModule
-   ├─ imports: [TasksModule, SystemModule]
-   ├─ providers: [StatsService]
-   └─ StatsService 构造函数分别注入 TasksService、SystemService
-```
-
-`TasksModule.exports` 公开任务服务，`StatsModule.imports` 声明依赖，构造函数完成注入。统计模块复用任务模块已创建的服务实例，数据保持一致。
-
-SystemModule 通过同样的方式公开 SystemService。StatsService 可以在构造函数中接收多个参数，在同一个统计方法中分别调用它们。参数属性写法 `private readonly xxxService: XxxService` 会自动把参数保存为 `this.xxxService`。构造参数是 Service 实例，不是 Module 实例。
-
-只在 AppModule 中导入两个模块，并不会自动使它们的服务互相可用。StatsModule 仍然要显式导入 TasksModule。不要再把 TasksService 注册进 StatsModule.providers；应复用 TasksModule 导出的服务，避免重复实例或依赖解析错误。
-
-统计接口的实际请求链：
-
-```text
-GET /api/stats
-→ StatsController.getOverview()
-→ StatsService.getOverview()
-  ├─ TasksService.count()
-  └─ SystemService.getUptimeSeconds()
-→ 返回当前任务数量和后端运行秒数
-```
-
-可以创建两条任务，观察统计为 2；编辑标题，数量仍为 2；删除一条，统计变为 1。这是验证两个模块共享同一份任务服务的直接方法。
-
-任务结构：
-
-```json
-{
-  "id": "服务端生成的 UUID",
-  "title": "理解 Controller",
-  "completed": false,
-  "createdAt": "ISO 格式的创建时间"
-}
-```
-
-## Controller、Service、Module 的关系
-
-**Controller 接收 HTTP 请求，Service 管任务业务和数据，Module 声明它们如何组织。**
-
-| 文件 | 这一课中的职责 |
-| --- | --- |
-| `backend/src/tasks/tasks.controller.ts` | 把 GET、POST、PUT、DELETE 路由映射到方法，提取并校验参数 |
-| `backend/src/tasks/tasks.service.ts` | 查询、创建、编辑、删除任务，并提供数量查询方法 |
-| `backend/src/tasks/tasks.module.ts` | 注册任务能力，并导出 TasksService |
-| `backend/src/stats/stats.module.ts` | 导入 TasksModule，注册统计能力 |
-| `backend/src/stats/stats.service.ts` | 同时注入 TasksService、SystemService，聚合两个模块的数据 |
-| `backend/src/system/system.service.ts` | 提供后端运行时长 |
-| `backend/src/app.module.ts` | 组合配置、数据库与业务模块，注册中间件和全局异常过滤器 |
-| `backend/src/main.ts` | 创建 Nest 应用并监听端口 |
-
-### Module 在应用启动时组织依赖
-
-```text
-main.ts 调用 NestFactory.create(AppModule)
-  └─ AppModule.imports: [ConfigModule.forRoot(...), DatabaseModule, TasksModule, SystemModule, StatsModule]
-       ├─ ConfigModule 读取 backend/.env，DatabaseModule 建立数据库连接
-       ├─ TasksModule 注册并导出 TasksService
-       ├─ SystemModule 注册并导出 SystemService
-       └─ StatsModule 导入上面两个模块
-            └─ StatsService 构造函数依赖 TasksService、SystemService
-```
-
-Nest 读取模块声明，创建 TasksService，并把它注入 TasksController。
-你在 Controller 中声明“我需要 TasksService”，而不是手动 `new TasksService()`。
-
-`@Injectable()` 让一个类能够参与依赖注入；它还需要在模块的 `providers` 中注册。
-当前 Service 在默认作用域下是单例；任务数据由 MongoDB 持久化保存，不依赖 Service 实例或进程内数组。
-
-**Module 不是每次请求都依次经过的中间处理步骤。它主要负责组织模块和依赖。**
-
-### GET 查询请求怎样流转
-
-```text
-浏览器打开页面
-  → frontend/src/pages/tasks/index.tsx 中的 useEffect
-  → frontend/src/store/tasks.ts 的 loadTasks()
-  → frontend/src/api/tasks.ts 的 getTasks()
-  → fetch('/api/tasks')
-  → Vite 代理到后端
-  → TasksController.findAll()（@Get）
-  → TasksService.findAll()
-  → 通过 Mongoose 查询 MongoDB 的 tasks 集合
-  → Nest 把返回值序列化为 JSON，状态 200
-  → MobX 更新 tasks
-  → observer 组件重新渲染
-```
-
-`main.ts` 调用 `app.setup.ts` 中的 `configureApp()` 设置 `/api` 前缀，加上 `@Controller('tasks')` 和 `@Get()`，组合为 `GET /api/tasks`。
-
-### POST 创建请求怎样流转
-
-```text
-填写标题，提交表单
-  → frontend store.createTask(title)
-  → POST /api/tasks，携带 JSON 请求体和 X-Learning-Key 演示头
-  → Nest 解析 JSON，匹配 Controller 路由
-  → 请求日志中间件记录开始；TaskWriteGuard 检查演示头
-  → @Body() 取得请求体，ValidationPipe 按 CreateTaskDto 校验
-  → TasksController.create(input)
-  → TasksService.create(input)
-  → Mongoose 按 Schema 生成 id 和时间，把任务写入 MongoDB
-  → Nest 返回新任务，状态 201
-  → 请求日志中间件记录最终状态与耗时
-  → MobX 将新任务加入列表
-  → 页面显示新任务
-```
-
-当前输入校验会去除标题两端空白，限制长度为 1–120，拒绝多余字段。TypeScript 类型本身不能校验网络请求，DTO 装饰器与 ValidationPipe 提供运行时校验。
-
-## 用终端直接验证 HTTP
+终端一：
 
 ```bash
-curl -i http://localhost:3000/api/tasks
-
-curl -i http://localhost:3000/api/tasks \
-  -H 'Content-Type: application/json' \
-  -H 'X-Learning-Key: awei-learning' \
-  -d '{"title":"理解 Service"}'
+npm run start:dev --prefix backend
 ```
 
-GET 返回 200，成功 POST 返回 201。写入接口需要上述公开的学习演示请求头；缺少时返回 403，通过守卫后空白标题会返回 400。
+终端二：
 
-## 建议阅读顺序
+```bash
+npm run dev --prefix frontend
+```
 
-1. `backend/src/tasks/tasks.controller.ts`
-2. `backend/src/tasks/tasks.service.ts`
-3. `backend/src/tasks/tasks.module.ts`
-4. `backend/src/app.module.ts`
-5. `backend/src/main.ts`
-6. 最后回到前端 `api`、`store` 和页面，把完整请求串起来。
+打开 http://127.0.0.1:5173 。Vite 将 /api 代理到 127.0.0.1:3000。数据库由 Compose 运行，应用在宿主机运行。
 
-## 独立练习
+## 操作流程
 
-先预测结果，再实际操作：
+1. 未登录时看到标记为“示例任务”的三条默认数据。
+2. 点击“登录 / 注册”，或点击示例的创建、编辑、删除入口，打开登录弹窗。
+3. 点击“立即注册”，输入数字账号、密码与确认密码；成功后进入个人任务区，初始为空。
+4. 创建、编辑标题、确认删除任务；取消删除不发送请求，创建/删除后刷新个人统计。
+5. 刷新页面恢复登录；点击退出回到示例。登录过期会清除私有数据并提示重新登录。
 
-1. 把 `@Controller('tasks')` 改成 `@Controller('todos')`，前端会发生什么？哪些地方需要一起修改？
-2. 创建任务后，刷新页面、重启后端，分别会发生什么？为什么？
-3. 从 `TasksModule.providers` 中移除 `TasksService`，应用为什么启动失败？完成后恢复配置。
+数字账号为3–5位ASCII数字字符串，保留前导零。未设置可验证的联系方式，第一版没有自助找回密码入口。密码规则、会话期限和错误行为统一见 SPEC-001。
 
-练习完成的标准：能解释 Controller 如何拿到 Service，以及 Module 为什么没有出现在运行时请求链中。
+历史无 ownerId 的任务仍保留在数据库，但不会作为示例公开，也不会分配给首个注册用户。若需要迁移，须另行确定归属。
+
+## 请求与模块
+
+```text
+浏览器
+  → API / MobX Store / 登录注册弹窗与任务页
+  → Vite /api 代理
+  → NestJS Session、认证与 CSRF 检查
+  → Controller → Service → Mongoose → MongoDB
+```
+
+- 首次 GET /api/auth/session 恢复身份并取得 CSRF 令牌；匿名状态也可以取得注册/登录所需令牌。
+- POST 注册/登录成功后重新生成 Session ID，并返回用户和新的 CSRF 令牌。
+- 浏览器通过 HttpOnly Cookie 携带会话，写请求在 X-CSRF-Token 中携带当前令牌。
+- 公共示例由 /api/public/tasks 与 /api/public/stats 提供；个人 /api/tasks 与 /api/stats 要求登录。
+- 创建任务时 ownerId 由服务端当前用户决定，编辑/删除使用 id 与 ownerId 联合过滤。前端隐藏操作不能代替后端权限检查。
+- 已移除 X-Learning-Key 学习演示头；它不再提供写入权限。
+- 错误响应保留 HTTP 状态及 message，并补充 path/requestId；未知错误不暴露内部信息。
+
+### 工程边界
+
+Controller 处理 HTTP 输入，Service 处理业务，Module 组织依赖。UsersModule 管理用户模型、持久化与密码校验，导出 UsersService；AuthModule 导入它，负责认证入口和 Session 生命周期。StatsModule 复用任务服务提供的用户级统计，不重复注册服务。
+
+模块根目录保留主要 Controller / Service / Module，DTO、Schema、Guard、配置与类型按职责归入子目录；每个 Guard 独立文件。具体约定见 [后端规则](backend/AGENTS.md#模块与目录组织)，本次整理与验证见 [SPEC-002](docs/specs/002-auth-module-organization.md)。
+
+DTO、数据库 Schema 与公开响应独立；用户及密码哈希不直接序列化为响应。会话过期由服务端校验，MongoDB TTL 仅负责清理。
+
+前端在身份切换时清空数据并使旧回调失效；旧请求即使完成，也不能覆盖新用户的页面。取消请求不能撤销已经在服务端执行的操作。
 
 ## 验证
 
+从项目根目录运行，要求本地 MongoDB 可用：
+
 ```bash
-# 从项目根目录执行，MongoDB 需已启动且本地配置可用。
 npm test --prefix backend
 npm run lint --prefix frontend
 npm run build --prefix frontend
 ```
 
-后端测试会构建实际代码，在临时端口启动 HTTP 服务，验证查询、创建、数据共享和非法输入。
-它不会占用开发服务器的 3000 端口；每个用例使用独立的临时数据库，完成后清理，不修改开发数据库。
+后端测试构建实际代码，并使用随机 awei_e2e_ 数据库启动真实 HTTP 服务，结束后只清理对应测试库。测试覆盖认证、CSRF、限流、用户隔离、任务原有边界和跨应用重启；实际结果以 SPEC 验证记录为准。
 
-前端 `build` 包含类型检查；只需要类型检查时可执行 `npm run check --prefix frontend`，无需在构建前重复执行。当前没有前端自动化交互测试，构建成功不等于页面行为全部通过。每次实际结果记录在对应 SPEC 与 STATE 中；命令列在 README 中不代表已经执行。
+前端 build 包含 TypeScript 检查，不需要重复运行 check。当前没有前端 test 脚本；浏览器验收单独记录，构建成功不代表交互全部通过。
 
-## 官方参考
+## NestJS 学习阅读顺序
 
-- [Controllers](https://docs.nestjs.com/controllers)
-- [Providers 与依赖注入](https://docs.nestjs.com/providers)
-- [Modules](https://docs.nestjs.com/modules)
+后端手写源码带有中文学习注释，建议沿一次请求阅读：
+
+1. [main.ts](backend/src/main.ts) → [app.module.ts](backend/src/app.module.ts)：应用启动、模块组装、依赖注入。
+2. [app.setup.ts](backend/src/app.setup.ts)：Session 中间件、全局管道与测试共用配置。
+3. [auth.controller.ts](backend/src/auth/auth.controller.ts) → [session.guard.ts](backend/src/auth/guards/session.guard.ts) / [csrf.guard.ts](backend/src/auth/guards/csrf.guard.ts) / [auth-rate-limit.guard.ts](backend/src/auth/guards/auth-rate-limit.guard.ts)：HTTP 路由、身份、CSRF 与认证限流。
+4. [auth.module.ts](backend/src/auth/auth.module.ts) → [users.module.ts](backend/src/users/users.module.ts)，再读 [auth.service.ts](backend/src/auth/auth.service.ts) → [users.service.ts](backend/src/users/users.service.ts)：跨模块依赖注入、会话生命周期、密码哈希与用户持久化。
+5. [tasks.controller.ts](backend/src/tasks/tasks.controller.ts) → [tasks.service.ts](backend/src/tasks/tasks.service.ts)：参数校验、按用户隔离的数据库操作、公开响应映射。
+6. [HTTP 测试辅助](backend/test/helpers/app.mjs)：如何用 TestingModule 替换连接，验证真实请求且保护开发数据。
+
+## 目录
+
+```text
+backend/src/users/       用户模型、持久化、密码哈希与校验
+backend/src/auth/        认证入口、Session与认证守卫
+  guards/               Session、CSRF、限流，各自独立文件
+  config/               认证配置
+  types/                会话响应与请求类型扩展
+  dto/                  注册登录输入校验
+backend/src/tasks/       私有任务CRUD
+backend/src/stats/       用户级任务统计
+backend/src/database/    MongoDB连接
+backend/test/            隔离数据库HTTP验证
+frontend/src/api/        HTTP与认证API
+frontend/src/store/      身份及任务状态
+frontend/src/pages/      任务页和交互
+openspec/changes/        变更引用，正文位于docs/specs/
+docs/ai/STATE.md         当前状态与接续入口
+```

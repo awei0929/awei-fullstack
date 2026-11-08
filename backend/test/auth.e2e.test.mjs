@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, afterEach, describe, it } from 'node:test';
 import { randomUUID } from 'node:crypto';
+import { UsersService } from '../dist/users/users.service.js';
 import { startApp, stopApp, client } from './helpers/app.mjs';
 
 // 通过真实HTTP请求覆盖完整链路，检查的不只是Service返回值，还包括Cookie、Guard与状态码。
@@ -21,12 +22,12 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
     assert.ok(publicTasks.every(t => t.completed === false && t.id !== legacy.id));
     assert.deepEqual(await visitor.request('/public/tasks').then(r => r.json()), publicTasks);
     assert.equal((await visitor.request('/public/stats').then(r => r.json())).total, 3);
-    await visitor.register();
+    await visitor.seedAndLogin();
     assert.deepEqual(await visitor.request('/tasks').then(r => r.json()), []);
     assert.equal(await state.connection.collection('tasks').countDocuments({ id: legacy.id }), 1);
   });
 
-  it('匿名令牌、注册换ID/令牌、Cookie属性、恢复和公开字段符合合同', async () => {
+  it('匿名令牌、登录换ID/令牌、Cookie属性、恢复和公开字段符合合同', async () => {
     const a = client(state);
     const initial = await a.request('/auth/session');
     assert.equal(initial.status, 200);
@@ -43,15 +44,16 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
     assert.equal(initial.headers.get('cache-control'), 'no-store');
     const oldCookie = a.cookie;
     a.csrfToken = view.csrfToken;
-    const response = await a.request('/auth/register', { method: 'POST', body: { account: '00123', password: '  pass word  ' } });
-    assert.equal(response.status, 201);
-    const registered = await response.json();
-    assert.equal(registered.user.account, '00123');
-    assert.deepEqual(Object.keys(registered.user).sort(), ['account', 'id']);
-    assert.match(registered.user.id, /^[a-f\d-]{36}$/);
+    await state.app.get(UsersService).register({ account: '00123', password: '  pass word  ' });
+    const response = await a.request('/auth/login', { method: 'POST', body: { account: '00123', password: '  pass word  ' } });
+    assert.equal(response.status, 200);
+    const loggedIn = await response.json();
+    assert.equal(loggedIn.user.account, '00123');
+    assert.deepEqual(Object.keys(loggedIn.user).sort(), ['account', 'id']);
+    assert.match(loggedIn.user.id, /^[a-f\d-]{36}$/);
     assert.notEqual(a.cookie, oldCookie);
-    assert.notEqual(registered.csrfToken, view.csrfToken);
-    assert.deepEqual(await a.session(), registered);
+    assert.notEqual(loggedIn.csrfToken, view.csrfToken);
+    assert.deepEqual(await a.session(), loggedIn);
     assert.equal((await client(state).request('/tasks', { headers: { Cookie: oldCookie } })).status, 401);
     const stored = await state.connection.collection('users').findOne({ account: '00123' });
     assert.match(stored.passwordHash, /^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
@@ -62,7 +64,7 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
     // 123 与 00123 是不同账号；同时覆盖最短、最长及中间长度，不能把账号转成数字。
     for (const [account, password] of [['123', 'a'.repeat(8)], ['00123', 'b'.repeat(64)], ['1234', 'password123'], ['12345', ' abcdef ']]) {
       const a = client(state);
-      assert.equal((await a.register(account, password)).user.account, account);
+      assert.equal((await a.seedAndLogin(account, password)).user.account, account);
     }
     assert.equal(await state.connection.collection('users').countDocuments(), 4);
   });
@@ -76,29 +78,29 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
       { account: '123', password: 'password123', role: 'admin' }, {},
     ];
     for (const body of invalid) {
-      for (const endpoint of ['register', 'login']) {
-        const response = await a.request(`/auth/${endpoint}`, { method: 'POST', body });
-        assert.equal(response.status, 400, JSON.stringify(body));
-      }
+      const response = await a.request('/auth/login', { method: 'POST', body });
+      assert.equal(response.status, 400, JSON.stringify(body));
     }
     assert.equal(await state.connection.collection('users').countDocuments(), 0);
     assert.equal((await a.session()).user, null);
   });
 
-  it('顺序与并发重复注册只有一个成功，失败不建立登录', async () => {
-    const users = Array.from({ length: 5 }, () => client(state));
-    // 同时注册同一个账号，验证Mongo唯一索引真正处理并发，而不是只测试先查再写的顺序场景。
-    await Promise.all(users.map(a => a.session()));
-    const results = await Promise.all(users.map(a => a.request('/auth/register', { method: 'POST', body: { account: '222', password: 'password123' } })));
-    assert.deepEqual(results.map(r => r.status).sort(), [201, 409, 409, 409, 409]);
-    const loser = users[results.findIndex(r => r.status === 409)];
-    assert.equal((await loser.session()).user, null);
-    assert.equal((await loser.request('/auth/register', { method: 'POST', body: { account: '222', password: 'password123' } })).status, 409);
-    assert.equal(await state.connection.collection('users').countDocuments({ account: '222' }), 1);
+  it('公开注册始终403，匿名/已登录/并发请求都不建号或改变身份', async () => {
+    const visitor = client(state), owner = client(state);
+    await visitor.session(); await owner.seedAndLogin('333');
+    const original = await owner.session();
+    const results = await Promise.all([visitor, visitor, owner, owner].map(a => a.request('/auth/register', {
+      method: 'POST', body: { account: '222', password: 'password123' },
+    })));
+    assert.deepEqual(results.map(r => r.status), [403, 403, 403, 403]);
+    assert.equal((await visitor.session()).user, null);
+    assert.deepEqual(await owner.session(), original);
+    assert.equal(await state.connection.collection('users').countDocuments({ account: '222' }), 0);
+    assert.equal((await visitor.request('/auth/register', { method: 'POST', body: {}, csrf: false })).status, 403);
   });
 
   it('错误登录统一401，正确登录重建会话且密码不trim', async () => {
-    await client(state).register('001', ' password ');
+    await client(state).seedAndLogin('001', ' password ');
     const a = client(state);
     await a.session();
     for (const body of [{ account: '001', password: 'password' }, { account: '999', password: 'password' }]) {
@@ -118,10 +120,9 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
 
   it('所有认证与任务写接口拒绝缺失、错误和另一会话的CSRF', async () => {
     const a = client(state), b = client(state);
-    await a.register(); await b.session();
+    await a.seedAndLogin(); await b.session();
     const task = await a.request('/tasks', { method: 'POST', body: { title: '保留' } }).then(r => r.json());
     const writes = [
-      ['/auth/register', 'POST', { account: '456', password: 'password123' }],
       ['/auth/login', 'POST', { account: '123', password: 'password123' }],
       ['/auth/logout', 'POST'], ['/tasks', 'POST', { title: '拒绝' }],
       [`/tasks/${task.id}`, 'PUT', { title: '拒绝' }], [`/tasks/${task.id}`, 'DELETE'],
@@ -139,7 +140,7 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
 
   it('A/B CRUD和统计隔离；外来任务404；伪造归属400', async () => {
     const a = client(state), b = client(state);
-    await a.register('101'); await b.register('202');
+    await a.seedAndLogin('101'); await b.seedAndLogin('202');
     const own = await a.request('/tasks', { method: 'POST', body: { title: 'A' } }).then(r => r.json());
     const other = await b.request('/tasks', { method: 'POST', body: { title: 'B' } }).then(r => r.json());
     assert.deepEqual(await a.request('/tasks').then(r => r.json()), [own]);
@@ -158,7 +159,7 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
 
   it('退出销毁服务端会话；旧cookie拒绝；已开始的只读请求不能复活会话', async (t) => {
     const { TasksService } = await import('../dist/tasks/tasks.service.js');
-    const a = client(state); await a.register();
+    const a = client(state); await a.seedAndLogin();
     let release, entered;
     const started = new Promise(resolve => { entered = resolve; });
     const delayed = new Promise(resolve => { release = resolve; });
@@ -178,7 +179,7 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
   });
 
   it('绝对有效期到期即拒绝，即使Mongo TTL尚未清理', async () => {
-    const a = client(state); await a.register();
+    const a = client(state); await a.seedAndLogin();
     const collection = state.connection.collection('sessions');
     const record = await collection.findOne({});
     const data = typeof record.session === 'string' ? JSON.parse(record.session) : record.session;
@@ -193,8 +194,34 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
     assert.equal((await a.session()).user, null);
   });
 
+  it('历史1–2位账号的活跃会话恢复为匿名，轮换Cookie后可登录且不删历史数据', async () => {
+    // 先走正常建号/登录，再在隔离库直接写入历史短账号，模拟新规则前已存在的用户和活跃Cookie。
+    // 原始集合操作只用于构造旧数据，正式服务不增加绕过校验或清理用户的入口。
+    await state.app.get(UsersService).register({ account: '55555', password: 'password123' });
+    for (const [validAccount, historicalAccount] of [['101', '1'], ['202', '12']]) {
+      const legacy = client(state); await legacy.seedAndLogin(validAccount);
+      const userId = legacy.user.id;
+      const task = await legacy.request('/tasks', { method: 'POST', body: { title: '历史任务保留' } }).then(r => r.json());
+      await state.connection.collection('users').updateOne({ id: userId }, { $set: { account: historicalAccount } });
+      const oldCookie = legacy.cookie, oldToken = legacy.csrfToken;
+      const response = await legacy.request('/auth/session');
+      assert.equal(response.status, 200);
+      const restored = await response.json();
+      assert.equal(restored.user, null);
+      assert.notEqual(legacy.cookie, oldCookie);
+      assert.notEqual(restored.csrfToken, oldToken);
+      assert.equal((await client(state).request('/tasks', { headers: { Cookie: oldCookie } })).status, 401);
+      assert.equal(await state.connection.collection('users').countDocuments({ id: userId, account: historicalAccount }), 1);
+      assert.equal(await state.connection.collection('tasks').countDocuments({ id: task.id, ownerId: userId }), 1);
+      legacy.csrfToken = restored.csrfToken;
+      const login = await legacy.request('/auth/login', { method: 'POST', body: { account: '55555', password: 'password123' } });
+      assert.equal(login.status, 200);
+      assert.equal((await login.json()).user.account, '55555');
+    }
+  });
+
   it('关闭并重建应用和Mongo连接后原会话、令牌与任务仍恢复', async () => {
-    const a = client(state); const view = await a.register();
+    const a = client(state); const view = await a.seedAndLogin();
     const task = await a.request('/tasks', { method: 'POST', body: { title: '重启保留' } }).then(r => r.json());
     const previous = state;
     await stopApp(previous, { drop: false });
@@ -206,10 +233,10 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
     assert.notEqual(state.connection, previous.connection);
   });
 
-  it('IP登录/注册合计原子限流且伪造转发头无法绕过', async () => {
+  it('IP登录原子限流且伪造转发头无法绕过', async () => {
     state.app.get((await import('@nestjs/config')).ConfigService).set('AUTH_IP_LIMIT', '3');
     const a = client(state); await a.session();
-    const results = await Promise.all(Array.from({ length: 6 }, (_, i) => a.request(i % 2 ? '/auth/login' : '/auth/register', {
+    const results = await Promise.all(Array.from({ length: 6 }, (_, i) => a.request('/auth/login', {
       method: 'POST', body: { account: 'invalid', password: 'password123' }, headers: { 'X-Forwarded-For': `192.0.2.${i}` },
     })));
     assert.deepEqual(results.map(r => r.status).sort(), [400, 400, 400, 429, 429, 429]);
@@ -218,7 +245,7 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
 
   it('存储读取与退出失败返回500；不能伪装匿名或退出成功', async (t) => {
     const { default: MongoStore } = await import('connect-mongo');
-    const a = client(state); await a.register();
+    const a = client(state); await a.seedAndLogin();
     const cookie = a.cookie;
     const get = t.mock.method(MongoStore.prototype, 'get', (_id, callback) => callback(new Error('storage offline')));
     const restore = await a.request('/auth/session');
@@ -236,8 +263,8 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
 
   it('Session首次保存失败不会被响应结束自动重试，已落库后回调失败也撤销身份', async (t) => {
     const { default: MongoStore } = await import('connect-mongo');
-    await client(state).register('123');
-    for (const endpoint of ['/auth/register', '/auth/login', '/auth/session']) {
+    await client(state).seedAndLogin('123');
+    for (const endpoint of ['/auth/login', '/auth/session']) {
       for (const writeBeforeError of [false, true]) {
         const a = client(state);
         if (endpoint !== '/auth/session') await a.session();
@@ -252,7 +279,7 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
           callback(new Error('transient write failed'));
         });
         const response = await a.request(endpoint, endpoint === '/auth/session' ? {} : {
-          method: 'POST', body: { account: endpoint === '/auth/register' ? (writeBeforeError ? '457' : '456') : '123', password: 'password123' },
+          method: 'POST', body: { account: '123', password: 'password123' },
         });
         patch.mock.restore();
         assert.equal(response.status, 500, endpoint);
@@ -266,13 +293,13 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
   it('密码按Unicode码点计数，变体选择符不被合并或删除', async () => {
     for (const [account, password] of [['401', '❤️'.repeat(4)], ['402', '❤️'.repeat(32)]]) {
       const a = client(state);
-      await a.register(account, password);
+      await a.seedAndLogin(account, password);
       const b = client(state); await b.session();
       assert.equal((await b.request('/auth/login', { method: 'POST', body: { account, password } })).status, 200);
     }
     const c = client(state); await c.session();
     for (const password of ['❤️'.repeat(3), '❤️'.repeat(33)]) {
-      assert.equal((await c.request('/auth/register', { method: 'POST', body: { account: '403', password } })).status, 400);
+      assert.equal((await c.request('/auth/login', { method: 'POST', body: { account: '403', password } })).status, 400);
     }
     assert.equal(await state.connection.collection('users').countDocuments({ account: '403' }), 0);
   });
@@ -293,7 +320,7 @@ describe('真实会话、认证和任务隔离 HTTP', () => {
   });
 
   it('认证与私有路由大小写/尾斜杠别名均禁止缓存', async () => {
-    const a = client(state); await a.register();
+    const a = client(state); await a.seedAndLogin();
     for (const path of ['/api/auth/session', '/api/auth/session/', '/API/AUTH/SESSION', '/API/TASKS', '/api/tasks/', '/API/STATS', '/api/stats/']) {
       const response = await fetch(`${state.baseUrl}${path}`, { headers: { Cookie: a.cookie } });
       assert.equal(response.status, 200, path);

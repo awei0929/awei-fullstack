@@ -14,16 +14,20 @@ export class AuthService {
   // Nest 根据构造参数类型注入用户服务与全局 ConfigService，无需在业务方法里 new。
   constructor(private readonly users: UsersService, private readonly config: ConfigService) {}
 
-  // Cookie 能找到会话不等于身份仍有效；每次访问都验证绝对期限，并确认用户仍存在。
+  // Cookie 能找到会话不等于身份仍有效；每次访问都验证绝对期限，并确认用户仍存在且符合当前账号合同。
   // MongoDB 的 TTL 删除是后台清理，可能延迟，不能把它当成身份过期判断。
   async currentUser(request: Request): Promise<User | null> {
     const { userId, authExpiresAt } = request.session;
     if (!userId || !authExpiresAt || authExpiresAt <= Date.now()) return null;
-    return this.users.findById(userId);
+    const user = await this.users.findById(userId);
+    // 历史1–2位账号可能仍有未过期Cookie；不能返回前端无法解析的旧身份。
+    // 只失效本次身份，session()会轮换匿名会话；不改名、不删除历史用户或任务。
+    if (!user || typeof user.account !== 'string' || !/^[0-9]{3,5}$/.test(user.account)) return null;
+    return user;
   }
 
-  // 恢复有效身份；过期或已删除的用户会轮换成新的匿名会话。
-  // 首次游客访问也保存随机令牌，后续登录/注册才能通过 CSRF 校验。
+  // 恢复有效身份；过期、已删除或不符合当前账号合同的用户会轮换成新的匿名会话。
+  // 首次游客访问也保存随机令牌，后续登录才能通过 CSRF 校验。
   async session(request: Request): Promise<SessionView> {
     const user = await this.currentUser(request);
     if (request.session.userId && !user) await this.regenerate(request);
@@ -36,7 +40,7 @@ export class AuthService {
     return { user, csrfToken: request.session.csrfToken! };
   }
 
-  // 注册/登录成功后重新生成 Session ID，防止沿用登录前已知的匿名 ID（会话固定攻击）。
+  // 登录成功后重新生成 Session ID，防止沿用登录前已知的匿名 ID（会话固定攻击）。
   // 同时轮换 CSRF 令牌；浏览器 Cookie 只保存签名后的 ID，用户身份保存在 MongoDB 会话中。
   async establish(request: Request, user: User): Promise<SessionView> {
     await this.regenerate(request);

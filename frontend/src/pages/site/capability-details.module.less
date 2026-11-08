@@ -1,0 +1,67 @@
+.dialog {
+  position: fixed; box-sizing: border-box; width: min(960px, calc(100% - 64px)); max-width: none; max-height: min(860px, calc(100svh - 64px)); padding: 34px; margin: auto; color: #fff0d2;
+  border: 1px solid #d4bb7b80; border-radius: 26px; background: linear-gradient(135deg, #3d442ff5, #253025f7 75%); box-shadow: inset 0 1px 0 #fff0d22b, 0 30px 100px #0b140c99;
+  overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c5bea977 transparent; z-index: 20; transform-origin: var(--detail-origin-x, 50%) var(--detail-origin-y, 50%);
+  &::backdrop { background: #0d190dc2; backdrop-filter: blur(10px); }
+  &[open] { animation: detailOpen 360ms cubic-bezier(.16, 1, .3, 1); }
+  button { font: inherit; cursor: pointer; color: inherit; }
+  button:focus-visible, a:focus-visible, [tabindex='0']:focus-visible { outline: 2px solid #f8ce7f; outline-offset: 4px; }
+  &[data-kind='company'], &[data-kind='projects'] { width: min(1000px, calc(100% - 64px)); }
+}
+@keyframes detailOpen { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+.close { position: sticky; float: right; top: 0; z-index: 2; display: grid; place-content: center; width: 38px; height: 38px; padding: 0; border: 1px solid #eee3bd66; border-radius: 50%; margin: -12px -12px 0 12px; color: #fff0d2; background: #263025; font-size: 28px !important; line-height: 1; &:hover { background: #4b513b; } }
+.heading { display: flex; align-items: flex-start; gap: 22px; padding: 8px 28px 28px 0; }
+.headingIcon { display: grid; place-items: center; flex: 0 0 84px; height: 84px; border: 1px solid #e8ce8d45; border-radius: 20px; background: #f4bd5812; color: #f8ce7f; svg { width: 42px; height: 42px; } }
+.company { color: #bbd39b; border-color: #bbd39b45; background: #bbd39b0c; }
+.projects { color: #ceb9dd; border-color: #ceb9dd45; background: #ceb9dd0c; }
+.eyebrow { margin: 0 0 10px !important; color: #c9cfb6; font-size: 11px; letter-spacing: .12em; }
+.heading h2 { margin: 0; font-size: clamp(23px, 2.5vw, 31px); line-height: 1.4; font-weight: 650; }
+.introduction { margin-top: 14px !important; color: #dedfc8; font-size: 15px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.techGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.techGroup { min-width: 0; padding: 22px; border: 1px solid #d6c58d3d; border-radius: 17px; background: #bfc58a09; > p { margin: 10px 0 20px; font-size: 14px; line-height: 1.8; color: #cbd0b9; } }
+.groupHeading { display: flex; align-items: center; gap: 12px; > span { color: #f4cf83; font-size: 28px; line-height: 1; } h3 { margin: 0; font-size: 21px; } }
+.frontend .groupHeading > span { color: #c3a8df; }
+.backend .groupHeading > span { color: #a5cc98; }
+.deployment .groupHeading > span { color: #91bfdb; }
+.technologies { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px 20px; padding: 0; margin: 0; list-style: none; li { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 56px; max-width: 120px; font-size: 14px; line-height: 1.5; text-align: center; overflow-wrap: anywhere; img { flex-shrink: 0; box-sizing: content-box; padding: 5px; border-radius: 8px; background: #f3edd8; object-fit: contain; } } }
+.quiet { color: #cbd0b9; }
+.dossier { display: grid; grid-template-columns: 225px minmax(0, 1fr); gap: 22px; align-items: start; }
+.directory { display: flex; flex-direction: column; gap: 10px; min-width: 0; max-height: 485px; overflow-y: auto; padding: 3px; scrollbar-width: thin; scrollbar-color: #c5bea977 transparent;
+  button { display: flex; align-items: center; flex-shrink: 0; gap: 12px; width: 100%; padding: 18px 14px; border: 1px solid #c6c59736; border-radius: 13px; background: #b4bd9010; text-align: left; transition: background-color 180ms, border-color 180ms;
+    &[aria-pressed='true'] { border-color: #f3ca7d; background: #ddbc6220; }
+    &:hover { background: #ddbc6219; }
+    > span:nth-child(2) { min-width: 0; flex: 1; }
+    strong { display: block; font-size: 15px; line-height: 1.6; font-weight: 550; overflow-wrap: anywhere; }
+    small { display: block; margin-top: 5px; color: #c4ccb3; font-size: 12px; line-height: 1.5; }
+  }
+}
+.directoryIndex { color: #f2cc80; font-size: 12px; font-variant-numeric: tabular-nums; }
+.directoryArrow { color: #dfd2a7; font-size: 20px; }
+.directoryEmpty { padding: 20px 12px; font-size: 14px; line-height: 2; span { color: #bfc9af; font-size: 12px; } }
+.document { min-width: 0; min-height: 330px; padding: 26px; border: 1px solid #d0ca9736; border-radius: 18px; background: #14221445;
+  > h3 { color: #fff0d2; font-size: 27px; line-height: 1.5; margin: 0 0 24px; overflow-wrap: anywhere; }
+}
+.documentLabel { color: #d8cf9f; font-size: 12px; line-height: 1.7; margin: 0 0 10px !important; overflow-wrap: anywhere; span { color: #bdc7ad; } }
+.projectSummary { color: #d9ddc6; margin: -10px 0 26px !important; padding-bottom: 22px; border-bottom: 1px solid #cfca972b; font-size: 14px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cover { margin: -26px -26px 24px; overflow: hidden; border-radius: 18px 18px 0 0; img { display: block; width: 100%; max-height: 240px; object-fit: cover; } }
+.empty { display: grid; align-content: center; justify-items: start; min-height: 200px; padding: 12px 0; > span { color: #c2c69b; font-size: 32px; } h3 { margin-top: 16px; font-size: 19px; line-height: 1.5; } p { margin-top: 12px; max-width: 310px; color: #bfc9af; font-size: 14px; line-height: 1.85; } }
+.footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 24px; padding-top: 18px; border-top: 1px solid #dbd3a51f; > span { color: #f2dca4; font-size: 20px; font-weight: 800; } p { margin: 0; color: #b7c1a5; font-size: 12px; line-height: 1.6; } }
+@media(max-width: 767px) {
+  .dialog, .dialog[data-kind='company'], .dialog[data-kind='projects'] { inset: 0; margin: 0; width: 100%; height: 100%; height: 100svh; max-height: none; padding: 24px 20px; border-radius: 0; border: 0; }
+  .heading { gap: 14px; padding: 26px 0 24px; flex-direction: column; }
+  .headingIcon { display: none; }
+  .heading h2 { margin: 0; font-size: 24px; }
+  .introduction { font-size: 14px; }
+  .close { top: 0; margin-top: -8px; margin-right: -4px; width: 36px; height: 36px; }
+  .techGrid { grid-template-columns: 1fr; gap: 14px; }
+  .techGroup { padding: 20px; .groupHeading h3 { font-size: 20px; } }
+  .technologies { gap: 18px 16px; li { max-width: 90px; } }
+  .dossier { display: flex; flex-direction: column; gap: 16px; }
+  .directory { width: 100%; display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden; max-height: none; padding: 4px 2px 10px; box-sizing: border-box; button { width: 180px; padding: 14px 12px; } }
+  .document { width: 100%; box-sizing: border-box; padding: 22px; > h3 { font-size: 24px; } }
+  .cover { margin: -22px -22px 22px; }
+  .footer { align-items: flex-start; p { text-align: right; } }
+}
+@media(prefers-reduced-motion: reduce) { .dialog[open] { animation: none; } .directory button { transition: none; } }
+
+.retry { min-height: 44px; margin-top: 20px; padding: 10px 18px; border: 1px solid #f4bd5877; border-radius: 22px; background: #f4bd5812; color: #fff0d2; }

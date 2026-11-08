@@ -1,0 +1,31 @@
+.host { width: 100%; min-width: 0; }
+.frame {
+  position: relative;
+  margin-inline: auto;
+  overflow: clip;
+  border-radius: 12px;
+  background: #565c43;
+  box-shadow: 0 16px 40px #17200b21;
+}
+.canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  border: 0;
+  transform-origin: top left;
+}
+.page { position: fixed; inset: 0; min-width: 0; overflow: clip; }
+.waiting {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 24px;
+  color: #48503c;
+  background: #f3f0e6;
+  text-align: center;
+  p { margin: 0; font-size: 18px; }
+  span { max-width: 360px; font-size: 14px; line-height: 1.7; }
+}

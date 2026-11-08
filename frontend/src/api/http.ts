@@ -1,10 +1,12 @@
 export class HttpError extends Error {
   readonly status: number
+  readonly code?: string
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message)
     this.name = 'HttpError'
     this.status = status
+    this.code = code
   }
 }
 
@@ -42,6 +44,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
           ? message
           : `请求失败（${response.status}），请稍后重试`,
       response.status,
+      body && typeof body === 'object' && 'code' in body && typeof body.code === 'string' ? body.code : undefined,
     )
   }
 

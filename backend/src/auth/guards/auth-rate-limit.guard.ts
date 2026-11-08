@@ -32,11 +32,11 @@ export class AuthRateLimitGuard implements CanActivate, OnModuleInit {
     const http = context.switchToHttp();
     const request = http.getRequest<Request>();
     const response = http.getResponse<Response>();
-    // 通过 CSRF 守卫的登录/注册尝试共享 IP 额度，之后的 DTO 校验失败也会计数。
+    // 通过 CSRF 守卫的登录尝试消耗 IP 额度，之后的 DTO 校验失败也会计数。
     // request.ip 由 Express 的 trust proxy 配置决定，默认不信任任意 X-Forwarded-For。
     await this.consume(`ip:${request.ip}`, positiveInteger(this.config, 'AUTH_IP_LIMIT', 30), response);
     // Guard 在 DTO 管道之前执行，此时请求体仍是不可信输入，必须先检查账号类型和格式。
-    // 只有标记为登录的处理器才额外消费账号额度；注册受上面的 IP 总额度限制。
+    // 只有标记为登录的处理器才额外消费账号额度；公开注册入口已关闭，不建立会话或消耗密码验证资源。
     const account: unknown = request.body?.account;
     if (this.reflector.get<boolean>(ACCOUNT_RATE_LIMIT, context.getHandler()) && typeof account === 'string' && /^[0-9]{3,5}$/.test(account)) {
       await this.consume(`account:${account}`, positiveInteger(this.config, 'AUTH_ACCOUNT_LIMIT', 10), response);

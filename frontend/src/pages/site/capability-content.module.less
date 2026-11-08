@@ -1,0 +1,37 @@
+.cards { position: absolute; inset: 0; z-index: 7; pointer-events: none; &[aria-hidden='true'] { pointer-events: none; } }
+.cardMotion { position: absolute; width: clamp(180px, 21vw, 304px); pointer-events: auto; &:focus-within { z-index: 2; } }
+.technology { left: 34%; top: 19%; --accent: #f8ce7f; --card-tint: #4a442c; }
+.company { right: 3.2%; top: 18%; --accent: #bbd39b; --card-tint: #334835; }
+.projects { right: 3.2%; top: 55%; --accent: #ceb9dd; --card-tint: #3d3847; }
+.card {
+  display: flex; flex-direction: column; width: 100%; padding: clamp(18px, 1.65vw, 26px); box-sizing: border-box;
+  color: #fff0d2; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-top-color: color-mix(in srgb, var(--accent) 75%, transparent);
+  border-radius: 22px; background: linear-gradient(145deg, color-mix(in srgb, var(--card-tint) 94%, transparent), #263025eb); box-shadow: inset 0 1px 0 #ffffff16, 0 12px 30px #0d160e33;
+  text-align: left; font: inherit; cursor: pointer; backdrop-filter: blur(12px); transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+  &:hover { transform: translateY(-5px); border-color: var(--accent); box-shadow: inset 0 1px 0 #ffffff16, 0 14px 36px #0d160e55; }
+  &:focus-visible { outline: 3px solid var(--accent); outline-offset: 5px; }
+  &:disabled { cursor: default; pointer-events: none; }
+  > strong { display: block; margin-top: 12px; font-size: clamp(22px, 2vw, 30px); line-height: 1.2; letter-spacing: .03em; }
+}
+.topline { display: flex; align-items: center; justify-content: space-between; color: var(--accent); > span { font-size: 12px; font-variant-numeric: tabular-nums; opacity: .7; } }
+.subtitle { margin-top: 8px; font-size: clamp(15px, 1.3vw, 18px); line-height: 1.4; font-weight: 500; }
+.description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin-top: 14px; color: #e0dfca; font-size: 14px; line-height: 1.75; overflow-wrap: anywhere; }
+.cardFooter { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; min-height: 38px; }
+.logos { display: flex; align-items: center; gap: 14px; img { object-fit: contain; } }
+.note { color: #ced0ba; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.arrow { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 50%; color: var(--accent); font-size: 24px; line-height: 1; }
+@media(min-width: 768px) and (max-height: 780px) { .card { padding: 16px 20px; > strong { margin-top: 8px; } } .topline svg { width: 26px; height: 26px; } .description { margin-top: 10px; -webkit-line-clamp: 2; } .cardFooter { margin-top: 12px; } }
+@media(min-width: 768px) and (max-width: 1100px) { .cardMotion { width: 23%; } .technology { left: 32%; top: 24%; } .company { right: 2%; top: 18%; } .projects { right: 2%; top: 58%; } .card { padding: 16px; border-radius: 16px; } .description { -webkit-line-clamp: 2; } .note { font-size: 12px; } }
+@media(max-width: 767px) {
+  .cards { inset: auto 0 65px; height: 215px; display: flex; gap: 12px; padding: 8px 6% 12px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; pointer-events: auto; scrollbar-width: thin; scrollbar-color: #c9b88755 transparent; }
+  .cardMotion { position: relative; flex: 0 0 76%; width: 76%; max-width: 310px; left: auto; right: auto; top: auto; scroll-snap-align: center; }
+  .card { height: 100%; padding: 16px 18px; border-radius: 17px; > strong { margin-top: 8px; font-size: 22px; } }
+  .topline { position: absolute; top: 18px; right: 18px; > span { display: none; } svg { width: 27px; height: 27px; } }
+  .subtitle { margin-top: 5px; font-size: 15px; }
+  .description { margin-top: 10px; font-size: 14px; line-height: 1.65; -webkit-line-clamp: 2; }
+  .cardFooter { margin-top: auto; padding-top: 10px; min-height: 30px; }
+  .arrow { flex-basis: 30px; width: 30px; height: 30px; font-size: 21px; }
+  .logos { gap: 14px; img { width: 23px; height: 23px; } }
+  .note { font-size: 12px; }
+}
+@media(prefers-reduced-motion: reduce) { .card { transition: none; &:hover { transform: none; } } }

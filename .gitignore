@@ -7,3 +7,12 @@ coverage/
 !.env.example
 *.log
 *.tsbuildinfo
+
+# 文档设计图与验收截图不入库；运行素材不受影响
+/docs/**/*.png
+/docs/**/*.jpg
+/docs/**/*.jpeg
+/docs/**/*.webp
+/docs/**/*.gif
+/docs/**/*.avif
+/docs/**/evidence/

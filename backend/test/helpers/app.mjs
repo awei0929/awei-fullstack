@@ -6,6 +6,7 @@ import { getConnectionToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
 import { createConnection } from 'mongoose';
 import { AppModule } from '../../dist/app.module.js';
+import { UsersService } from '../../dist/users/users.service.js';
 import { configureApp } from '../../dist/app.setup.js';
 
 // 每个用例启动真实Nest应用和独立数据库；port=0交给系统分配空闲端口。
@@ -34,6 +35,7 @@ export async function startApp({ databaseName = `awei_e2e_${randomUUID().replace
     settings.set('SESSION_SECRET', 'http-test-secret-fixed-and-at-least-32-characters');
     settings.set('NODE_ENV', 'test');
     settings.set('TRUST_PROXY', '');
+    settings.set('SITE_OWNER_USER_ID', '');
     settings.set('SESSION_MAX_AGE_MS', '604800000');
     settings.set('AUTH_RATE_WINDOW_MS', '900000');
     settings.set('AUTH_IP_LIMIT', '1000');
@@ -98,10 +100,12 @@ export function client(state) {
       this.user = view.user;
       return view;
     },
-    async register(account = '123', password = 'password123') {
+    // 关闭公开注册后，仅测试辅助层通过服务创建隔离用户，再走真实HTTP登录。
+    async seedAndLogin(account = '123', password = 'password123') {
+      await state.app.get(UsersService).register({ account, password });
       await this.session();
-      const response = await this.request('/auth/register', { method: 'POST', body: { account, password } });
-      assert.equal(response.status, 201);
+      const response = await this.request('/auth/login', { method: 'POST', body: { account, password } });
+      assert.equal(response.status, 200);
       const view = await response.json();
       this.csrfToken = view.csrfToken;
       this.user = view.user;

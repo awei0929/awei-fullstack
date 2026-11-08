@@ -1,6 +1,6 @@
 # NestJS 后端
 
-本项目提供任务管理与跨模块统计，包含 DTO 校验、写入守卫、请求日志、全局异常处理，以及 MongoDB 持久化。这里保留后端实现的阅读说明，适合已完成 NestJS 基础学习、具有前端经验的开发者。
+本项目提供个人官网、站主配置、会话认证、任务管理与跨模块统计，包含 DTO 校验、写入守卫、请求日志、全局异常处理，以及 MongoDB 持久化。这里保留后端实现的阅读说明，适合已完成 NestJS 基础学习、具有前端经验的开发者。
 
 - [根 README](../README.md)：唯一的环境准备与启动入口，包含 Node.js、Docker Compose、MongoDB 和环境变量配置。
 - [系统基线 SPEC](../docs/specs/000-current-system.md)：当前接口、输入输出、状态码、数据规则和验收标准。
@@ -11,12 +11,15 @@
 
 启动后端前，先按根 README 准备 MongoDB，并配置 `backend/.env` 中的 `MONGODB_URI`；变量示例见 [`.env.example`](./.env.example)。`DatabaseModule` 使用 `ConfigService.getOrThrow` 取得连接地址，缺少配置会阻止启动，仅安装 npm 依赖并不足以运行后端。
 
-任务已存入 MongoDB，重启后端不会清空任务。当前写入守卫使用公开的学习演示值，不代表已实现用户登录或用户级权限。
+用户、会话、任务和官网内容均存入 MongoDB。任务按会话用户隔离；官网配置仅允许 `SITE_OWNER_USER_ID` 指定的站主读写，未配置时拒绝所有人。公开注册已经关闭，登录与任务合同见 [SPEC-001](../docs/specs/001-session-auth.md)，官网合同与关闭注册覆盖规则见 [SPEC-003](../docs/specs/003-personal-site.md)。
 
 ## 请求和数据的职责边界
 
 | 入口 | 职责 |
 | --- | --- |
+| [site.module.ts](./src/site/site.module.ts) | 组织站点持久化、站主权限、公开读取与媒体上传 |
+| [site.service.ts](./src/site/site.service.ts) | 单站点版本原子比较更新、默认内容与历史作品字段只读剔除 |
+| [site-assets.service.ts](./src/site/site-assets.service.ts) | 验证音频容器/帧，使用随机文件名持久化并受控读取媒体 |
 | [main.ts](./src/main.ts) | 创建 Nest 应用、应用公共配置并监听本机端口 |
 | [app.setup.ts](./src/app.setup.ts) | 设置 `/api` 前缀、全局 ValidationPipe 和退出钩子；测试复用此配置 |
 | [tasks.controller.ts](./src/tasks/tasks.controller.ts) | 声明 HTTP 路由、参数来源和方法级守卫 |
@@ -33,7 +36,7 @@ DTO 描述 HTTP 输入，Schema 描述数据库存储，公开响应描述客户
 
 ## 守卫与请求日志
 
-[TaskWriteGuard](./src/tasks/guards/task-write.guard.ts) 读取请求头，决定是否继续执行；它不处理任务业务。[TasksController](./src/tasks/tasks.controller.ts) 通过方法级 `@UseGuards` 将它用于写入操作，查询保持开放。演示请求头与错误状态以系统基线 SPEC 为准。
+[SessionGuard](./src/auth/guards/session.guard.ts) 恢复并验证会话用户，个人任务读写均要求登录；写请求再经过 [CsrfGuard](./src/auth/guards/csrf.guard.ts)。官网配置与上传额外使用 [SiteOwnerGuard](./src/site/guards/site-owner.guard.ts)，只比较服务端认证后的用户 UUID。公开官网与游客示例使用独立入口。
 
 守卫在参数管道之前执行，因此同一个非法请求可能先被守卫拒绝，只有放行后才进入 DTO 和路径参数校验。这个顺序已由 [HTTP 测试](./test/tasks.e2e.test.mjs) 覆盖。
 
@@ -75,8 +78,8 @@ npm run build
 npm test
 ```
 
-`npm test` 本身会先构建，再用 Node.js 测试运行器执行 [tasks.e2e.test.mjs](./test/tasks.e2e.test.mjs)；只需验证 HTTP 行为时直接运行 `npm test`，无需重复构建。`npm run test:e2e` 调用同一测试入口。可用脚本以 [package.json](./package.json) 为准。
+`npm test` 本身会先构建，再用 Node.js 测试运行器执行 `test/*.e2e.test.mjs`（认证、任务、站点与受控初始化）；只需验证 HTTP 行为时直接运行 `npm test`，无需重复构建。`npm run test:e2e` 调用同一测试入口。可用脚本以 [package.json](./package.json) 为准。
 
 测试连接 `MONGODB_URI` 指定的 MongoDB 服务，每个用例使用随机命名的 `awei_e2e_*` 数据库和临时 HTTP 端口。结束时先核对数据库名称，再删除该用例数据库并关闭连接。运行前需要可访问的开发或测试 MongoDB，以及创建和删除这些临时数据库的权限。
 
-现有测试覆盖任务增删改查、输入校验、守卫执行顺序、错误响应和跨模块统计；测试文件的存在不代表本次变更已验证。每次执行的结果和未验证项按根规范记录到对应任务，不能用构建通过代替 HTTP 测试通过。
+现有测试覆盖任务增删改查与隔离、会话与CSRF、关闭注册、站主权限、版本并发保存、重启恢复、输入校验、媒体上传及本地初始化；测试文件的存在不代表本次变更已验证。每次执行的结果和未验证项按根规范记录到对应任务，不能用构建通过代替 HTTP 测试通过。

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Alert, Button, Form, Input, Modal, message } from 'antd'
 import { observer } from 'mobx-react-lite'
 import { authStore } from '../store/auth'
-import type { AuthInput, AuthMode } from '../types/auth'
+import type { AuthInput } from '../types/auth'
 import { hasValidPasswordLength } from '../utils/auth-validation'
 
 interface AuthModalProps {
@@ -12,8 +12,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal = observer(function AuthModal({ open, reason, onClose }: AuthModalProps) {
-  const [form] = Form.useForm<AuthInput & { confirmPassword?: string }>()
-  const [mode, setMode] = useState<AuthMode>('login')
+  const [form] = Form.useForm<AuthInput>()
   const [messageApi, contextHolder] = message.useMessage()
   const submitting = authStore.submitting
   const waitingForLogout = authStore.loggingOut
@@ -21,7 +20,6 @@ export const AuthModal = observer(function AuthModal({ open, reason, onClose }: 
   useEffect(() => {
     if (!open) {
       form.resetFields()
-      setMode('login')
     }
   }, [open, form])
 
@@ -32,19 +30,8 @@ export const AuthModal = observer(function AuthModal({ open, reason, onClose }: 
     onClose()
   }
 
-  function switchMode(value: AuthMode) {
-    if (authStore.submitting || authStore.loggingOut) return
-    setMode(value)
-    authStore.clearAuthError()
-    form.setFields([
-      { name: 'account', errors: [] },
-      { name: 'password', errors: [] },
-      { name: 'confirmPassword', value: undefined, errors: [] },
-    ])
-  }
-
   async function submit(values: AuthInput) {
-    if (await authStore.authenticate(mode, { account: values.account, password: values.password })) {
+    if (await authStore.authenticate('login', { account: values.account, password: values.password })) {
       form.resetFields()
       onClose()
     } else if (authStore.authError) {
@@ -54,7 +41,7 @@ export const AuthModal = observer(function AuthModal({ open, reason, onClose }: 
 
   return (
     <Modal
-      title={mode === 'login' ? '登录你的账号' : '创建你的账号'}
+      title="登录账号"
       open={open}
       onCancel={close}
       footer={null}
@@ -90,41 +77,12 @@ export const AuthModal = observer(function AuthModal({ open, reason, onClose }: 
               : Promise.reject(new Error('密码须为 8–64 个字符')),
           },
         ]}>
-          <Input.Password autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="8–64 个字符" size="large" />
+          <Input.Password autoComplete="current-password" placeholder="8–64 个字符" size="large" />
         </Form.Item>
-        {mode === 'register' && (
-          <Form.Item
-            name="confirmPassword"
-            label="确认密码"
-            dependencies={['password']}
-            preserve={false}
-            rules={[
-              { required: true, message: '请再次输入密码' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  return !value || getFieldValue('password') === value
-                    ? Promise.resolve()
-                    : Promise.reject(new Error('两次输入的密码不一致'))
-                },
-              }),
-            ]}
-          >
-            <Input.Password autoComplete="new-password" placeholder="再次输入密码" size="large" />
-          </Form.Item>
-        )}
         <Button type="primary" htmlType="submit" block size="large" loading={submitting} disabled={submitting || waitingForLogout}>
-          {mode === 'login' ? '登录' : '注册并登录'}
+          登录
         </Button>
       </Form>
-      <p style={{ margin: '20px 0 0', textAlign: 'center', color: '#758077' }}>
-        {mode === 'login' ? '还没有账号？' : '已有账号？'}
-        <Button
-          type="link"
-          style={{ paddingInline: 4 }}
-          disabled={submitting || waitingForLogout}
-          onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
-        >{mode === 'login' ? '立即注册' : '去登录'}</Button>
-      </p>
     </Modal>
   )
 })

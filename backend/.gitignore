@@ -5,3 +5,6 @@ coverage/
 *.tsbuildinfo
 *.log
 .DS_Store
+
+# 本机上传图片持久目录；部署时备份或配置SITE_ASSETS_DIR到持久卷。
+.data/

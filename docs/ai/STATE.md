@@ -1,27 +1,166 @@
 # 工作区交接状态
 
-- 更新时间：2026-11-07（Asia/Shanghai）。
-- 当前任务：认证功能、模块整理及3–5位账号规则已提交并推送GitHub origin/main。
-- 状态：已完成。功能提交6680afe已成功推送至awei0929/awei-fullstack的main；后续交接文档随本次记录同步。原基准bd2b983。
-- 规格：[SPEC-001](../specs/001-session-auth.md)为行为合同，[SPEC-002](../specs/002-auth-module-organization.md)为模块整理记录。两个OpenSpec引用保留、未归档。
+## 2026-11-08：个人官网提交交接
+
+- 用户授权提交当前工作区：个人官网、唯一站主后台、能力三卡与履历详情、运行素材、规格与交接文档，以及文档图片清理规则；沿用当前`main`分支，不推送或部署。
+- 沿用下方P28记录的后端76/76、前端lint/build与Chrome验收结果；本次仅核对记录对应关系、Git范围与敏感文件，不重复开发验收。真实环境文件、上传媒体、依赖目录及文档截图不纳入提交。
+- P28记录的8个SHA256全部匹配；依赖与相关配置未发现验证后变化。敏感文件检查仅命中环境模板的占位连接串，`git diff --check`通过。
+- 本次重新核对8个SHA256全部匹配，205个候选文件未发现真实凭据或应排除文件；沿用既有验证。暂存检查另报告3处文档末尾空行与Docker SVG的1处行尾空白，属于格式告警，本次保留原文件内容与素材校验值。
+- 本次用户再次授权提交，Git元数据已可写，`git add -A`成功；提交范围为上述已完成工作，提交说明为`feat: 实现个人官网与站主管理后台`。站主真实公司/项目内容与此前未实操的兼容边界仍按下方记录保留；不推送或部署。
+
+## 2026-11-08：文档图片清理与验收规则调整
+
+- 用户要求清理历史图片、不再做图片对比；清理`docs/designs/personal-site/`的7张设计稿与66张验收截图（含PNG/JPG），合计17,552,279字节，约16.74 MiB。保留文字设计、素材提示词、原有验证记录和边界；下方旧图片文件名仅作历史记录，对应文件已删除，不要求恢复。
+- 通用规则集中在[AGENT](../../AGENT.md#验收证据与图片管理)，SPEC规范/模板及SPEC-003同步引用或更新：默认不生成/保存设计对比图、验收截图、录屏或视觉快照，不做图片对比；仍按范围做必要浏览器交互/布局验收，用文字记录环境、步骤、DOM数据与实际结果。排障截图只用临时目录，不入Git。
+- 根`.gitignore`新增文档图片与evidence目录忽略规则，移除失效图片链接并同步素材来源说明；`frontend/public/`运行素材、应用代码、数据库与开发服务未变。
+- 本轮检查通过：docs图片剩余0；52份运行资源清理前后SHA256一致；修改文档的125个本地链接目标存在；73个旧图片路径均命中忽略规则，运行图片不受影响；`git diff --check`通过。独立只读复核未发现遗留有效截图要求或失效图片链接。
+- 基准82acde8，保留原有大量未提交改动；开始核对时这些图片均未跟踪，本地所有可见引用的提交历史中也没有`docs/designs/`，无需改写Git历史。仅做文档与文件清理检查，不重复lint/build/HTTP/浏览器验收；未提交/推送/部署。
+
+
+## 当前任务：P28能力三卡与履历详情（已验证，2026-11-08）
+
+- 用户要求将四技术分类卡改为技术栈/公司背景/公司项目三卡；已实现960px技术四区、公司三目录与项目内切换、安全Markdown、手机全屏。后台技术配置保留，新增公司/项目配置、增删排序/隐藏/封面URL/MD预览及实时iframe弹窗。
+- 新capabilityDetails沿用Mongo整站CAS、Session/Owner/CSRF；GET旧分区只读补默认，PUT必填防静默清空；公开服务端剔除隐藏项目。旧独立作品档案/顶层projects/图片上传仍不恢复。真实v6公司与项目为空，未伪造或保存示例经历。
+- 本轮后端TDD定向8先红→绿、完整76/76/5套件含build通过；前端最终lint/build通过，实际API19/编辑器8/保存定位4模拟通过。Chrome1440/1920、390/320公开/后台/iframe及隔离fixture UI保存v2与刷新持久化通过；独立审查两个P2已修复关闭，无未关闭阻塞。
+- 详细范围/结果/边界见[SPEC-003 P28](../specs/003-personal-site.md)与[整合](tasks/003-capability-details-integration.md)/[后端](tasks/003-capability-details-backend.md)/[配置](tasks/003-capability-details-admin.md)/[审查](tasks/003-capability-details-review.md)。截图evidence/capability-three-cards-v13.jpg、capability-technology-dialog-v13.jpg。
+- OS reduce/真机touch软键盘/多浏览器/浏览器断网与409未实操，不扩大声明。根恢复起始缺失的3000开发watch；5173保留。浏览器留正式能力页、viewport reset已调用；测试登录已退出，同host端口Cookie不保证保留原站主登录状态。fixture库/隔离媒体/缓存已清理，3001/5174已停，3000/5173保留。
+- 基准82acde8，大量既有未提交改动保留，本轮快照/tmp/nest-capability-details-before；未提交/推送/部署/换分支/worktree。下一步是站主自行填真实公司背景与项目Markdown。
+
+
+## 2026-11-08：后端停止与502排查
+
+- 13:59实际复现：首页5173为200，代理API为502，3000无监听且直连失败。证据指向旧聊天执行会话于00:24关闭，其托管的后端开发命令同时被工具标记失败结束；关闭触发方与具体信号未知，不能归因为业务崩溃或某人关闭窗口。
+- 并行P28聊天于14:03重新执行原开发命令，本排查聊天未启动/重启；本轮直连3000公开统计/官网与5173代理官网均200，官网仍v6。仅新增诊断记录、更新本节，未改应用/真实配置、未跑全量构建测试、未提交推送；不覆盖P28验证状态。证据与边界见[排查记录](tasks/003-backend-stop-diagnosis.md)。
+
+## 当前任务：P27默认动效与欢迎场景恢复（已验证，2026-11-07）
+
+- 用户要求动效默认开/隐藏按钮，指出初次见面不动。已删除公开开关及首页/首载两处site-motion-off旧偏好覆盖；仍尊重后台appearance.motion与系统reduce，音乐独立。P26的Switch合同被本轮覆盖。
+- 确认P26收掉柔光/星芒循环导致静置不明显；现恢复受控柔光与星芒内层循环、欢迎人物内层6秒/5px轻呼吸，不虚称真实挥手。新循环仅欢迎空闲端点运行，弹窗/首载/切场/隐藏/reduce暂停或静止，不碰850ms时钟与三环。
+- 本轮实际TSX/函数模拟先红1/10→绿10/10，lint/build通过；Chrome桌面人物/星芒矩阵变化、关于暂停/Esc恢复、切场暂停、刷新开场、390手机无开关/无横溢出与后台iframerunning均已确认。独立[审查](tasks/003-welcome-motion-review.md)无P0/P1/P2。详见[SPEC-003 P27](../specs/003-personal-site.md)。
+- 真实v6/保存disabled未改，未保存/退出/上传；未提交/推送/部署/换分支/worktree。基准82acde8，源快照/tmp/nest-welcome-motion-before；3000/5173继续运行。截图welcome-motion-*-v12.jpg为390实际首屏；viewport reset已调用但最终读值仍390×844，不声称恢复正常尺寸。OS reduce/真实隐藏/其它浏览器仍是未实操边界。
+
+## 当前任务：P26温暖工作室视觉精修（已验证，2026-11-07）
+
+- 按用户完整风格与参考图，在现有HEY./左文右人物/同人双幕上精修：深橄榄工作室环境、暖奶油金主按钮/深绿圆箭头、极简动效Switch、细导航下划线、能力14px/轻实底。人物/三环/850ms可逆时钟及P24/P25合同保留；没有虚构资料或恢复档案。
+- 新增内置imagegen环境WebP1672/768两版共约37KiB；原图来源和最终提示词在frontend/public/site/ASSETS.md。手机因14px双列断词改卡内单列，四组横卡与名单滚动保留。
+- 最终前端lint/build通过；Chrome原窗口/1440桌面/390及320公开、后台1440×900/390×844 iframe通过本轮布局与关键交互。正向/反向/中途反向有真实中间帧；用户指出转场消失时已定位为验收临时关闭动效，已恢复on。独立审查reduce箭头瞬移P2已修，无未关闭阻塞。
+- 用户真实v6未保存/上传/退出；后端未改不重复HTTP。真实OS reduce/多浏览器/手机touch/长40字和12项新浏览器重造未执行，详见[SPEC-003 P26](../specs/003-personal-site.md)、[整合](tasks/003-warm-studio-integration.md)、[审查](tasks/003-warm-studio-review.md)。截图evidence/warm-studio-*-v11.jpg。
+- 基准82acde8，保留既有未提交改动，本次基线/tmp/nest-warm-studio-before。未提交/推送/部署/换分支/worktree。3000/5173保留运行，浏览器留初次见面且动效on，viewport已调用reset。
+
+## 当前任务：P25后台预览布局修复（已验证，2026-11-07）
+
+- 用户指出预览黑边、内部滚条、标题断行和右卡片裁切。已用同源独立iframe与草稿消息替换嵌套div，桌面至少1440×900/手机390×844完整等比适配；外框精确包住画布，CSS/JS读取自己的viewport。保留P24移除档案、能力配置/彩色SVG及三环/850ms转场。
+- Chrome1889/1440/1280桌面与390/320后台已验无整页横溢出；桌面标题一行、四卡完整、无内部双滚条/单侧黑边。连续输入/清空昵称同步且场景保持，设备切换、手机菜单、关于/Esc、独立入口等待及公开1440/390回归通过。
+- 前端lint/build（含TS）通过，模块36/36+TSX生命周期模拟14/14；独立审查无P0/P1/P2。后端未改，不重复其HTTP检查；真实手机、多浏览器、OS reduce与真实409浏览器本轮未扩大覆盖。合同/证据见[SPEC-003 P25](../specs/003-personal-site.md)、[整合](tasks/003-preview-layout-integration.md)、[诊断](tasks/003-preview-layout-diagnosis.md)、[实现](tasks/003-preview-layout-implementation.md)、[审查](tasks/003-preview-layout-review.md)。
+- 所有编辑测试仅随机临时Mongo；3001/5174已停止，两次fixture库/媒体均清理且0残留。真实API仍v6、保存disabled，用户登录保留；3000/5173继续运行。viewport已reset，实际能力预览保留，截图evidence/preview-fixed-final-v10.jpg。
+- 基准82acde8；保留全工作区既有改动，无提交/推送/部署/换分支/worktree，未写开发配置。P24作品档案移除仍是有效合同。
+
+## 上一任务：P24作品档案整体移除（已验证，2026-11-07）
+
+- 用户要求整体移除作品档案及站主对应配置；最新合同与AC见[SPEC-003 P24](../specs/003-personal-site.md#p24作品档案整体移除最新合同2026-11-07)，覆盖下方保留档案的旧任务记录。
+- 已移除公开档案导航/区块/详情/query、站主作品分区/所有编辑/封面上传、前后端projects合同；首页探索改为我的能力。旧Mongo读取只剔除响应，正常保存替换content；图片POST404，音频与历史媒体GET保留，/tasks不变。
+- 三路报告：[后端](tasks/003-remove-archive-backend.md)、[后台与共享合同](tasks/003-remove-archive-admin.md)、[公开页](tasks/003-remove-archive-public.md)，[整合](tasks/003-remove-archive-integration.md)、[独立审查](tasks/003-remove-archive-review.md)。
+- 基准82acde8，保留原大量未提交工作；本轮未提交/推送/部署/换分支/worktree，不写开发数据库或删除历史上传文件。代码快照`/tmp/nest-remove-archive-before`区分本次差异。
+- 后端本轮70/70、5套件通过（含build），先红5条后实现；前端最终lint/build通过，API21/store17定向模拟通过。Chrome1920/390/320公开/后台只读确认无档案/无横溢出、旧query普通首页、关于/联系与回焦、主按钮/键盘跳能力及反向端点、后台五分区/音乐/预览。独立审查无P0/P1/P2；截图evidence/remove-archive-*.png。
+- 开发API实读仍v6；本轮没有保存真实配置、上传或退出用户会话。失败重试仅源码/API-store模拟，未做浏览器断网注入；真机/多浏览器/OS reduce等边界未扩大。前端5173、后端3000保留，浏览器viewport已reset。
+- P24冻结验收之后，外部聊天「配置我的能力分类」开始iframe预览重构，改动admin/index、admin/style、site/style及新增预览文件；已保留，文件落盘后根重新build通过。P24后台截图/19文件hash对应该预览重构之前，后续iframe/路由/视觉由该任务继续验收，不覆盖本轮删除合同；详见整合报告。
+
+## 历史交接（P24前，仅供背景）
+
+- 更新时间：2026-11-07（Asia/Shanghai）；代码基准82acde8，当前未提交工作区。
+- 当前任务：[SPEC-003](../specs/003-personal-site.md)个人官网与唯一站主配置。首版至第四轮增量已验证；第五轮连续双场景已实现并通过Chrome桌面/手机尺寸验收（其它兼容边界见末节）：首载完整开场、移除跳过/页脚按钮、独立登录提示、背景音乐及音源配置，第一条参考的Splash Cursor柔雾流体背景已接入。档案揭幕仍仅建议，未混入本轮。
+- 保留根AGENT.md用户既有规则。此前6680afe、82acde8已推送main；本任务没有提交、推送、换分支、worktree、部署或清库。
 
 ## 当前实现
 
-- 普通用户，3–5位ASCII数字字符串账号，保留前导零；密码8–64 Unicode码点，注册自动登录，登录/注册弹窗底部链接切换，业务错误消息提示。
-- MongoDB Session、HttpOnly Cookie、固定最长7天、CSRF和限流；用户仅管理本人任务，游客三条只读示例，历史无主任务保留且隔离。
-- UsersModule封装用户模型/服务/类型，AuthModule通过imports复用；三个Guard各自放入auth/guards，配置/类型分别分类，保留中文学习注释。
-- 根规则及后端规则明确业务模块与目录组织，README/架构/基线/导航同步。
+- `/`：橄榄人物舞台、作品档案、分类和阅读面板、关于/联系、手机简化、系统和手动减弱动效。静帧人物不含连续肢体/眼神表演。
+- 新增：首页站主入口→舞台内登录面板→`/admin`；手机菜单同入口，后台预览禁用登录。HEY.写完+停留后显影，正常4100ms；首载等待数据与图片、硬刷新重播、同App返回不重复，保留Esc、无跳过/页脚重看按钮；桌面滚动景深、纸页悬停/展开、柔光与鼠标流体。
+- `/admin`：真实API配置、全站草稿、上传、原子保存、版本冲突、未保存预览、权限/过期边界。`/tasks`保留原任务演示。
+- 技术栈不变：React/MobX/Ant Design/Less Modules + NestJS/MongoDB，路由懒加载，无新增Three/GSAP/视频依赖。
+- 唯一站主55555已受控初始化，UUID只在本地忽略backend/.env；服务端Session+Owner+CSRF，缺owner配置拒绝所有管理请求，公开注册API403。密码不入仓库/日志/测试。
+- 图片PNG/JPEG/WebP限5MiB，音乐MP3/WAV/OGG限15MiB，实际容器/文件头验证，保存在ignored backend/.data/site-assets；全站version比较原子保存，隐藏项目不公开。
+- 真实配置当前v6（用户保存）：前端能力为React/Vite/TypeScript；标题OH,/HELLO.、默认展示名HEY.、真实任务项目及已上传截图。个人简介/联系待填写；音乐disabled/空音源/音量25/循环true，临时QA文案与音源引用已清空。
 
-## 最新验证
+## 验证与证据
 
-- 账号规则统一前HTTP40/42，两个失败来自旧1位合法夹具；用户确认新规则后调整边界覆盖，最终`npm test --prefix backend`构建与42/42全部通过，0失败/跳过/取消。
-- 前端lint/build通过；实际表单validator与API解析12组边界通过（1/2/6位拒绝，3/4/5位通过，前导零保留），额外数值账号响应拒绝、匿名响应通过。原680.57kB体积提示仍在。
-- 本次浏览器确认2位账号字段提示；完整交互证据保留SPEC-001历史记录，未把本次局部验证说成完整重验。
-- 认证实现、模块整理及3–5位规则均经独立审查，无本轮阻塞；提交范围检查69个路径无意外配置/构建物，实际.env、依赖与dist不入库，敏感格式及本地Session密钥匹配无泄漏。
+- 后端第一版最终 `npm test --prefix backend`：59/59、5套件、0失败/跳过/取消，含构建。该记录为历史；第四轮音乐变更后的67/67结果见下方。日志 `/tmp/nest-backend-test-email-fix.log`。
+- 第二轮最终重新执行前端lint/build均退出0，含TypeScript，无大块警告；前端无test脚本。临时Node生命周期断言intro19/19、login13/13是模拟证据，不冒充浏览器。
+- 第一版真实浏览器：站主登录、保存v1、跨窗口409保留输入/载入最新、JPEG上传保存v2/刷新持久化，桌面/390×844手机配置与公开页、分类空态、详情返回、预览连续输入/单独换图同步；临时输入已恢复。
+- 第二轮真实浏览器：开场自动结束/skip/Esc/重播/会话一次、手动关闭动效、桌面滚动进度、作品返回；首页登录错误/成功及滚动锁清理，手机菜单/登录布局无溢出。重播焦点P2已修复并验证：结束后首屏logo，下一Tab不跳回页脚。
+- 后端、前端与增量动效独立审查均已关闭阻塞。系统OS减少动画、手机软键盘、真实隐藏标签暂停及断网/401浏览器注入未实操；源码、HTTP、模拟与浏览器证据在SPEC分别记录。
+- 历史截图已按上方清理记录删除；第一版及第二轮的浏览器操作结果与未验证边界保留在本节和对应SPEC/任务报告中。
 
-## 边界与环境
+## 分工与后续
 
-- 账号长度收紧后，旧1–2位账号不能通过新登录校验，旧会话可能显示恢复失败；本次不自动改名或删除数据，后续需要时另行处理迁移。
-- 开发前端5173、后端3000已重新启动；真实配置保持本地忽略，不打印密钥、不清开发库。
-- 只提交及普通推送main；不强制推送、不部署、不归档OpenSpec。
-- 下一步：按用户新目标继续，不擅自增加功能；当前无待实施项。
+- [整合](tasks/003-integration.md)、[后端](tasks/003-backend.md)、[公开页](tasks/003-public.md)、[配置](tasks/003-admin.md)、[动效](tasks/003-motion.md)、[登录面板](tasks/003-login-panel.md)、[开场](tasks/003-intro.md)。
+- [后端审查](tasks/003-backend-review.md)、[前端审查](tasks/003-frontend-review.md)、[动效增量审查](tasks/003-motion-review.md)。
+- 已观看[七的三次方视差视频](https://www.douyin.com/video/7686420711983942964)的演示与制作关键画面：三关键帧→两视频→滚动控制揭幕。建议下一轮优先橙色档案掀开露出作品，详细观察/素材边界见SPEC的P10；不是已实现功能。
+- 人物连续动作素材、真实个人介绍/联系待补。用户此前已决定先页面后台、动作后补，不再重复索要密码或自行启用付费视频生成。
+- 本地前端5173、后端3000；预览保留首页。测试结束主动退出站主会话，可从首页登录。媒体需与MongoDB一起备份，未保存引用上传目前无自动清理。
+- 旧独立浮岛原型已移废纸篓、4177停止；保留原参考照片，不恢复旧方案。两个既有OpenSpec引用未归档。
+
+## 2026-11-07：Unslop 检查
+
+按用户要求安装用户级 `~/.codex/skills/unslop`，完成当前官网桌面/手机实际页面与独立源码审查；[总报告](tasks/003-unslop-audit.md)、[源码报告](tasks/003-unslop-code-review.md)。结论是保留现有橄榄舞台/人物/档案并局部精修，优先按钮对比度、手机小字、重复文案。此次仅安装和检查，建议未实施；未修改产品代码或配置数据，未重跑构建/HTTP，不覆盖上方其它任务的验证记录。
+
+
+## 当前第三轮增量（已验证）
+
+- P11：intro代理将原重叠时序改为2110ms收笔→740ms完整停留→350ms文字淡出→900ms玻璃显影，总4100ms。已按最新要求移除“跳过开场”按钮，dialog自身接焦点，读屏说明改为自动进入。
+- P12：第一条视频约27秒已实际核对为React Bits Splash Cursor，采用官方WebGL流体本地适配，暖金/灰绿背景图层，手机/关闭/隐藏时停止，不模糊或遮挡人物文字。fluid代理只写components/site-fluid；根集成site与浏览器，未引新包。
+- 最终增量独立审查无P0/P1/P2；前端lint/build通过。桌面/手机完整签名无skip、自然结束、鼠标实际像素、停止/关闭/登录时隐藏、离屏回收1×1及回首屏恢复已实测。系统reduce/硬件故障/隐藏标签仅源码与模拟证据。此前后端59/59不受影响，未重跑。
+
+## Unslop 三项精修已完成
+
+- 用户授权的按钮对比度、手机字号、重复文案/双标点已修正；本轮只改公开页 `index.tsx` 和 `style.module.less`，保留橄榄舞台、人物及动效实现。
+- 最终lint/build通过；浏览器桌面1280×720、手机390×844/320×740验证正文14px/标签12px、阅读返回/关于、无横向溢出；按钮四端点最低4.8936:1。独立审查两处字号遗漏已关闭。多项目与后台预览仅源码验证。
+- [交接与截图](tasks/003-unslop-polish.md)、[独立审查](tasks/003-unslop-polish-review.md)。记录两份精修文件哈希；开场浏览器检查后P11继续变化，最新动效验收仍由上方第三轮任务负责，不把本轮结果扩展到并发新动效。
+- 交付核对时P12已往公开页集成SiteFluidBackground；精修文案保留、样式哈希未变。此次截图/构建记录对应该集成前的精修验收版本，新背景由P12–P13续验。
+
+- 第三轮报告：[流体实现](tasks/003-fluid.md)、[增量审查](tasks/003-fluid-review.md)、[开场](tasks/003-intro.md)。完整开场与流体过程截图见evidence/home-intro-complete-v3.jpg、home-fluid-desktop-v3.jpg；已保留首页预览。第三轮已完成；最新第四轮结果见下方。
+
+
+## 当前第四轮增量（已验证）
+
+- 首载：App提前显示开场，懒加载首页与主图decode就绪且文字停留结束才显影；8秒资源降级/12秒可见时间保险，错误可重载。硬刷新完整播放，站内返回不重复；详情query不抢开场dialog。
+- 提示与控件：奶油色独立SiteTip复用于登录和音乐，登录红框移除且输入框不位移；页脚重看/回首页两按钮删除。视觉动效与音乐各用明确文字开关。613px鼠标窗口流体已实测可用。
+- 音乐：后台外观区支持URL/15MiB音频上传、名称、音量、循环与启用，上传仅改草稿。沿用Session/Owner/CSRF与版本保存；无配置不显示播放器，主动点击才创建Audio。离页/换源/禁用清理，错误使用tips、弹窗期间延后展示。
+- 最终后端67/67、5套件通过（含build），日志/tmp/nest-backend-music-final.log；前端lint/build退出0且无lint警告，无新依赖。独立审查P2已关闭；实际模块模拟入口37、登录33、播放器/tip34、API解析23均通过，不能替代浏览器/真实网络覆盖。
+- 浏览器已验：首载/完整签名/自然显影、about深链顺序、613px流体、登录空/错误/重复提示/成功、测试WAV上传草稿/保存/播放/暂停、失败提示、手机无横向溢出。临时音乐v3/v4已恢复为空v5，刷新确认，已退出站主会话。系统reduce、真实慢网/隐藏标签仅源码/模拟证据。
+- Vite热更新期间一次动态模块加载失败，重启原开发服务后恢复；不伪称为生产加载故障复现。前端5173、后端3000继续运行，最终保留官网预览。未提交、推送、部署。
+- [首载报告](tasks/003-cold-entry.md)、[提示报告](tasks/003-login-tips.md)、[音乐配置](tasks/003-music-config.md)、[独立增量审查](tasks/003-entry-tips-player-review.md)。当前截图：evidence/home-intro-v4.jpg、home-login-tip-v4.jpg、admin-music-v4.jpg。后续待用户正式音源、个人介绍/联系与人物动作素材。
+
+## 当前第五轮：双场景规范（已实现，Chrome验收通过）
+
+- [SPEC-003 P18](../specs/003-personal-site.md)：同一首页舞台欢迎/能力，共享1900ms可逆时钟、重复操作锁、端点状态与焦点、系统/手动减弱动效、手机横向技术卡片。新桌前MacBook透明WebP双分辨率预decode，8秒错误降级，9个本地技术SVG；作品档案/旧人物/后台配置保留。
+- 最终lint/build通过（`/tmp/nest-capability-final.log`）；真实hook47及页面39定向模拟通过，无新增前端test脚本或依赖。未改后端，未重跑HTTP。
+- Chrome1440/768/390/320两场景、正反/快速点击/卡片/键盘/手动reduce通过。修复HMR状态帧不一致、舞台内部滚动、平板低头位、手机文案遮挡/隐藏滚条及320整页横溢出。8张截图`evidence/capability-*-v5.png`；[独立审查/浏览器记录](tasks/003-capability-review.md)、[整合](tasks/003-capability-integration.md)。
+- Safari原生工具连接超时，Firefox/Edge/真实手机触摸/OS reduce/慢网断图/真实后台预览未实操，源码/模拟不冒充浏览器；兼容补验边界详见SPEC。Chrome预览留首页，动效开启；临时viewport已请求reset。
+- 保留所有已有未提交工作，无提交/推送/部署或数据库写入。后续为上述兼容补验及原先个人资料/正式音源待补，不自行启动新功能。
+
+## P20 光圈动效修正（2026-11-07）
+- 已补能力人物椭圆轨道的18秒光点/金色尾迹循环，外层保留原可逆转场；手动/系统reduce静止，切场/弹窗/离开首页/隐藏标签暂停。未改并行P19配置或数据库。
+- Chrome实际采样移动、手动off、弹窗暂停、离屏/反向暂停及回来恢复通过；lint/build与共享时钟47断言通过，独立小范围审查无阻塞。图`evidence/capability-orbit-flow-v6.png`，详情SPEC P20；OS reduce/真实隐藏仅源码。Chrome留能力页、动效开，未提交/推送。
+
+## P19 我的能力配置（已实现并验证）
+
+- 最新用户任务：AI/前端/后端/部署四类能力由站主配置，后台四Tab、SVG+名称Select、自定义昵称与排序/删除；公开保留人物和四卡片。合同与实施清单在SPEC-003 P19。
+- 图标38可选项+原openai兼容文件共39SVG；后续官方/品牌色增量后约296KiB，来源/固定版本/许可/SHA256见frontend/public/site/tech/SOURCES.md/json；39/39静态验证通过。
+- 后端能力合同与兼容已接入，最终真实HTTP72/72、5套件通过，日志/tmp/nest-backend-capabilities-final.log；最终前端lint/build通过，日志/tmp/nest-capability-config-frontend-final.log。API模块22/22、UI模块18/18、保存定位7/7模拟通过，不冒充浏览器。
+- Chrome桌面1318、390/320尺寸已验四Tab/搜索/添加/改图标保留昵称/连续预览/跨Tab/排序/删空/保存及公开同步、12项和40字昵称、409保留草稿；后台/公开无横溢出，名单可局部键盘滚到末项。
+- 独立审查两个P2已修复复验关闭：隐藏无效昵称保存自动切分类并聚焦（含手机预览回编辑），纵向列表允许水平滚动链给外层横卡。真机touch、软键盘、多浏览器/断网注入未实操，边界见SPEC。
+- 所有浏览器测试写入使用localhost:5174/3001独立临时Mongo库，已退出测试会话、停临时服务、清理审计无残留fixture；开发配置仍v5九项。原开发watcher中断后已恢复3000/5173，正式能力页图标全加载并保留预览，动效开。未提交/推送/部署。
+- 报告：[图标](tasks/003-capability-icons.md)、[后端](tasks/003-capability-config-backend.md)、[前端](tasks/003-capability-config-frontend.md)、[根整合](tasks/003-capability-config-integration.md)、[审查](tasks/003-capability-config-review.md)。截图evidence/*capabilities*-v7.jpg；后续可从/admin→我的能力维护自己的列表。
+
+### P19后续：导入错误与官方图标（已处理）
+
+- 复现悬空use-orbit-card-windows引用造成TS2307/Vite500；并行P21模块先补齐，后重构为use-orbit-occlusion，当前导入均存在、TS/lint/build通过，模块HTTP200。根未覆盖光圈改动。
+- 13SVG（12可选+openai兼容）更新官方来源，含当前九项及Vue/ChatGPT/Cursor；其它26保留开源且明确区分。Codex采用OpenAI官方Blossom fallback，不虚称独立Codex图标。源码path/来源/许可/哈希详见SOURCES和图标报告。
+- 官网和Select取消白色滤镜、保留原色并加浅底。39静态SVG与HTTP均通过；Chrome后台四Tab/Select及公开九图已加载、无错误遮罩。仅只读用户v6，未改数据或退出其会话；截图official-svg-admin-v8.jpg，构建日志/tmp/nest-official-svg-final-build.log，独立[复审](tasks/003-capability-official-svg-review.md)通过。未提交/推送/部署。
+- 用户继续反馈没有颜色：21项已补齐固定版本原色SVG或可核实的品牌hex，现30项品牌色+8项黑白表示。原13官方文件哈希保持，39SVG共302532B；来源和独立复审已同步。最终build/TS通过（/tmp/nest-brand-colors-final-build.log），沿用未变样式的lint；39SVG与模块HTTP200。Chrome选择器彩色效果、56图加载/filter none/无overlay已验，保存按钮仍disabled，本轮未写用户v6。截图brand-colors-admin-v9.jpg。
+
+## P21–P23 光环与转场迭代（已交付）
+- 用户最新要求已覆盖P18/P20旧表现：三条1/.82/.6724等比光环缓慢旋转（无光点尾迹），SVG收紧至最大旋转包络；仅可见人物遮光，卡片及展开说明区域透光，局部坐标遮罩由use-orbit-occlusion管理。保留并行P19配置工作。
+- 转场1900→850ms，导航/场景按钮点击即按targetScene选中；未decode不阻塞切换、显示原人物降级；中途可在同一时间轴逆向，重复同目标忽略，卡片端点后才可交互。
+- 最终lint/build通过，最新时钟86+遮罩几何37定向断言通过，独立小范围审查无阻塞。Chrome确认active=page时busy=true/settled=0、快速逆向、桌面/768三环/遮罩/部署展开/动效关闭；图evidence/capability-three-rings-fast-v8.png。真机/其它浏览器/OS reduce边界未扩大，详见SPEC最终记录。
+- Chrome留我的能力、动效开，viewport已reset。未提交/推送/部署，P19其它任务状态仍按其独立记录。

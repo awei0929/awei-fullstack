@@ -8,7 +8,7 @@ import { TasksService } from '../dist/tasks/tasks.service.js';
 
 let writeHeaders;
 
-// 保留原任务CRUD的输入/错误回归，但所有私有请求都先使用真实注册会话。
+// 保留原任务CRUD的输入/错误回归，但所有私有请求都先使用受控用户夹具与真实登录会话。
 describe('任务 HTTP 接口', () => {
   let app;
   let baseUrl;
@@ -25,7 +25,7 @@ describe('任务 HTTP 接口', () => {
     state = await startApp();
     ({ app, baseUrl } = state);
     user = client(state);
-    await user.register();
+    await user.seedAndLogin();
     writeHeaders = { 'X-CSRF-Token': user.csrfToken };
   });
 

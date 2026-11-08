@@ -1,3 +1,5 @@
+import { SiteModule } from './site/site.module.js';
+import { SiteController } from './site/site.controller.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AuthController } from './auth/auth.controller.js';
 import { PublicModule } from './public/public.module.js';
@@ -28,6 +30,7 @@ import { SystemModule } from './system/system.module.js';
     DatabaseModule,
     AuthModule,
     PublicModule,
+    SiteModule,
     TasksModule,
     SystemModule,
     StatsModule,
@@ -49,6 +52,6 @@ export class AppModule implements NestModule {
       .apply(RequestLoggerMiddleware)
       // forRoutes 指定需要记录的 Controller，包含它们全部HTTP方法；不打印密码、Cookie或请求体。
       // 全局 /api 前缀由 Nest 统一处理，不需要在这里重复拼写。
-      .forRoutes(TasksController, StatsController, AuthController, PublicController);
+      .forRoutes(TasksController, StatsController, AuthController, PublicController, SiteController);
   }
 }

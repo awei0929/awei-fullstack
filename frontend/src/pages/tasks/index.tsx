@@ -45,7 +45,7 @@ export const TasksPage = observer(function TasksPage() {
               <span className={styles.account}>账号 {authStore.user.account}</span>
               <Button onClick={() => void authStore.logout()} loading={authStore.loggingOut} disabled={authStore.loggingOut}>退出</Button>
             </div>
-          ) : <Button onClick={requestLogin}>登录 / 注册</Button>
+          ) : <Button onClick={requestLogin}>登录</Button>
         )}
       </header>
 
@@ -246,7 +246,7 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
                 disabled={refreshing || busy}
               >创建任务</Button>
             </Form>
-            <p className={styles.hint}>{guest ? '注册或登录后开始记录，示例内容保持不变。' : '任务会自动保存，下次登录可以继续。'}</p>
+            <p className={styles.hint}>{guest ? '登录已有账号后开始记录，示例内容保持不变。' : '任务会自动保存，下次登录可以继续。'}</p>
           </div>
         </section>
       </div>

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res, SetMetadata, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, HttpCode, Post, Req, Res, SetMetadata, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { CredentialsDto } from './dto/credentials.dto.js';
@@ -17,17 +17,15 @@ export class AuthController {
   constructor(private readonly auth: AuthService, private readonly users: UsersService, private readonly config: ConfigService) {}
 
   // @Req 取得当前请求，session 由前置 express-session 中间件挂载。
-  // 游客也能调用此接口，先取得绑定匿名会话的 CSRF 令牌，再提交注册或登录。
+  // 游客也能调用此接口，先取得绑定匿名会话的 CSRF 令牌，再提交登录。
   @Get('session')
   session(@Req() request: Request): Promise<SessionView> { return this.auth.session(request); }
 
-  // POST 默认成功状态为 201。守卫先按声明顺序验证 CSRF、限流，
-  // 放行后全局 ValidationPipe 才验证 @Body 的 DTO，最后执行方法。
+  // 公开注册已关闭：不解析凭据、不创建用户、不改变现有会话，所有调用都明确403。
+  // 本地受控初始化直接复用UsersService，不通过HTTP注册后门。
   @Post('register')
-  @UseGuards(CsrfGuard, AuthRateLimitGuard)
-  async register(@Req() request: Request, @Body() input: CredentialsDto): Promise<SessionView> {
-    // 等用户创建成功后才建立登录会话；重复账号等错误不会进入会话建立步骤。
-    return this.auth.establish(request, await this.users.register(input));
+  register(): never {
+    throw new ForbiddenException({ message: '本站已关闭公开注册', code: 'REGISTRATION_DISABLED' });
   }
 
   // 使用处理器元数据标记账号限流，而不根据请求 URL 文本判断。

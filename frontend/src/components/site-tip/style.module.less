@@ -1,0 +1,43 @@
+.viewport {
+  position: fixed;
+  z-index: 100;
+  top: max(20px, env(safe-area-inset-top));
+  right: 16px;
+  left: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  pointer-events: none;
+  font-family: Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.tip {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: min(420px, 100%);
+  padding: 10px 10px 10px 14px;
+  border: 1px solid #d5ceb7;
+  border-radius: 12px;
+  color: #37412a;
+  background: #fff7e6;
+  box-shadow: 0 8px 28px #17201326, inset 0 1px 0 #ffffffb3;
+  pointer-events: auto;
+  animation: appear 180ms ease both;
+
+  &[data-exiting='true'] { animation: disappear 160ms ease both; }
+  &[data-tone='error'] .icon { color: #61370b; background: #f3c286; }
+  &[data-tone='success'] .icon { color: #f9f2dd; background: #566441; }
+}
+
+.icon { display: grid; flex: 0 0 22px; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: #445334; background: #e4e8d6; font-size: 14px; font-weight: 700; line-height: 1; }
+.message { min-width: 0; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.tip .close { display: grid; flex: 0 0 30px; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 7px; color: #596047; background: transparent; font: inherit; font-size: 21px; line-height: 1; cursor: pointer; touch-action: manipulation; &:hover { color: #303b24; background: #e8e9d8; } &:focus-visible { outline: 2px solid #65764a; outline-offset: 2px; } }
+
+@keyframes appear { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes disappear { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-5px); } }
+.reducedMotion .tip { animation: none; &[data-exiting='true'] { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .tip { animation: none; &[data-exiting='true'] { visibility: hidden; } } }
+@media (max-width: 480px) { .message { font-size: 14px; } }

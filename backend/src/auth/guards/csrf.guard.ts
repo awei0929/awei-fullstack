@@ -11,11 +11,11 @@ export class CsrfGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const expected = request.session.csrfToken;
     const received = request.get('X-CSRF-Token');
-    if (!expected || !received) throw new ForbiddenException('CSRF令牌无效');
+    if (!expected || !received) throw new ForbiddenException({ message: 'CSRF令牌无效', code: 'CSRF_INVALID' });
     // timingSafeEqual 在长度相等时以恒定时间比较内容，避免普通字符串比较的提前退出差异。
     // 此 API 要求 Buffer 长度相同，因此先检查长度；令牌内容不会进入错误响应。
     const a = Buffer.from(expected), b = Buffer.from(received);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) throw new ForbiddenException('CSRF令牌无效');
+    if (a.length !== b.length || !timingSafeEqual(a, b)) throw new ForbiddenException({ message: 'CSRF令牌无效', code: 'CSRF_INVALID' });
     return true;
   }
 }

@@ -93,3 +93,9 @@ Superpowers 升级时，用 Skill Installer 将审阅过的新提交先安装到
 需要回退时，只移除来源清单列出的本次技能及 OpenSpec 配置/schema，撤回本次新增的文档段落；保留原有 AGENT、SPEC、STATE 和业务文档。已有实际变更时先保留其引用记录。确认没有其它项目依赖当前 CLI 后，才卸载 npm 全局包。不要用 `git reset --hard` 或整目录删除来处理安装前已存在的未提交文档。
 
 官方依据：[OpenSpec 自定义工作流](https://github.com/Fission-AI/OpenSpec/blob/main/docs/customization.md)、[工具适配](https://github.com/Fission-AI/OpenSpec/blob/main/docs/supported-tools.md)、[Superpowers 固定版本](https://github.com/obra/superpowers/tree/v7.0.2)、[Codex 技能范围](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)。
+
+## 2026-11-07：用户级 Unslop
+
+按用户要求，通过系统 `skill-installer` 从 `heydamir/unslop` 的 `main` 分支安装 `skills/unslop`，位置为 `/Users/awei/.codex/skills/unslop`。这是本机用户级技能，不计入上述 21 个项目技能，也不随本仓库同步。没有修改全局模型配置或项目依赖。
+
+安装后已读取 `SKILL.md`、`references/signs.md`、`references/tokens.md` 并用于[个人官网检查](tasks/003-unslop-audit.md)。下一轮可使用 `$unslop`；本轮通过直接读取已安装文件应用规则。作者 Damir Sokolovsky，CC BY 4.0，保留上游署名和许可。来源：[技能目录](https://github.com/heydamir/unslop/tree/main/skills/unslop)。

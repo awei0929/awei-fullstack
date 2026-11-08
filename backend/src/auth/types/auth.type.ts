@@ -1,6 +1,6 @@
 import type { User } from '../../users/types/user.type.js';
 
-// 同一种响应形状用于恢复、注册和登录；游客以 user:null 明确表示，仍可持有 CSRF 令牌。
+// 同一种响应形状用于恢复和登录；游客以 user:null 明确表示，仍可持有 CSRF 令牌。
 export interface SessionView { user: User | null; csrfToken: string }
 
 // 声明合并：为第三方 SessionData 补充本项目字段，让读取/写入会话有类型提示。

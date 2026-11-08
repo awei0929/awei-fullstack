@@ -1,3 +1,4 @@
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -15,6 +16,8 @@ import './auth/types/auth.type.js';
 export async function configureApp(app: INestApplication): Promise<void> {
   // app.get 从 Nest 的依赖容器取已有实例，等价于启动阶段使用依赖注入。
   const config = app.get(ConfigService);
+  // 全站配置一次提交多个分区，统一限制整个JSON请求体为2MiB，避免无限接收输入。
+  (app as NestExpressApplication).useBodyParser('json', { limit: '2mb' });
   // 密钥给会话ID签名，防止Cookie被篡改；不用于加密密码，也不能每次重启随机生成。
   const secret = config.get<string>('SESSION_SECRET');
   if (!secret || secret.length < 32) throw new Error('SESSION_SECRET 必须固定配置且至少32字符');
@@ -41,7 +44,7 @@ export async function configureApp(app: INestApplication): Promise<void> {
   await store.collectionP;
   // 个人数据和认证响应不交给浏览器/代理缓存；/i与Express默认不区分大小写的路由保持一致。
   app.use((request: Request, response: Response, next: NextFunction) => {
-    if (/^\/api\/(auth|tasks|stats)(?:\/|$)/i.test(request.path)) response.setHeader('Cache-Control', 'no-store');
+    if (/^\/api\/(auth|tasks|stats|site)(?:\/|$)/i.test(request.path)) response.setHeader('Cache-Control', 'no-store');
     next();
   });
   // 必须在Controller与Guard之前安装，后续才能通过request.session读取身份。

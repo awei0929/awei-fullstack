@@ -13,7 +13,8 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main.js",
     "test": "npm run build && node --test test/*.e2e.test.mjs",
-    "test:e2e": "npm test"
+    "test:e2e": "npm test",
+    "site:owner:init": "node dist/scripts/initialize-site-owner.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

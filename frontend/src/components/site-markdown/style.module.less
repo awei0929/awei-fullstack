@@ -1,0 +1,19 @@
+.markdown {
+  min-width: 0; color: #e6e4cf; font-size: 15px; line-height: 1.85; overflow-wrap: anywhere;
+  > :first-child { margin-top: 0; }
+  > :last-child { margin-bottom: 0; }
+  h1, h2, h3, h4, h5, h6 { color: #fff0d2; line-height: 1.45; margin: 1.5em 0 .65em; }
+  h1 { font-size: 27px; } h2 { font-size: 23px; } h3 { font-size: 19px; }
+  p, ul, ol, blockquote, pre, table { margin: 0 0 1em; }
+  ul, ol { padding-left: 1.5em; } li + li { margin-top: .3em; }
+  a { color: #f8ce7f; text-decoration: underline; text-underline-offset: 3px; }
+  blockquote { border-left: 2px solid #b4b789; padding: 8px 16px; background: #ffffff05; color: #cbceb6; }
+  code { padding: .15em .35em; border-radius: 4px; background: #10190f8c; font-family: monospace; font-size: .9em; }
+  pre { max-width: 100%; overflow: auto; padding: 18px; border: 1px solid #e9d5a71f; border-radius: 10px; background: #10190f8c; line-height: 1.7; code { padding: 0; background: none; white-space: pre; } }
+  img { display: block; max-width: 100%; height: auto; border-radius: 10px; margin: 16px 0; }
+  hr { border: 0; border-top: 1px solid #e9d5a72b; margin: 28px 0; }
+  input[type='checkbox'] { accent-color: #f4bd58; }
+  :focus-visible { outline: 2px solid #f4bd58; outline-offset: 3px; }
+}
+.tableScroll { max-width: 100%; overflow: auto; margin-bottom: 1em; scrollbar-width: thin; table { border-collapse: collapse; width: 100%; min-width: 360px; margin: 0; } th, td { padding: 10px 14px; text-align: left; border: 1px solid #e9d5a72b; } th { color: #fff0d2; background: #ffffff08; } }
+.imageFallback { display: grid; place-content: center; gap: 6px; min-height: 100px; padding: 20px; border: 1px dashed #e9d5a744; border-radius: 10px; color: #c6cbb4; background: #ffffff05; font-size: 14px; text-align: center; small { display: block; overflow-wrap: anywhere; } }

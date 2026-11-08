@@ -42,6 +42,17 @@ export class UsersService implements OnModuleInit {
     }
   }
 
+  // 受控本地初始化复用用户业务能力；已有账号必须验证原密码，绝不静默重置。
+  // 并发初始化时仍由唯一索引裁决，输家验证赢家的凭据后返回相同UUID。
+  async provisionAccount(input: UserCredentials): Promise<User> {
+    if (await this.users.exists({ account: input.account })) return this.login(input);
+    try { return await this.register(input); }
+    catch (error) {
+      if (error instanceof ConflictException) return this.login(input);
+      throw error;
+    }
+  }
+
   // lean 返回普通对象，适合只读查询；verify 从已保存哈希中读取参数和盐并验证原始密码。
   async login(input: UserCredentials): Promise<User> {
     const record = await this.users.findOne({ account: input.account }).lean().exec();

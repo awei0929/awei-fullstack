@@ -9,6 +9,7 @@
 | 工具读取入口 | [AGENTS](../AGENTS.md) |
 | OpenSpec / Superpowers 安装范围、版本与使用 | [工具配置](ai/TOOLING.md) |
 | 环境配置、启动和检查命令 | [项目 README](../README.md) |
+| 自动构建部署、日志、发布与回退 | [部署手册](deployment.md) / [SPEC-005](specs/005-automatic-deployment.md) |
 | 系统结构与模块边界 | [架构概览](architecture/overview.md) |
 | 后端/前端具体约定 | [后端](../backend/AGENTS.md) / [前端](../frontend/AGENTS.md) |
 | 如何编写功能规格 | [SPEC 规范](../SPEC.md) / [模板](specs/TEMPLATE.md) |

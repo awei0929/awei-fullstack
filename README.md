@@ -10,6 +10,8 @@ React + NestJS + MongoDB 全栈项目。公开官网展示人物、个人能力�
 
 ## 开发入口
 
+- [自动构建与部署](docs/deployment.md)：main 推送、构建/部署日志、手动发布和回退。
+
 - [AGENT](AGENT.md) / [AGENTS](AGENTS.md)：项目规范和工具入口。
 - [文档导航](docs/README.md) / [架构概览](docs/architecture/overview.md)。
 - [SPEC 规范](SPEC.md) / [当前系统基线](docs/specs/000-current-system.md)。

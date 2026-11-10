@@ -28,7 +28,11 @@
 - Mongo8.0实际错误为Linux kernel 6.19+兼容检查（SERVER-121912），待按官方依据配置CI兼容项；不改线上数据库。容器初始化时自定义日志目录尚不存在，Artifacts API数量0，原生错误日志可查看/下载；已补文档说明这一边界。
 - [42756018740](https://github.com/awei0929/awei-fullstack/actions/runs/42756018740) 手动回退入口验证已成功：目标为当前bootstrap，因此实际验证的是幂等回退、GitHub到服务器受限SSH、重启和API/HTTPS双健康检查；未发生旧/新目标切换。构建正确跳过，部署日志归档deploy-logs-42756018740-1实际存在（541字节），未改业务数据。
 - CI Mongo service已按官方镜像维护者建议配置临时rseq兼容项，actionlint及格式检查通过，将由main推送实际重验。
-- 待补：实际测试/构建、日志及归档、SSH安装/切换、线上探针，和main推送自动触发结果。
+- main推送d0c5ef6a96b09b584b6a9e2324c3a9f6b1bb42c6自动触发[42756174781](https://github.com/awei0929/awei-fullstack/actions/runs/42756174781)，Validate、Build、Deploy全部success。Node24.22.2，部署测试24/24，后端HTTP76/76、5套件，前端npm ci/lint/build通过；两端安装各有2个既有moderate审计提示，本次未升级业务依赖。
+- 发布版本d0c5ef6a96b09b584b6a9e2324c3a9f6b1bb42c6-42756174781-1；远端04:30:54收包，04:37:18安装生产依赖，04:37:21切换，04:37:23成功。上传约6分24秒；只读fd元数据从2MiB增到3MiB确认网络缓慢而非死锁。生产依赖148项/3秒、审计0漏洞；argon2有install-scripts提示，安装返回0且应用启动成功，没有把健康检查扩展为真实密码登录。
+- 产物SHA256为83db7784471202b5d4751a73cb26cc2e04079d4d24da25fe61cf4105af99aedc。发布包本体4,348,230字节，3份Artifacts均存在未过期：[发布包](https://github.com/awei0929/awei-fullstack/actions/runs/42756174781/artifacts/13736180265)、[构建日志](https://github.com/awei0929/awei-fullstack/actions/runs/42756174781/artifacts/13735408030)、[部署日志](https://github.com/awei0929/awei-fullstack/actions/runs/42756174781/artifacts/13736310877)。实际下载发布包及部署日志，确认远端deployment succeeded。
+- 根线上验证：可信HTTPS首页与归档内frontend/dist/index.html逐字节相同，SHA256 c2c6e18900c07e654f5aba9465dedc57cb1cdcabdf63810ed393d2c6d719ac12；3个入口JS资源、/admin、/api/public/stats均200。无业务登录/保存/上传或数据库写入。
+- 最后仅回写文档和索引并跳过文档提交重复CI，应用源码/依赖/工作流与上述已验证提交相同；保留原未提交SPEC-004，README的该功能接入步骤局部适配自动发布也留在工作区。
 
 ## 边界
 

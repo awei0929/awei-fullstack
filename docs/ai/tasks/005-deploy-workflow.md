@@ -61,3 +61,7 @@
 ## 下一步
 
 root 推送 CI 服务环境窄修复后跟进真实 main 工作流，记录新 run URL、commit、release、实际依赖/测试数、构建/SSH/日志下载和线上只读探针结果，再验证手动回退与非 main 拒绝行为。部署仍仅包含已提交业务代码，排除 SPEC-004。
+
+## 整合追加：真实自动发布已通过
+
+main推送d0c5ef6触发[42756174781](https://github.com/awei0929/awei-fullstack/actions/runs/42756174781)，Validate/Build/Deploy全部成功：Node24.22.2、部署脚本24/24、已提交业务后端76/76与5套件、前端lint/build；3份日志/发布归档实际存在，SSH安装/切换与双健康检查通过。手动回退当前bootstrap的[42756018740](https://github.com/awei0929/awei-fullstack/actions/runs/42756018740)也成功；不同目标切换仍只声称隔离测试证据。线上字节核对及最终边界见[整合记录](005-deployment-integration.md)。本节由整合者按实际结果追加，取代上方待验交接状态；历史失败保留。

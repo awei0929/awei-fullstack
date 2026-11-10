@@ -1,5 +1,13 @@
 # 工作区交接状态
 
+## 2026-11-10：自动构建部署（已接入并验证）
+
+- 用户授权代为接入 main 推送后自动部署并交接步骤；合同/清单：[SPEC-005](../specs/005-automatic-deployment.md)，使用方式：[部署手册](../deployment.md)。基准9b12524，现有SPEC-004业务/文档改动保留且不纳入本次发布。
+- production仅允许main，部署私钥仅环境Secret，连接Variables已设；用户完成腾讯云MFA并确认受限公钥。原隧道密钥、真实env/Mongo/媒体保留。发布根/srv/nest，systemd与Nginx共用current版本；首次bootstrap权限失败实际恢复旧站，修复重试成功。
+- main推送d0c5ef6触发[42756174781](https://github.com/awei0929/awei-fullstack/actions/runs/42756174781)全成功：Node24.22.2、部署测试24/24、后端76/76与5套件、前端lint/build；3份构建/部署日志及发布包归档可下载。当前成功版本d0c5ef6a96b09b584b6a9e2324c3a9f6b1bb42c6-42756174781-1，首页与归档逐字节一致、3资源/后台入口/API均HTTPS200。
+- 已验证构建失败不发布、受限命令拒绝、手动回退当前bootstrap的幂等入口；不同目标回退/恶意输入/故障恢复/并发为隔离测试，未冒充线上故障注入。首次SSH上传约6分24秒、依赖安装3秒；CI Mongo有官方临时rseq兼容项。文档回写不改变已验证应用/依赖/工作流，沿用本次结果。
+- 本轮仅提交/推送自动部署文件和文档增量，SPEC-004仍未提交/上线；原README中的上传接入步骤已局部改为通过main发布，随该功能文档继续留在工作区。证据：[整合](tasks/005-deployment-integration.md)、[运行器](tasks/005-deploy-runtime.md)、[工作流](tasks/005-deploy-workflow.md)、[审查](tasks/005-deployment-review.md)。日常提交后推main并查看Actions；回退按部署手册，不自行发布其他未提交功能。
+
 ## 2026-11-08：个人官网提交交接
 
 - 用户授权提交当前工作区：个人官网、唯一站主后台、能力三卡与履历详情、运行素材、规格与交接文档，以及文档图片清理规则；沿用当前`main`分支，不推送或部署。

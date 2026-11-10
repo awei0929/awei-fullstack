@@ -68,6 +68,9 @@ jobs:
     services:
       mongodb:
         image: mongo:8.0
+        env:
+          # Temporary rseq/kernel workaround: https://github.com/docker-library/mongo/discussions/748
+          GLIBC_TUNABLES: glibc.pthread.rseq=1
         ports: ['27017:27017']
         options: >-
           --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"

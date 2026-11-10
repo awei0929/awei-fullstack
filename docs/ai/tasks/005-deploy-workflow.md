@@ -3,7 +3,7 @@
 - 更新时间：2026-11-10（Asia/Shanghai）。
 - 范围：仅 `.github/workflows/deploy.yml` 与本记录；对应 [SPEC-005](../../specs/005-automatic-deployment.md) AC-01、AC-02、AC-07。
 - 基准：开始时 HEAD `9b12524`；当前 main 与 SPEC-004 已有未提交改动保留。没有读取真实 `.env`、运行本机业务测试、提交、推送、配置 GitHub 或连接服务器。
-- 状态：实现与本机配置验证已完成；GitHub 实跑和线上验证由整合任务继续。
+- 状态：实现与本机配置验证已完成；首次真实运行因 CI Mongo 容器的内核兼容检查失败，已做下方窄范围修复，待 root 推送实际重验。
 
 ## 实现
 
@@ -14,7 +14,7 @@
 - 产物仅含 backend/dist、backend/package.json、backend/package-lock.json、frontend/dist。打包前拒绝缺失项、env、node_modules、符号链接及特殊文件；生成 gzip tar 与 SHA256。build 成功后上传 artifact，deploy job 下载并校验摘要；远端仍独立校验归档。实际源码来自 Git 提交，不包含本地 SPEC-004 未提交内容。
 - 发布 ID 为 `<完整提交SHA>-<run_id>-<run_attempt>`。专用 SSH 仅调用 `deploy <ID>` 并将 tar.gz 送入 stdin；回退跳过 build/download/checksum，调用 `rollback <ID>`，stdin 为 /dev/null。ID 仅允许 ASCII 字母、数字、连字符，长度 1–128。
 - 所有动态表达式先进入环境变量，再由带引号的 Shell 参数使用；每段脚本启用 `set -euo pipefail`。SSH 使用 BatchMode、IdentitiesOnly、StrictHostKeyChecking=yes、显式 known_hosts、禁止密码/交互/转发/终端，并设置连接/存活超时。密钥只在临时目录以 600 写入，EXIT 清理；不执行 ssh-keyscan 或绕过主机密钥验证。
-- 每个检查、构建、归档、SSH 阶段保留原生实时步骤日志；可控命令通过 tee 同时写入日志，失败保留原退出码。始终上传 build-logs/deploy-logs；构建成功另有 release artifact，保留 14 天。GitHub Summary 给出触发 commit、release、逐阶段结果、在线日志和下载链接。checkout/setup-node 等 action 自身错误以 GitHub 原生日志为准。
+- 每个检查、构建、归档、SSH 阶段保留原生实时步骤日志；可控命令通过 tee 同时写入日志，失败保留原退出码。job 初始化完成后，无论命令成功或失败均尝试上传 build-logs/deploy-logs；构建成功另有 release artifact，保留 14 天。GitHub Summary 给出触发 commit、release、逐阶段结果、在线日志和可用下载链接。服务容器在步骤前初始化失败时尚无自定义日志目录，故没有额外日志 artifact；这类错误和 checkout/setup-node 等 action 自身错误均可查看、下载 GitHub 原生日志。
 
 ## 需要配置
 
@@ -46,8 +46,18 @@
 - 原机器没有 actionlint；只从 [rhysd/actionlint v1.7.12 官方 release](https://github.com/rhysd/actionlint/releases/tag/v1.7.12) 下载至 `/tmp/nest-actionlint-005`，核对官方 checksums 后运行。Darwin arm64 归档 SHA256 `aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f` 匹配。
 - `actionlint .github/workflows/deploy.yml` 通过；首次检查发现 job env 不能使用 runner context，已将媒体目录移到后端 test step env，最终检查无告警。机器没有 ShellCheck；另外将实际 workflow 的 14 段 run 逐一交给 `bash -n`，全部通过。
 - 从实际 workflow 提取脚本，在系统临时目录执行 29 项断言：main/非 main、未知操作、空/128/129字符/分号/换行/路径/命令替换回退 ID；安全归档成员与 SHA256；env/node_modules/链接/FIFO 拒绝；SSH deploy/rollback 的命令及 stdin；BatchMode/严格主机检查/600密钥；远端退出码23经 tee 仍失败；非法服务器参数及缺配置在调用前拒绝；成功/失败均清理密钥目录。全部通过。SSH 使用本机命令替身，没有实际联网，也没有真实凭据或数据库。
-- 新 workflow 只有静态及隔离验证，尚未在 GitHub runner 执行 npm 安装/业务测试/构建，也未做真实 artifact 传递、专用 SSH 或线上健康检查；这些不是已完成验收。
+- 首次真实运行之前仅完成上述静态及隔离验证；GitHub 执行结果另记下节，不以静态检查代替实际构建或发布。
+
+## 首次真实 CI 及窄范围修复（2026-11-10）
+
+- 只读跟进 [run 42755814824](https://github.com/awei0929/awei-fullstack/actions/runs/42755814824)，workflow_dispatch，提交 `17f9c803f8e34aa4b13a3162a2d90492f932c29b`，发布 ID `17f9c803f8e34aa4b13a3162a2d90492f932c29b-42755814824-1`。main/release validate 成功；Build and test 在 Initialize containers 失败，Deploy or roll back 按依赖跳过。npm 安装、部署脚本测试、业务测试、前后端构建、归档和 SSH 均未执行，不声明实际测试数或发布成功。
+- 原生日志实证：mongo:8.0 拉取成功，digest 为 `sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142`；2026-11-10 04:26:11 UTC 容器以 F/CONTROL、id12257600 报错，指出 Linux kernel 6.19+ 与当前 MongoDB 不兼容并链接 SERVER-121912，随后 unhealthy。日志未提供真实 runner 内核完整版本，不据此推断具体内核补丁级别。
+- build-logs 上传步骤执行成功但提示路径无文件；只读 artifacts API 返回 `total_count=0`。原因是服务在 Initialize build log 之前失败，尚未创建日志目录；错误已通过 `gh run view --log-failed` 从原生日志读取，GitHub 本身保留其在线/下载入口。没有为了这类初始化失败增加额外收集流程。
+- 只读 production 分支策略 API 返回唯一 branch policy `main`；实际 main validate 成功。本次没有触发非 main workflow，不能将配置核对表述为真实非 main 拒绝测试。
+- 官方依据：MongoDB [SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912) 说明 rseq/内核问题；官方镜像维护者 yosifkit 在 [docker-library/mongo discussion 748](https://github.com/docker-library/mongo/discussions/748) 的 2026-06-01 回复明确给出 `GLIBC_TUNABLES=glibc.pthread.rseq=1` 临时办法，后续 [issue 765](https://github.com/docker-library/mongo/issues/765) 也记录相同启动保护错误。另有 [SERVER-131779](https://jira.mongodb.org/browse/SERVER-131779) 跟踪 Ubuntu 内核版本识别，但其修复版本标记不等于对应镜像已经发布或本 runner 已验证。
+- 按 root 授权，仅为 CI mongodb service 增加上述环境变量，沿用 mongo:8.0 与既有 healthcheck，不更改线上 Mongo、镜像版本、业务依赖或真实 env。该设置与 STATE 已记录的服务器临时兼容办法一致，仍需实际 runner 重验；以后仅在官方修复镜像已发布且真实运行验证后评估移除。
+- 该窄修复本机 `actionlint .github/workflows/deploy.yml` 通过；此前 29 项模拟与构建/SSH脚本无关此次服务 env 改动，未重复执行。本代理未提交、推送、修改服务器或触发新 run。
 
 ## 下一步
 
-整合者复核服务器入口与上述配置，确保 scripts/test-deploy.py 可无参数运行。仅提交本次部署文件和文档增量，排除 SPEC-004；推送后跟进首次 main 工作流，记录 run URL、commit、release、构建/SSH/日志下载和线上只读探针结果，再验证手动回退与非 main 拒绝行为。
+root 推送 CI 服务环境窄修复后跟进真实 main 工作流，记录新 run URL、commit、release、实际依赖/测试数、构建/SSH/日志下载和线上只读探针结果，再验证手动回退与非 main 拒绝行为。部署仍仅包含已提交业务代码，排除 SPEC-004。

@@ -47,3 +47,9 @@
 550dc533adacafc32f966cca477ea51bd879b8c5b7d80b811166d087c92174a7  scripts/setup-deploy.sh
 9fd4f3bc1f8efd127251dc418c71556579989fbad9fb03b796f6513bee4146a0  .github/workflows/deploy.yml
 ```
+
+## 首次真实setup后的限定复核
+
+- 整合者在线上首次执行发现GNU `install -d -m755`在umask077下可令中间bootstrap根目录保持0700；真实`namei`定位到`/srv/nest/releases/bootstrap-20261110T042334Z`，而frontend/dist/index其余权限正确。`www-data`可读检查失败触发ERR恢复，整合者确认原后端active与HTTPS200。此为整合者提供的服务器证据，审查者未操作服务器。
+- 限定审查当前`setup-deploy.sh:64-69`新增公共修复：位于首次bootstrap分支之外；`readlink -f`规范化最终目录，要求dirname严格等于`/srv/nest/releases`，检查ready标记与静态入口存在后，只将当前release根改为755。覆盖首次接入与本次失败重试，不放宽backend/env/home权限，不改current指向。就已定位的单个中间目录0700故障而言修复完整，无新增实质问题。
+- 本次只重新运行`bash -n scripts/setup-deploy.sh`，通过；未重复runtime测试。前述21项runtime结果继续沿用，setup旧SHA256已被这次7行增量替代；首次迁移重试与线上结果由整合者继续验证。

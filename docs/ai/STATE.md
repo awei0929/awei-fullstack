@@ -1,18 +1,19 @@
 # 工作区交接状态
 
-## 2026-11-10：上传功能发布（进行中）
+## 2026-11-10：上传功能发布（已上线并验证）
 
-- 用户明确授权提交/推送SPEC-004并上线，确认自动部署与线上上传。沿用main/77d70f7，17/17应用源码匹配既有验证快照，依赖和构建配置未变；复用本机95/95、前端68/SSR5/lint/build与审查结果，由真实CI重新验证实际提交。
-- 官网后台当前已登录、公开保存版本v7；合成PNG/PDF/ZIP/2MiB文本样例已准备。服务器重连需要用户完成腾讯云MFA，持久目录/Nginx25m及线上上传尚待实际核对。
-- 合同与证据：[SPEC-004](../specs/004-disk-file-uploads.md)、[线上发布](tasks/004-disk-uploads-deployment.md)。保留原env、媒体、账号与官网内容，不对线上数据库运行测试套件。
+- 用户授权提交推送上线。17/17源码与既有验证相同，依赖/构建配置未变；沿用本机结果，81ef221实际推送触发[42761696989](https://github.com/awei0929/awei-fullstack/actions/runs/42761696989)全绿：后端95/95/6套件、部署24/24、前端lint/build，3份构建/部署日志与发布包可下载。
+- 当前上线版本81ef221c1364567c930f354ed579e002621366b8-42761696989-1；Nginx备份后设置API25m并reload，持久目录ubuntu可读写。真实Chrome上传PNG/PDF/ZIP/2MiB文本与正文图片/附件，共6文件；匿名GET均200、SHA256一致、UTF-8中文下载名保留，正文图片64×64正常，Chrome实际PDF下载成功。
+- 同版本受限入口重启后6文件仍可读、哈希不变。正文只在草稿预览后恢复，公开配置逐字节保持v7，原账号/env/Mongo/媒体保留。用户确认的临时浏览器本地文件权限已关闭。线上保存PUT/真机/多浏览器/精确最大边界未新增实操；六份公开合成验收文件保留，无自动清理。
+- 合同/证据：[SPEC-004](../specs/004-disk-file-uploads.md)、[线上发布](tasks/004-disk-uploads-deployment.md)。发布代码与相关文档已提交推送，后续文档回写跳过重复CI；此前其他部署/飞书/数据库笔记仍保留在工作区，不对线上运行测试套件。
 
 ## 2026-11-10：自动构建部署（已接入并验证）
 
 - 用户授权代为接入 main 推送后自动部署并交接步骤；合同/清单：[SPEC-005](../specs/005-automatic-deployment.md)，使用方式：[部署手册](../deployment.md)。基准9b12524，现有SPEC-004业务/文档改动保留且不纳入本次发布。
 - production仅允许main，部署私钥仅环境Secret，连接Variables已设；用户完成腾讯云MFA并确认受限公钥。原隧道密钥、真实env/Mongo/媒体保留。发布根/srv/nest，systemd与Nginx共用current版本；首次bootstrap权限失败实际恢复旧站，修复重试成功。
-- main推送d0c5ef6触发[42756174781](https://github.com/awei0929/awei-fullstack/actions/runs/42756174781)全成功：Node24.22.2、部署测试24/24、后端76/76与5套件、前端lint/build；3份构建/部署日志及发布包归档可下载。当前成功版本d0c5ef6a96b09b584b6a9e2324c3a9f6b1bb42c6-42756174781-1，首页与归档逐字节一致、3资源/后台入口/API均HTTPS200。
+- 当轮main推送d0c5ef6触发[42756174781](https://github.com/awei0929/awei-fullstack/actions/runs/42756174781)全成功：Node24.22.2、部署测试24/24、后端76/76与5套件、前端lint/build；3份构建/部署日志及发布包归档可下载。该轮成功版本d0c5ef6a96b09b584b6a9e2324c3a9f6b1bb42c6-42756174781-1，首页与归档逐字节一致、3资源/后台入口/API均HTTPS200；最新上传发布见上方。
 - 已验证构建失败不发布、受限命令拒绝、手动回退当前bootstrap的幂等入口；不同目标回退/恶意输入/故障恢复/并发为隔离测试，未冒充线上故障注入。首次SSH上传约6分24秒、依赖安装3秒；CI Mongo有官方临时rseq兼容项。文档回写不改变已验证应用/依赖/工作流，沿用本次结果。
-- 本轮仅提交/推送自动部署文件和文档增量，SPEC-004仍未提交/上线；原README中的上传接入步骤已局部改为通过main发布，随该功能文档继续留在工作区。证据：[整合](tasks/005-deployment-integration.md)、[运行器](tasks/005-deploy-runtime.md)、[工作流](tasks/005-deploy-workflow.md)、[审查](tasks/005-deployment-review.md)。日常提交后推main并查看Actions；回退按部署手册，不自行发布其他未提交功能。
+- 当轮仅发布自动部署配置，SPEC-004由用户后续追加授权发布，结果见上方。证据：[整合](tasks/005-deployment-integration.md)、[运行器](tasks/005-deploy-runtime.md)、[工作流](tasks/005-deploy-workflow.md)、[审查](tasks/005-deployment-review.md)。日常提交后推main并查看Actions；回退按部署手册，不自行发布其他未提交功能。
 
 ## 2026-11-09：服务器磁盘文件上传（本机已验证，未部署）
 

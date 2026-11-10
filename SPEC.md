@@ -15,6 +15,7 @@
 | 001 | [弹窗注册登录与私有任务](docs/specs/001-session-auth.md) | 已验证 |
 | 002 | [按职责拆分用户与认证模块](docs/specs/002-auth-module-organization.md) | 已验证 |
 | 003 | [个人官网与站主配置](docs/specs/003-personal-site.md) | 已验证，P28能力三卡/详情与站主Markdown履历；P24独立作品档案移除仍有效 |
+| 004 | [服务器磁盘文件上传](docs/specs/004-disk-file-uploads.md) | 本机隔离环境已验证，未部署；图片、PDF、附件公开上传与后台入口 |
 | 005 | [推送后自动构建部署](docs/specs/005-automatic-deployment.md) | 已验证，main 自动构建/SSH 发布、日志与失败回退 |
 
 ## OpenSpec 引用模式

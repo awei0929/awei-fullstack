@@ -2,7 +2,8 @@ import { makeAutoObservable, reaction, runInAction } from 'mobx'
 import * as siteApi from '../api/site'
 import { getSession } from '../api/auth'
 import { HttpError } from '../api/http'
-import type { SiteContent, SiteDocument } from '../types/site'
+import type { SiteContent, SiteDocument, SiteFileAsset, SiteFileUploadTarget } from '../types/site'
+import { siteFileMarkdown, siteFileUploadKey, siteFileValidationError } from '../utils/site-files'
 import { authStore } from './auth'
 
 function clone<T>(value: T): T {
@@ -16,6 +17,10 @@ export class SiteAdminStore {
   status: 'idle' | 'loading' | 'ready' | 'forbidden' | 'error' = 'idle'
   saving = false
   uploadingAudio = false
+  uploadingFile = false
+  fileUploadTarget = ''
+  fileUploadError = ''
+  lastFileUpload: { asset: SiteFileAsset; markdown: string; targetKey: string } | null = null
   checkingLatest = false
   loadError = ''
   saveError = ''
@@ -43,7 +48,7 @@ export class SiteAdminStore {
   }
 
   get busy(): boolean {
-    return this.saving || this.uploadingAudio || this.checkingLatest || authStore.loggingOut
+    return this.saving || this.uploadingAudio || this.uploadingFile || this.checkingLatest || authStore.loggingOut
   }
 
   get canEdit(): boolean {
@@ -61,6 +66,7 @@ export class SiteAdminStore {
     this.latestVersion += 1
     this.saving = false
     this.uploadingAudio = false
+    this.uploadingFile = false
     this.checkingLatest = false
   }
 
@@ -74,6 +80,9 @@ export class SiteAdminStore {
     this.outcomeUnknown = false
     this.saveError = ''
     this.audioUploadError = ''
+    this.fileUploadError = ''
+    this.fileUploadTarget = ''
+    this.lastFileUpload = null
     this.latestError = ''
     this.notice = ''
   }
@@ -83,6 +92,7 @@ export class SiteAdminStore {
     this.latestVersion += 1
     this.saving = false
     this.uploadingAudio = false
+    this.uploadingFile = false
     this.checkingLatest = false
     this.status = 'idle'
     this.loadError = ''
@@ -292,6 +302,62 @@ export class SiteAdminStore {
       })
     } finally {
       runInAction(() => { if (this.current(identity, version)) this.uploadingAudio = false })
+    }
+  }
+
+  async uploadFile(file: File, target: SiteFileUploadTarget, expectedKind?: SiteFileAsset['kind']): Promise<void> {
+    if (!this.active || !this.canEdit || !this.draft) return
+    const targetKey = siteFileUploadKey(target)
+    const requiredKind = target.type === 'cover' ? 'image' : expectedKind
+    this.fileUploadTarget = targetKey
+    this.fileUploadError = siteFileValidationError(file, requiredKind)
+    if (this.fileUploadError) return
+    const identity = authStore.identityVersion
+    const version = ++this.requestVersion
+    this.uploadingFile = true
+    this.notice = ''
+    try {
+      const csrfToken = await this.writeToken(identity)
+      if (!this.current(identity, version)) return
+      const asset = await siteApi.uploadSiteFile(file, csrfToken)
+      runInAction(() => {
+        if (!this.current(identity, version) || !this.draft) return
+        const markdown = siteFileMarkdown(asset)
+        this.lastFileUpload = { asset, markdown, targetKey }
+        if (requiredKind && asset.kind !== requiredKind) {
+          this.fileUploadError = '服务返回的文件类型不符，原内容已保留。可复制下方地址。'
+          return
+        }
+        if (target.type === 'library') {
+          this.notice = '文件已上传，可复制地址或 Markdown。添加到草稿后仍需保存全部。'
+          return
+        }
+        if (target.type === 'cover') {
+          const project = this.draft.capabilityDetails.projects.find(item => item.id === target.projectId)
+          if (!project) { this.fileUploadError = '原项目已不在草稿中，未替换封面。可复制下方地址。'; return }
+          project.coverUrl = asset.url
+        } else {
+          const project = target.type === 'project' ? this.draft.capabilityDetails.projects.find(item => item.id === target.projectId) : null
+          if (target.type === 'project' && !project) { this.fileUploadError = '原项目已不在草稿中，未插入正文。可复制下方内容。'; return }
+          const original = target.type === 'company' ? this.draft.capabilityDetails.company[target.field] : project!.content
+          const next = `${original}${original ? '\n\n' : ''}${markdown}`
+          if (Array.from(next).length > (target.type === 'company' ? 10000 : 20000)) {
+            this.fileUploadError = '插入后正文会超出字数限制，原文已保留。文件已上传，可复制下方地址或 Markdown。'
+            return
+          }
+          if (target.type === 'company') this.draft.capabilityDetails.company[target.field] = next
+          else project!.content = next
+        }
+        this.notice = '已写入当前草稿，保存全部后更新页面引用。文件现在即可凭链接公开访问。'
+      })
+    } catch (error) {
+      runInAction(() => {
+        if (!this.current(identity, version) || this.authFailure(error, identity)) return
+        if (error instanceof HttpError && error.code === 'CSRF_INVALID') authStore.csrfToken = ''
+        this.fileUploadError = `${error instanceof Error ? error.message : '上传失败'}；原封面和正文已保留。请重新选择文件重试。`
+      })
+    } finally {
+      runInAction(() => { if (this.current(identity, version)) this.uploadingFile = false })
     }
   }
 }

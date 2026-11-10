@@ -81,10 +81,12 @@ UsersModule 只向外导出 UsersService，AuthModule 不重复注册用户模�
 
 官网首页舞台包含欢迎与能力两个状态，共享`use-capability-transition`的850ms进度。原生Web Animations保持同一组关键帧，由活动期间单一RAF采样，返回反向采样；停止动效直接提交端点。`CapabilityContent`展示技术栈/公司背景/公司项目三卡，点击由`SiteExperience`的原生dialog生命周期管理；`CapabilityDetails`展示技术四分区或目录/Markdown正文。手机三卡横向排列，详情全屏，后台独立iframe共用同一展示。能力人物使用本地WebP两种分辨率，提前decode，8秒超时或加载失败后保留旧人物降级。原独立作品档案、详情与站主作品编辑已整体移除，首页按钮进入我的能力。公司项目为P28新增的能力详情。
 
-`SiteContent`顶层不再包含projects，后端从旧Mongo文档映射响应时只读剔除历史字段，不写库或改变version；下一次版本化保存替换content。含projects的写入按未知字段400处理。作品封面图片上传POST已删除；音频上传与受控媒体GET继续服务音乐和历史媒体，已有文件不自动删除。最新合同与验证见SPEC-003 P24。
+`SiteContent`顶层不再包含projects，后端从旧Mongo文档映射响应时只读剔除历史字段，不写库或改变version；下一次版本化保存替换content。含projects的写入按未知字段400处理。旧作品封面图片POST已删除；音频上传与受控媒体GET继续服务音乐和历史媒体，已有文件不自动删除。SPEC-004另增file-assets接口服务当前公司项目/正文，不恢复独立作品档案或旧POST。
 
 能力列表现纳入同一版本化 `SiteContent.capabilities`，固定 AI/前端/后端/部署四类。后台独立能力编辑器通过共享草稿维护 SVG 标识和昵称；图标目录在前端本地配置，后端使用同一38项白名单校验，不接受原始SVG或外部图标地址。旧文档完全缺少分区时只读补原九项，不写库或改变版本；显式空组保留。保存沿用整站版本比较与 Session/Owner/CSRF，不新增能力专用接口。详情与验证见 SPEC-003 P19。
 
 首页导航使用targetScene即时高亮，scene仅用于端点交互；转场可在同一时间轴中途反向。`use-orbit-occlusion`按人物与可见卡片表面生成局部SVG遮罩，三条等比椭圆在最大旋转包络内旋转；资源decode不阻塞导航，未就绪时显示已加载的原人物。
 
-能力详情集中在`SiteContent.capabilityDetails`：技术介绍、公司三个Markdown栏目、最多12份公司项目。读取历史缺失分区只补响应；PUT要求完整分区，避免旧页面静默清空履历。`readPublic`在服务端仅投影visible=true项目，站主读取与保存仍返回全部数据，沿用整站版本CAS与Session/Owner/CSRF。Markdown使用react-markdown和remark-gfm，关闭原始HTML并限制URL；封面仅支持安全URL，不恢复上传接口。后台技术栈/公司/项目Tab共享原草稿与iframe消息协议，弹窗仅约束iframe内焦点与滚动，不阻塞父页编辑。详情见SPEC-003 P28。
+能力详情集中在`SiteContent.capabilityDetails`：技术介绍、公司三个Markdown栏目、最多12份公司项目。读取历史缺失分区只补响应；PUT要求完整分区，避免旧页面静默清空履历。`readPublic`在服务端仅投影visible=true项目，站主读取与保存仍返回全部数据，沿用整站版本CAS与Session/Owner/CSRF。Markdown使用react-markdown和remark-gfm，关闭原始HTML并限制URL；封面支持安全URL与SPEC-004的新图片上传入口。后台技术栈/公司/项目Tab共享原草稿与iframe消息协议，弹窗仅约束iframe内焦点与滚动，不阻塞父页编辑。详情见SPEC-003 P28。
+
+服务器磁盘上传合同见[SPEC-004](../specs/004-disk-file-uploads.md)。`POST /api/site/file-assets`复用Session/Owner/CSRF，multipart唯一file，图片5MiB、PDF/ZIP/TXT/DOCX/XLSX/PPTX附件20MiB；音频原接口15MiB保留。文件校验、随机命名、写盘与公开读取保留在SiteModule资产业务，文件与附件下载名元数据位于同一`SITE_ASSETS_DIR`，不新增Mongo集合或存储依赖。GET仅接受UUID文件名与白名单扩展名，附件强制下载并保留安全原名；上传不改站点版本。后台独立上传区、封面、公司/项目Markdown共享上传状态和身份保护，结果只改草稿；Markdown专用URL类型允许本站附件路径，联系配置仍仅HTTP(S)。全部文件上传完成即可公开访问，不随隐藏项目变私密；部署与回滚保留媒体目录，备份需同时包含磁盘与Mongo。

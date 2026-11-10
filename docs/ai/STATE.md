@@ -1,5 +1,11 @@
 # 工作区交接状态
 
+## 2026-11-10：上传功能发布（进行中）
+
+- 用户明确授权提交/推送SPEC-004并上线，确认自动部署与线上上传。沿用main/77d70f7，17/17应用源码匹配既有验证快照，依赖和构建配置未变；复用本机95/95、前端68/SSR5/lint/build与审查结果，由真实CI重新验证实际提交。
+- 官网后台当前已登录、公开保存版本v7；合成PNG/PDF/ZIP/2MiB文本样例已准备。服务器重连需要用户完成腾讯云MFA，持久目录/Nginx25m及线上上传尚待实际核对。
+- 合同与证据：[SPEC-004](../specs/004-disk-file-uploads.md)、[线上发布](tasks/004-disk-uploads-deployment.md)。保留原env、媒体、账号与官网内容，不对线上数据库运行测试套件。
+
 ## 2026-11-10：自动构建部署（已接入并验证）
 
 - 用户授权代为接入 main 推送后自动部署并交接步骤；合同/清单：[SPEC-005](../specs/005-automatic-deployment.md)，使用方式：[部署手册](../deployment.md)。基准9b12524，现有SPEC-004业务/文档改动保留且不纳入本次发布。
@@ -7,6 +13,14 @@
 - main推送d0c5ef6触发[42756174781](https://github.com/awei0929/awei-fullstack/actions/runs/42756174781)全成功：Node24.22.2、部署测试24/24、后端76/76与5套件、前端lint/build；3份构建/部署日志及发布包归档可下载。当前成功版本d0c5ef6a96b09b584b6a9e2324c3a9f6b1bb42c6-42756174781-1，首页与归档逐字节一致、3资源/后台入口/API均HTTPS200。
 - 已验证构建失败不发布、受限命令拒绝、手动回退当前bootstrap的幂等入口；不同目标回退/恶意输入/故障恢复/并发为隔离测试，未冒充线上故障注入。首次SSH上传约6分24秒、依赖安装3秒；CI Mongo有官方临时rseq兼容项。文档回写不改变已验证应用/依赖/工作流，沿用本次结果。
 - 本轮仅提交/推送自动部署文件和文档增量，SPEC-004仍未提交/上线；原README中的上传接入步骤已局部改为通过main发布，随该功能文档继续留在工作区。证据：[整合](tasks/005-deployment-integration.md)、[运行器](tasks/005-deploy-runtime.md)、[工作流](tasks/005-deploy-workflow.md)、[审查](tasks/005-deployment-review.md)。日常提交后推main并查看Actions；回退按部署手册，不自行发布其他未提交功能。
+
+## 2026-11-09：服务器磁盘文件上传（本机已验证，未部署）
+
+- 用户授权图片、PDF、附件上传并告知流程；已确认全公开、仅站主可上传。沿用9b12524及当前分支，保留原README/STATE改动，无提交、推送、部署或真实env改动。合同：[SPEC-004](../specs/004-disk-file-uploads.md)。
+- 新POST `/api/site/file-assets`复用Session/Owner/CSRF；图片5MiB、PDF/ZIP/TXT/DOCX/XLSX/PPTX附件20MiB，UUID写盘到SITE_ASSETS_DIR，附件保留安全原下载名并强制下载。旧音频和历史媒体兼容；后台统一上传、封面、公司/项目Markdown入口，上传仅改草稿，文件立即可公开访问。无COS、自动清理或私密下载。
+- 后端最终95/95、6套件含build；前端实际模块68/68、Markdown SSR5/5、lint无警告/build通过；独立审查1项P2已修，限定复核58项通过。根Chrome156桌面1440/手机390实际上传/错误重试/中文下载/草稿/保存v3刷新/公开图片及附件/忙状态/10000字保留/重建应用后媒体持久化通过。证据：[整合](tasks/004-disk-uploads-integration.md)、[后端](tasks/004-disk-uploads-backend.md)、[前端](tasks/004-disk-uploads-frontend.md)、[审查](tasks/004-disk-uploads-review.md)。
+- 全程测试显式使用原本机Mongo127.0.0.1:27017及随机临时库/媒体，未沿真实backend/.env连接线上。4个明确归属的浏览器fixture库、临时媒体/Cookie/样例/缓存已清理；3001/5174已停，原本机与线上业务数据保留，无截图。
+- 下一步按[README接入流程](../../README.md#图片pdf与附件上传接入)发布：确认服务器持久目录与ubuntu读写、已有/api/代理加25m、构建/同步前端并重启后端，再做线上上传验证。服务器配置/HTTPS上传未在本轮实操，真机/多浏览器/断电边界未扩大声明。
 
 ## 2026-11-08：个人官网提交交接
 

@@ -1,13 +1,14 @@
 import { Body, Controller, Get, Param, Post, Put, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import type { Response } from 'express';
 import { SiteAudioUploadInterceptor } from './interceptors/site-audio-upload.interceptor.js';
+import { SiteFileUploadInterceptor } from './interceptors/site-file-upload.interceptor.js';
 import { SessionGuard } from '../auth/guards/session.guard.js';
 import { CsrfGuard } from '../auth/guards/csrf.guard.js';
 import { SiteOwnerGuard } from './guards/site-owner.guard.js';
 import { SaveSiteDto } from './dto/save-site.dto.js';
 import { SiteService } from './site.service.js';
 import { SiteAssetsService } from './site-assets.service.js';
-import type { SiteDocument, SiteUpload } from './types/site.type.js';
+import type { SiteDocument, SiteFileAsset, SiteUpload } from './types/site.type.js';
 
 // 公开读取经过隐藏项目投影，受控管理保留完整文档；管理入口显式列出Session→Owner→CSRF顺序。
 @Controller('site')
@@ -26,11 +27,21 @@ export class SiteController {
   // Guard先于文件解析执行；未授权请求不会触及媒体存储。
   @UseInterceptors(SiteAudioUploadInterceptor)
   uploadAudio(@UploadedFile() file?: SiteUpload): Promise<{ url: string }> { return this.assets.uploadAudio(file); }
+  @Post('file-assets')
+  @UseGuards(SessionGuard, SiteOwnerGuard, CsrfGuard)
+  @UseInterceptors(SiteFileUploadInterceptor)
+  uploadFile(@UploadedFile() file?: SiteUpload): Promise<SiteFileAsset> { return this.assets.uploadFile(file); }
   @Get('assets/:filename')
   async asset(@Param('filename') filename: string, @Res() response: Response): Promise<void> {
     const file = await this.assets.read(filename);
     response.setHeader('Content-Type', file.mime);
     response.setHeader('X-Content-Type-Options', 'nosniff');
+    if (file.downloadName) {
+      // ASCII回退名去除引号/反斜杠；RFC5987参数编码原Unicode名，不能拼接原始请求头值。
+      const fallback = file.downloadName.replace(/[^\x20-\x7e]|["\\]/g, '_');
+      const encoded = encodeURIComponent(file.downloadName).replace(/['()*]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+      response.setHeader('Content-Disposition', `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`);
+    }
     response.send(file.data);
   }
 }

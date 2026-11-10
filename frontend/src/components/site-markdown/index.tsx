@@ -12,11 +12,11 @@ export function SiteImage({ src, alt = '', ...props }: ComponentProps<'img'>) {
   return <img {...props} src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedSource(src)} />
 }
 
-// 不启用raw HTML插件；URL仅允许明确的http(s)、站内图片及页内锚点。
+// 不启用raw HTML插件；链接支持严格本站文件路径，图片仍使用独立图片白名单。
 export function SiteMarkdown({ content }: { content: string }) {
   return <div className={styles.markdown}><Markdown remarkPlugins={[remarkGfm]} skipHtml urlTransform={(url, key) => {
     if (key === 'src') return isSafeSiteUrl(url, 'image') ? url : undefined
-    return /^#[\w\u4e00-\u9fff-]+$/u.test(url) || isSafeSiteUrl(url) ? url : undefined
+    return /^#[\w\u4e00-\u9fff-]+$/u.test(url) || isSafeSiteUrl(url, 'markdown') ? url : undefined
   }} components={{
     a: ({ href, children }) => href ? <a href={href} target={href.startsWith('#') ? undefined : '_blank'} rel="noopener noreferrer">{children}</a> : <span>{children}</span>,
     img: ({ src, alt }) => <SiteImage src={src} alt={alt} />,

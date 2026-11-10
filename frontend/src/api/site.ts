@@ -1,6 +1,7 @@
-import type { SiteCapabilities, SiteCapabilityDetails, SiteContent, SiteDocument } from '../types/site'
+import type { SiteCapabilities, SiteCapabilityDetails, SiteContent, SiteDocument, SiteFileAsset } from '../types/site'
 import { CAPABILITY_CATEGORIES, defaultSiteCapabilities, isCapabilityIcon, MAX_CAPABILITIES_PER_CATEGORY } from '../config/site-capabilities'
 import { defaultSiteCapabilityDetails, MAX_COMPANY_PROJECTS } from '../config/site-capability-details'
+import { SITE_ATTACHMENT_MAX_SIZE, SITE_FILE_TYPES, SITE_IMAGE_MAX_SIZE } from '../config/site-files'
 import { request } from './http'
 
 function invalid(): never {
@@ -24,12 +25,13 @@ function bool(value: unknown): boolean {
   return value
 }
 
-export function isSafeSiteUrl(value: string, kind: 'link' | 'audio' | 'image' = 'link'): boolean {
+export function isSafeSiteUrl(value: string, kind: 'link' | 'markdown' | 'audio' | 'image' = 'link'): boolean {
   if (!value) return true
   const hasControl = (input: string) => Array.from(input).some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
   if (value.length > 2048 || /[\s\\]/.test(value) || hasControl(value)) return false
   if (kind === 'audio' && /^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.(mp3|wav|ogg)$/.test(value)) return true
   if (kind === 'image' && /^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.(png|jpg|webp)$/.test(value)) return true
+  if (kind === 'markdown' && /^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.(png|jpg|webp|pdf|zip|txt|docx|xlsx|pptx)$/.test(value)) return true
   if (!/^https?:\/\//i.test(value)) return false
   try {
     const parsed = new URL(value)
@@ -138,4 +140,22 @@ export async function uploadSiteAudio(file: File, csrfToken: string): Promise<{ 
   const assetUrl = url(result.url, 'audio')
   if (!assetUrl.startsWith('/api/site/assets/')) return invalid()
   return { url: assetUrl }
+}
+
+export function parseSiteFileAsset(value: unknown): SiteFileAsset {
+  const asset = object(value, ['url', 'name', 'mimeType', 'size', 'kind'])
+  const assetUrl = text(asset.url, 2048, true)
+  if (!/^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.(jpg|png|webp|pdf|zip|txt|docx|xlsx|pptx)$/.test(assetUrl)) return invalid()
+  const extension = assetUrl.split('.').pop() as keyof typeof SITE_FILE_TYPES
+  const info = SITE_FILE_TYPES[extension]
+  const name = text(asset.name, 150, true)
+  const unsafeName = name.includes('/') || name.includes('\\') || Array.from(name).some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
+  if (unsafeName || asset.kind !== info.kind || asset.mimeType !== info.mimeType || !Number.isSafeInteger(asset.size) || (asset.size as number) < 1 || (asset.size as number) > (info.kind === 'image' ? SITE_IMAGE_MAX_SIZE : SITE_ATTACHMENT_MAX_SIZE)) return invalid()
+  return { url: assetUrl, name, mimeType: info.mimeType, size: asset.size as number, kind: info.kind }
+}
+
+export async function uploadSiteFile(file: File, csrfToken: string): Promise<SiteFileAsset> {
+  const body = new FormData()
+  body.append('file', file)
+  return parseSiteFileAsset(await request<unknown>('/site/file-assets', { method: 'POST', csrfToken, body }))
 }

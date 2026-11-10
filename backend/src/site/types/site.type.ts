@@ -19,4 +19,6 @@ export type SiteContent = {
 };
 export type SiteDocument = { version: number; updatedAt: string | null; content: SiteContent };
 // 只声明当前上传业务实际使用的字段，不依赖客户端文件名决定存储路径或媒体类型。
-export type SiteUpload = { buffer: Buffer; size: number; mimetype: string };
+export type SiteUpload = { buffer: Buffer; size: number; mimetype: string; originalname?: string };
+// 上传与整站版本保存分离：这里只返回可供草稿引用的公开地址及展示信息。
+export type SiteFileAsset = { url: string; name: string; mimeType: string; size: number; kind: 'image' | 'attachment' };

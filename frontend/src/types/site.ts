@@ -32,3 +32,17 @@ export interface SiteDocument {
   updatedAt: string | null
   content: SiteContent
 }
+
+export interface SiteFileAsset {
+  url: string
+  name: string
+  mimeType: string
+  size: number
+  kind: 'image' | 'attachment'
+}
+
+export type SiteFileUploadTarget =
+  | { type: 'library' }
+  | { type: 'cover'; projectId: string }
+  | { type: 'company'; field: 'introduction' | 'business' | 'responsibilities' }
+  | { type: 'project'; projectId: string }

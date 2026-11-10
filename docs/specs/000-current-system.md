@@ -2,8 +2,9 @@
 
 - 类型：存量功能基线，记录当前实现；详细新增需求与认证合同以 [SPEC-001](001-session-auth.md) 为准。
 - 状态：已验证（2026-11-06；模块整理见SPEC-002；3–5位账号规则与最终42项HTTP回归见SPEC-001；认证实现时的前端工程与浏览器证据见SPEC-001，历史记录保留原状态）。
-- 更新日期：2026-11-07。
+- 更新日期：2026-11-09（仅同步SPEC-004增量入口，原基线历史验证不改写）。
 - 官网增量合同以[SPEC-003](003-personal-site.md)为准；P24整体移除作品档案、项目详情与站主项目配置，不影响本基线的独立`/tasks`、认证和任务数据隔离。
+- 图片、PDF与附件上传增量见[SPEC-004](004-disk-file-uploads.md)，沿用站主/Session/CSRF和独立磁盘媒体；不改变本基线任务与认证合同。
 - 代码基准：bd2b983 加当前 SPEC-001 / SPEC-002 未提交改动；原 d688983 基线验证保留在历史记录中。
 - 依据：[任务 Controller](../../backend/src/tasks/tasks.controller.ts)、[Service](../../backend/src/tasks/tasks.service.ts)、[认证 Controller](../../backend/src/auth/auth.controller.ts)、[公共 Controller](../../backend/src/public/public.controller.ts)、[任务 HTTP 测试](../../backend/test/tasks.e2e.test.mjs)、[认证 HTTP 测试](../../backend/test/auth.e2e.test.mjs)。
 - 结构：用户模型与服务属于 UsersModule；AuthModule 导入它，负责认证入口、会话与独立 Guard。目录整理及其验证见 [SPEC-002](002-auth-module-organization.md)，HTTP 与数据合同不变。

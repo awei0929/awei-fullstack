@@ -1,0 +1,17 @@
+.upload { min-width: 0; margin: 12px 0 18px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.button { position: relative; display: inline-flex; align-items: center; border: 1px solid #b9a071; border-radius: 8px; padding: 9px 12px; color: #eddfbe; font-size: 13px; cursor: pointer; }
+.button:focus-within { outline: 2px solid #d9ba75; outline-offset: 2px; }
+.button input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.disabled { opacity: .45; cursor: not-allowed; }
+.upload > small, .result > small, .formats { display: block; margin: 10px 0; color: #b8b39f; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.upload > progress { display: block; width: 100%; margin: 12px 0; accent-color: #ed791b; }
+.error { margin: 10px 0; color: #efad96; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.result { display: flex; min-width: 0; flex-direction: column; gap: 7px; margin-top: 16px; border: 1px solid #595a47; border-radius: 9px; padding: 12px; }
+.result > p { margin: 0 0 5px; color: #e8dfca; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.result strong { font-weight: 500; }
+.result > label { color: #dfceaa; font-size: 12px; }
+.result > textarea { box-sizing: border-box; min-width: 0; width: 100%; resize: vertical; border: 1px solid #6d6954; border-radius: 6px; padding: 8px; background: #1e201b; color: #f6ecd8; font: inherit; font-size: 13px; line-height: 1.7; }
+.result > textarea:focus { outline: 2px solid #d9ba75; outline-offset: 2px; }
+.result > small { margin: 0; }
+@media (max-width: 480px) { .result > textarea { font-size: 16px; } }

@@ -4,11 +4,13 @@ import type { SiteCapabilityCategory } from '../../types/site'
 import type { CapabilityEditorTab, Section } from './sections'
 import { Group, TextField, Toggle } from './fields'
 import { CapabilitiesEditor } from './capabilities-editor'
+import { FileUploadsEditor } from './file-upload'
 import styles from './style.module.less'
 
 export const Editors = observer(function Editors({ section, capabilityTab, onCapabilityTabChange, capabilityCategory, onCapabilityCategoryChange, companyProjectId, onCompanyProjectChange }: { section: Section; capabilityTab: CapabilityEditorTab; onCapabilityTabChange: (tab: CapabilityEditorTab) => void; capabilityCategory: SiteCapabilityCategory; onCapabilityCategoryChange: (category: SiteCapabilityCategory) => void; companyProjectId: string | null; onCompanyProjectChange: (id: string | null) => void }) {
   const content = store.draft!
   switch (section) {
+    case 'files': return <FileUploadsEditor />
     case 'home': return <>
       <Group title="迎宾文案">
         <TextField label="开场小字" value={content.home.eyebrow} onChange={(value) => store.edit((draft) => { draft.home.eyebrow = value })} maxLength={80} required />

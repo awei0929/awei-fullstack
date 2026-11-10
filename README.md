@@ -88,6 +88,71 @@ python3 -c 'import getpass,json; print(json.dumps({"account":"55555","password":
 
 官网内容存 MongoDB；上传的媒体默认在 `backend/.data/site-assets/`，可用 `SITE_ASSETS_DIR` 指向持久目录。迁移或部署时需同时备份媒体目录与数据库。当前版本不自动清理未被最终保存引用的媒体。
 
+### 图片、PDF与附件上传接入
+
+实现与验收合同见 [SPEC-004](docs/specs/004-disk-file-uploads.md)。文件保存到服务器磁盘，不需要开通 COS。
+
+接入链路：
+
+```text
+后台选择文件
+  → API 用 FormData 的 file 字段发送，并携带 Session Cookie / CSRF token
+  → POST /api/site/file-assets：先验证登录、站主、CSRF，再解析文件
+  → 校验大小与文件内容，生成 UUID 文件名，写入 SITE_ASSETS_DIR
+  → 返回文件 URL、显示名称、类型、大小
+  → 后台填入封面或插入 Markdown 草稿
+  → 保存全部后，官网使用新链接
+
+访客访问链接 → GET /api/site/assets/:filename → 图片展示 / PDF与附件下载
+```
+
+- 支持 JPG/JPEG、PNG、WebP 图片，最大 5 MiB；PDF、ZIP、TXT、DOCX、XLSX、PPTX 附件，最大 20 MiB。音频仍使用原音乐入口，最大15 MiB。
+- 进入后台「文件上传」可上传并复制地址/Markdown；「我的能力 → 公司项目」可直接上传封面，公司/项目正文的 Markdown 字段可直接上传并插入图片或附件。
+- 文件上传只写磁盘，不会自动更新官网或站点版本；应用到封面/正文后仍要点击「保存全部并更新官网」。
+- 用户已选择全部公开：文件上传完成后，拿到链接的人即可访问，即使尚未保存、取消编辑或项目被隐藏。不要上传私密文件。
+- 服务器不自动解压或执行附件。ZIP仅支持普通单卷，不支持分卷与ZIP64；Office 仅校验 ZIP 容器与扩展名，不保证文件有效或无病毒。TXT须为UTF-8文本；不支持的类型需明确扩展白名单。
+
+服务器接入与发布流程（当前已接入 main 自动构建部署）：
+
+1. 核对待发布代码和现有验证记录；正式版本由 GitHub Actions 从已推送的提交构建。真实环境文件和媒体目录独立保留，不能用前端构建产物覆盖媒体目录。
+2. 在服务器的 `backend/.env` 中确认以下配置，站主 UUID 沿用现值：
+
+   ```dotenv
+   SITE_ASSETS_DIR=/home/ubuntu/nest-data/site-assets
+   SITE_OWNER_USER_ID=existing_site_owner_uuid
+   ```
+
+   上述站主值是占位提示，不要覆盖成该字符串。目录必须在代码/`dist` 之外，后端服务用户须可读写。当前部署以 `ubuntu` 用户运行，可检查：
+
+   ```bash
+   sudo -u ubuntu test -r /home/ubuntu/nest-data/site-assets
+   sudo -u ubuntu test -w /home/ubuntu/nest-data/site-assets
+   ```
+
+   若尚未创建，使用 `sudo install -d -o ubuntu -g ubuntu -m 750 /home/ubuntu/nest-data/site-assets` 创建；不要清空现有目录或修改为所有人可写。
+3. 编辑现有 Nginx 站点 `/etc/nginx/sites-available/nest`，在已有 `location /api/` 内加入下行，保留原代理设置：
+
+   ```nginx
+   client_max_body_size 25m;
+   ```
+
+   25m 为最大20 MiB文件及 multipart 开销留余量；应用仍执行自己的5/20 MiB限制。检查并重载：
+
+   ```bash
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+4. 完成上述服务器持久目录和 Nginx 限额准备后，提交本功能代码并推送 `main`，按[部署手册](docs/deployment.md)等待 GitHub Actions 的检查、构建和部署成功。流程会发布完整前后端产物并重启服务；当前服务从 `/srv/nest/current/backend` 启动，前端由同一版本的 `frontend/dist` 提供。
+5. 通过线上 HTTPS 后台上传一张小图片、一份 PDF 和一个 ZIP，确认地址可在未登录窗口读取、图片显示且附件下载；将图片/附件用于正文并保存，刷新官网核对。重启后端后再次打开原链接，确认文件持久化。413 通常先查 Nginx 限额；401/403 核对会话/站主/CSRF；500 检查服务日志、目录权限与磁盘空间。
+6. 备份整份 `SITE_ASSETS_DIR`（含下载名元数据）及 MongoDB；发布和回滚不删除媒体目录。共享Mongo并不会共享磁盘文件，正式文件从线上后台上传。
+
+按实现顺序阅读代码：
+
+- [上传与读取路由](backend/src/site/site.controller.ts)：声明站主/CSRF权限及附件下载响应头。
+- [multipart拦截器](backend/src/site/interceptors/site-file-upload.interceptor.ts) → [文件验证](backend/src/site/validation/site-file.ts)：限制文件数量/体积，检查实际内容及文件名。
+- [媒体服务](backend/src/site/site-assets.service.ts)：生成UUID、写盘、保存附件原名元数据、失败清理及公开读取。
+- [前端API](frontend/src/api/site.ts) → [草稿Store](frontend/src/store/site-admin.ts) → [上传控件](frontend/src/pages/admin/file-upload.tsx)：提交文件、验证响应、维护忙状态和草稿，再由原保存接口发布内容。
+
 ## 操作流程
 
 1. 打开官网浏览初次见面、我的能力及关于/联系；独立任务演示位于 `/tasks`。
@@ -98,9 +163,9 @@ python3 -c 'import getpass,json; print(json.dumps({"account":"55555","password":
 
 背景音乐在「外观与动效 → 背景音乐」设置：填写直接音频地址，或上传 MP3/WAV/OGG（最大15MiB），可设置名称、0–100%音量、循环和启用。上传只改草稿，点击保存后生效。访客主动点击「音乐」才开始播放；没有音源或未启用时隐藏播放器，音乐与环境动效独立。
 
-原独立作品档案及其配置、封面上传已整体移除；新的公司项目位于「我的能力」弹窗，不恢复作品导航或旧项目接口。历史配置读取时剔除作品字段，保留其它配置与版本；读取不改数据库，下一次正常保存采用新合同。旧项目链接显示普通首页，历史上传媒体不自动删除。
+原独立作品档案及其配置、旧封面上传接口已移除；新的公司项目位于「我的能力」弹窗，通过新的文件上传接口设置封面，不恢复作品导航或旧项目接口。历史配置读取时剔除作品字段，保留其它配置与版本；读取不改数据库，下一次正常保存采用新合同。旧项目链接显示普通首页，历史上传媒体不自动删除。
 
-「我的能力」分为技术栈、公司背景、公司项目三类入口卡片。技术栈详情集中展示前端、后端、AI、部署四区，后台仍按原四个 Tab 编辑图标、昵称和顺序，每类最多12项；新增技术介绍在技术栈弹窗上方展示。公司背景可配置名称、摘要与公司简介/核心业务/岗位职责；公司项目最多12份，可新增、排序、删除、隐藏并设置封面URL。公司正文与项目正文支持 Markdown、表格、代码和图片，编辑器可展开预览；不执行原始HTML。保存全部后统一更新，隐藏项目不出现在公开接口。38个图标仅作为可选目录，默认沿用原九项。图标来源与使用说明见[技术图标记录](frontend/public/site/tech/SOURCES.md)。
+「我的能力」分为技术栈、公司背景、公司项目三类入口卡片。技术栈详情集中展示前端、后端、AI、部署四区，后台仍按原四个 Tab 编辑图标、昵称和顺序，每类最多12项；新增技术介绍在技术栈弹窗上方展示。公司背景可配置名称、摘要与公司简介/核心业务/岗位职责；公司项目最多12份，可新增、排序、删除、隐藏并设置封面URL或上传封面。公司正文与项目正文支持 Markdown、表格、代码、图片及附件上传，编辑器可展开预览；不执行原始HTML。保存全部后统一更新，隐藏项目不出现在公开接口。38个图标仅作为可选目录，默认沿用原九项。图标来源与使用说明见[技术图标记录](frontend/public/site/tech/SOURCES.md)。
 
 数字账号为3–5位ASCII数字字符串，保留前导零。未设置可验证的联系方式，第一版没有自助找回密码入口。密码规则、会话期限和错误行为统一见 SPEC-001。
 

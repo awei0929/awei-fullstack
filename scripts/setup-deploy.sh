@@ -61,6 +61,13 @@ if [[ ! -L $deploy_root/current ]]; then
   chown -h "$app_user:$app_user" "$deploy_root/current"
 fi
 
+# install -d can leave intermediate bootstrap parents at 0700 under umask 077.
+# Also repair an already-created bootstrap when retrying an interrupted setup.
+current_target=$(readlink -f "$deploy_root/current")
+[[ $(dirname "$current_target") == "$deploy_root/releases" ]]
+[[ -f $current_target/.nest-release-ready && -f $current_target/frontend/dist/index.html ]]
+chmod 755 "$current_target"
+
 # Never replace existing user data, database configuration or media files.
 install -o root -g root -m 755 "$script_dir/deploy.py" /usr/local/libexec/nest-deploy.py
 install -o root -g root -m 755 "$script_dir/deploy-ssh.sh" /usr/local/libexec/nest-deploy-ssh.sh

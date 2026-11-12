@@ -10,6 +10,9 @@ export class TurnRecord {
   @Prop({ type: String, default: '' }) answer!: string;
   @Prop({ type: String, required: true }) modelId!: string;
   @Prop({ type: String, required: true }) modelLabel!: string;
+  // 历史文档允许缺省，由公开映射只读补齐；新轮次同时记录原选择和实际尝试模型。
+  @Prop({ type: String }) requestedModelId?: string;
+  @Prop({ type: String }) requestedModelLabel?: string;
   @Prop({ type: String, required: true, enum: ['streaming', 'completed', 'canceled', 'failed', 'interrupted'] }) status!: ChatStatus;
   @Prop({ type: String, default: null }) error!: string | null;
   @Prop({ type: Date, required: true }) createdAt!: Date;

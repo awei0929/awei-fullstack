@@ -6,14 +6,14 @@ import { randomUUID } from 'node:crypto';
 import { ConversationRecord } from './schemas/conversation.schema.js';
 import type { TurnRecord } from './schemas/conversation.schema.js';
 import { ChatConfig } from './config/chat.config.js';
-import { ChatCompletionsProvider } from './providers/chat-completions.provider.js';
+import { ChatCompletionsProvider, ModelRateLimitError } from './providers/chat-completions.provider.js';
 import { ChatMemoryService } from './chat-memory.service.js';
 import type { StreamChatDto } from './dto/chat.dto.js';
 import type { ChatConversation, ChatEvent, ChatStatus, ChatTurn, ModelMessage, ModelSettings } from './types/chat.type.js';
 
 interface Run {
   ownerId: string; conversationId: string; turn: ChatTurn; model: ModelSettings; messages: ModelMessage[];
-  controller: AbortController; answer: string; savedAt: number;
+  controller: AbortController; answer: string; savedAt: number; deadline: number; fallbackModel?: ModelSettings;
   ending?: Promise<ChatTurn>; timer?: ReturnType<typeof setTimeout>;
 }
 export interface PreparedChat { conversationId: string; turn: ChatTurn; run?: Run }
@@ -51,7 +51,7 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
     await this.recover(ownerId); const record = await this.find(ownerId, id);
     const existing = record.turns.find(turn => turn.requestId === input.requestId);
     if (existing) {
-      if (existing.content !== input.content || existing.modelId !== input.modelId) throw new ConflictException('同一请求编号不能用于不同内容或模型');
+      if (existing.content !== input.content || (existing.requestedModelId ?? existing.modelId) !== input.modelId) throw new ConflictException('同一请求编号不能用于不同内容或模型');
       if (existing.status === 'streaming') throw new ConflictException('该请求仍在生成中');
       return { conversationId: id, turn: this.turnView(existing) };
     }
@@ -60,13 +60,14 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
     this.admitting.add(ownerId);
     try {
       if (record.turns.length >= 100) throw new BadRequestException('此会话已达100轮，请新建会话');
-      const model = this.config.models().find(item => item.id === input.modelId);
+      const models = this.config.models();
+      const model = models.find(item => item.id === input.modelId);
       if (!model) throw new BadRequestException('请选择有效模型');
       if (!model.apiKey) throw new ServiceUnavailableException('此模型尚未配置，请在服务端配置API Key');
       // 在受理写库前获取启用记忆快照；失败时仍返回普通JSON，不产生无上下文的半受理轮次。
       const memoryContext = await this.memories.context(ownerId);
       const timeoutMs = this.config.timeout(); const now = new Date();
-      const turn: TurnRecord = { requestId: input.requestId, content: input.content, answer: '', modelId: model.id, modelLabel: model.label, status: 'streaming', error: null, createdAt: now, updatedAt: now };
+      const turn: TurnRecord = { requestId: input.requestId, content: input.content, answer: '', modelId: model.id, modelLabel: model.label, requestedModelId: model.id, requestedModelLabel: model.label, status: 'streaming', error: null, createdAt: now, updatedAt: now };
       let updated;
       try {
         updated = await this.conversations.findOneAndUpdate(
@@ -79,7 +80,7 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
         throw error;
       }
       if (!updated) throw new ConflictException('会话状态已变化，请刷新后重试');
-      const run: Run = { ownerId, conversationId: id, turn: this.turnView(turn), model, messages: [...memoryContext, ...this.context(record.turns, input.content)], controller: new AbortController(), answer: '', savedAt: 0 };
+      const run: Run = { ownerId, conversationId: id, turn: this.turnView(turn), model, fallbackModel: models.find(item => item.id === model.fallbackModelId && item.apiKey), messages: [...memoryContext, ...this.context(record.turns, input.content)], controller: new AbortController(), answer: '', savedAt: 0, deadline: now.getTime() + timeoutMs };
       this.runs.set(ownerId, run);
       // 数据库可能已受理但响应迟到，另一请求已取消；登记句柄后再读一次，封住此窗口。
       try {
@@ -94,7 +95,7 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
         throw error;
       }
       // 从受理时计时，客户端不读取流也不能无限占用模型资源。
-      run.timer = setTimeout(() => { void this.finish(run, 'interrupted', '生成超时，已保留部分回复'); }, Math.max(1, now.getTime() + timeoutMs - Date.now()));
+      run.timer = setTimeout(() => { void this.finish(run, 'interrupted', '生成超时，已保留部分回复'); }, Math.max(1, run.deadline - Date.now()));
       return { conversationId: id, turn: run.turn, run };
     } finally { this.admitting.delete(ownerId); }
   }
@@ -103,24 +104,31 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
     const run = prepared.run;
     if (!run) { emit({ type: 'done', conversationId: prepared.conversationId, turn: prepared.turn }); return; }
     try {
-      if (!run.ending) {
-        for await (const text of this.provider.generate(run.model, run.messages, run.controller.signal)) {
-          if (run.ending) break;
-          const remaining = 16000 - Array.from(run.answer).length;
-          const points = Array.from(text); const accepted = points.slice(0, remaining).join('');
-          run.answer += accepted;
-          if (accepted) emit({ type: 'delta', requestId: run.turn.requestId, text: accepted });
-          if (points.length > remaining) throw new Error('回复超过16000字符限制，已保留部分内容');
-          if (Date.now() - run.savedAt >= 250) {
-            await this.conversations.updateOne({ ownerId: run.ownerId, id: run.conversationId, turns: { $elemMatch: { requestId: run.turn.requestId, status: 'streaming' } } },
-              { $set: { 'turns.$.answer': run.answer, 'turns.$.updatedAt': new Date() } }).exec();
-            run.savedAt = Date.now();
-          }
+      try { await this.consume(run, emit); }
+      catch (error) {
+        // 只在首次可信HTTP429且无正文时尝试固定免费备用；第二次consume不再进入此catch。
+        if (!(error instanceof ModelRateLimitError) || !run.fallbackModel || run.answer || this.stopped(run)) throw error;
+        const fallback = run.fallbackModel;
+        run.fallbackModel = undefined;
+        const updated = await this.conversations.findOneAndUpdate(
+          { ownerId: run.ownerId, id: run.conversationId, active: true, runtimeId: this.runtimeId, expiresAt: { $gt: new Date() }, turns: { $elemMatch: { requestId: run.turn.requestId, status: 'streaming', modelId: run.model.id, answer: '' } } },
+          { $set: { 'turns.$.modelId': fallback.id, 'turns.$.modelLabel': fallback.label, 'turns.$.updatedAt': new Date() } },
+          { returnDocument: 'after' },
+        ).lean().exec();
+        // await期间可能取消或超时；终态CAS优先，写入失败/未命中都不能启动新上游。
+        if (updated) run.turn = this.turnView(updated.turns.find(turn => turn.requestId === run.turn.requestId)!);
+        if (!this.stopped(run)) {
+          if (!updated) throw new Error('切换模型状态已变化');
+          run.model = fallback;
+          emit({ type: 'fallback', conversationId: run.conversationId, turn: run.turn });
+          await this.consume(run, emit);
         }
       }
+      this.stopped(run);
       const turn = await (run.ending ?? this.finish(run, run.answer.trim() ? 'completed' : 'failed', run.answer.trim() ? null : '模型未返回有效文本，请重试'));
       emit({ type: 'done', conversationId: run.conversationId, turn });
     } catch (error) {
+      this.stopped(run);
       // 只公开本地适配层定义的错误；未知网络/数据库异常不能带出原始响应或连接信息。
       const message = error instanceof Error && /^(模型|回复超过)/.test(error.message) ? error.message : '生成或保存回复失败，请刷新后重试';
       const turn = await (run.ending ?? this.finish(run, 'failed', message));
@@ -129,6 +137,28 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
       if (run.timer) clearTimeout(run.timer);
       if (this.runs.get(run.ownerId) === run) this.runs.delete(run.ownerId);
     }
+  }
+  private async consume(run: Run, emit: (event: ChatEvent) => void): Promise<void> {
+    if (this.stopped(run)) return;
+    for await (const text of this.provider.generate(run.model, run.messages, run.controller.signal)) {
+      // 每次上游/数据库await后检查同一截止时间，不依赖计时器是否已获得事件循环执行机会。
+      if (this.stopped(run)) break;
+      const remaining = 16000 - Array.from(run.answer).length;
+      const points = Array.from(text); const accepted = points.slice(0, remaining).join('');
+      run.answer += accepted;
+      if (accepted) emit({ type: 'delta', requestId: run.turn.requestId, text: accepted });
+      if (points.length > remaining) throw new Error('回复超过16000字符限制，已保留部分内容');
+      if (Date.now() - run.savedAt >= 250) {
+        await this.conversations.updateOne({ ownerId: run.ownerId, id: run.conversationId, turns: { $elemMatch: { requestId: run.turn.requestId, status: 'streaming' } } },
+          { $set: { 'turns.$.answer': run.answer, 'turns.$.updatedAt': new Date() } }).exec();
+        if (this.stopped(run)) break;
+        run.savedAt = Date.now();
+      }
+    }
+  }
+  private stopped(run: Run): boolean {
+    if (!run.ending && Date.now() >= run.deadline) void this.finish(run, 'interrupted', '生成超时，已保留部分回复');
+    return Boolean(run.ending) || run.controller.signal.aborted;
   }
   async disconnect(prepared: PreparedChat): Promise<void> {
     if (prepared.run) {
@@ -187,5 +217,5 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
     return [...selected.flatMap(turn => [{ role: 'user' as const, content: turn.content }, { role: 'assistant' as const, content: turn.answer }]), { role: 'user', content }];
   }
   private conversationView(record: ConversationRecord): ChatConversation { return { id: record.id, title: record.title, createdAt: record.createdAt.toISOString(), updatedAt: record.updatedAt.toISOString() }; }
-  private turnView(turn: TurnRecord): ChatTurn { return { requestId: turn.requestId, content: turn.content, answer: turn.answer, modelId: turn.modelId, modelLabel: turn.modelLabel, status: turn.status, error: turn.error, createdAt: turn.createdAt.toISOString(), updatedAt: turn.updatedAt.toISOString() }; }
+  private turnView(turn: TurnRecord): ChatTurn { return { requestId: turn.requestId, content: turn.content, answer: turn.answer, modelId: turn.modelId, modelLabel: turn.modelLabel, requestedModelId: turn.requestedModelId ?? turn.modelId, requestedModelLabel: turn.requestedModelLabel ?? turn.modelLabel, status: turn.status, error: turn.error, createdAt: turn.createdAt.toISOString(), updatedAt: turn.updatedAt.toISOString() }; }
 }

@@ -10,9 +10,13 @@ export class ChatConfig {
     try {
       const extras: unknown = JSON.parse(this.config.get<string>('CHAT_MODELS_JSON') || '[]');
       if (!Array.isArray(extras) || extras.length > 10) throw new Error();
-      const defaults = { id: 'glm-4.7-flash', label: 'GLM-4.7-Flash', model: 'glm-4.7-flash', baseUrl: this.config.get<string>('GLM_BASE_URL') || 'https://open.bigmodel.cn/api/paas/v4', apiKeyEnv: 'GLM_API_KEY', disableThinking: true };
+      const glm = { baseUrl: this.config.get<string>('GLM_BASE_URL') || 'https://open.bigmodel.cn/api/paas/v4', apiKeyEnv: 'GLM_API_KEY' };
+      const defaults = [
+        { ...glm, id: 'glm-4.7-flash', label: 'GLM-4.7-Flash', model: 'glm-4.7-flash', disableThinking: true },
+        { ...glm, id: 'glm-4-flash-250414', label: 'GLM-4-Flash-250414', model: 'glm-4-flash-250414', disableThinking: false },
+      ];
       const ids = new Set<string>();
-      return [defaults, ...extras].map(value => {
+      return [...defaults, ...extras].map(value => {
         if (!value || typeof value !== 'object' || Object.keys(value).some(key => !['id', 'label', 'model', 'baseUrl', 'apiKeyEnv', 'disableThinking'].includes(key))) throw new Error();
         const { id, label, model, baseUrl, apiKeyEnv, disableThinking = false } = value;
         if (typeof id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/.test(id) || ids.has(id)) throw new Error();
@@ -20,7 +24,8 @@ export class ChatConfig {
         if (typeof label !== 'string' || !label.trim() || label.length > 100 || typeof model !== 'string' || !model.trim() || model.length > 200 || typeof apiKeyEnv !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(apiKeyEnv) || typeof disableThinking !== 'boolean') throw new Error();
         const url = new URL(baseUrl);
         if (url.username || url.password || url.search || url.hash || !(url.protocol === 'https:' || (url.protocol === 'http:' && this.config.get('NODE_ENV') !== 'production' && ['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname)))) throw new Error();
-        return { id, label: label.trim(), model: model.trim(), baseUrl: url.href.replace(/\/$/, ''), apiKey: this.config.get<string>(apiKeyEnv)?.trim() || '', disableThinking };
+        // 备用关系由代码固定，额外白名单不能注入关系或覆盖内置id，避免自动调用收费模型。
+        return { id, label: label.trim(), model: model.trim(), baseUrl: url.href.replace(/\/$/, ''), apiKey: this.config.get<string>(apiKeyEnv)?.trim() || '', disableThinking, ...(id === 'glm-4.7-flash' ? { fallbackModelId: 'glm-4-flash-250414' } : {}) };
       });
     } catch {
       // 不把JSON解析异常或原始配置抛出，避免错误页/日志包含密钥。
@@ -28,7 +33,7 @@ export class ChatConfig {
     }
   }
   catalog(): { models: ChatModel[]; defaultModelId: string } {
-    return { models: this.models().map(model => ({ id: model.id, label: model.label, available: Boolean(model.apiKey) })), defaultModelId: 'glm-4.7-flash' };
+    return { models: this.models().map(model => ({ id: model.id, label: model.label, available: Boolean(model.apiKey), ...(model.fallbackModelId ? { fallbackModelId: model.fallbackModelId } : {}) })), defaultModelId: 'glm-4.7-flash' };
   }
   timeout(): number {
     const raw = this.config.get<string>('CHAT_TIMEOUT_MS') || '120000';

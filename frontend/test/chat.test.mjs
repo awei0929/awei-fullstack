@@ -26,6 +26,8 @@ const rid = '33333333-3333-4333-8333-333333333333'
 const date = '2026-11-12T00:00:00.000Z'
 const conversation = (id = cid) => ({ id, title: '对话', createdAt: date, updatedAt: date })
 const turn = (overrides = {}) => ({ requestId: rid, content: '你好', answer: '', modelId: 'glm-4.7-flash', modelLabel: 'GLM-4.7-Flash', status: 'streaming', error: null, createdAt: date, updatedAt: date, ...overrides })
+const fallbackTurn = (overrides = {}) => turn({ requestedModelId: 'glm-4.7-flash', requestedModelLabel: 'GLM-4.7-Flash', modelId: 'glm-4-flash-250414', modelLabel: 'GLM-4-Flash-250414', ...overrides })
+const modelCatalog = () => ({ models: [{ id: 'glm-4.7-flash', label: 'GLM-4.7-Flash', available: true, fallbackModelId: 'glm-4-flash-250414' }, { id: 'glm-4-flash-250414', label: 'GLM-4-Flash-250414', available: true }], defaultModelId: 'glm-4.7-flash' })
 const event = (type, data) => `event: ${type}\r\ndata: ${JSON.stringify({ type, ...data })}\r\n\r\n`
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 const stream = (text) => new ReadableStream({ start(controller) { for (const byte of new TextEncoder().encode(text)) controller.enqueue(Uint8Array.of(byte)); controller.close() } })
@@ -77,6 +79,89 @@ test('API keeps standard errors and only sends allowed stream fields', async () 
     return json({ message: '模型尚未配置', code: 'MODEL_UNAVAILABLE' }, 503)
   }
   await assert.rejects(startChatStream(cid, { requestId: rid, content: '你好', modelId: 'glm-4.7-flash' }, 'token', new AbortController().signal, () => {}), error => error instanceof HttpError && error.status === 503)
+})
+
+test('turn parsing normalizes old history and preserves requested and actual models independently', async () => {
+  const { parseChatTurn } = await import('../src/api/chat.ts')
+  const old = parseChatTurn(turn({ status: 'completed', answer: '旧回复' }))
+  assert.equal(old.requestedModelId, 'glm-4.7-flash')
+  assert.equal(old.requestedModelLabel, 'GLM-4.7-Flash')
+  const switched = parseChatTurn(fallbackTurn({ status: 'completed', answer: '备用回复' }))
+  assert.equal(switched.requestedModelId, 'glm-4.7-flash')
+  assert.equal(switched.requestedModelLabel, 'GLM-4.7-Flash')
+  assert.equal(switched.modelId, 'glm-4-flash-250414')
+})
+
+test('turn parsing rejects incomplete or malformed requested model metadata', async () => {
+  const { parseChatTurn } = await import('../src/api/chat.ts')
+  for (const fields of [
+    { requestedModelId: 'glm-4.7-flash' },
+    { requestedModelLabel: 'GLM-4.7-Flash' },
+    { requestedModelId: '', requestedModelLabel: 'GLM-4.7-Flash' },
+    { requestedModelId: 'glm-4.7-flash', requestedModelLabel: 42 },
+  ]) assert.throws(() => parseChatTurn(turn(fields)), /格式/)
+})
+
+test('model catalog supports both built-ins plus ten extras and validates fallback references', async () => {
+  const { getChatModels } = await import('../src/api/chat.ts')
+  const catalog = modelCatalog()
+  for (let index = 0; index < 10; index++) catalog.models.push({ id: `extra-${index}`, label: `模型 ${index}`, available: false })
+  globalThis.fetch = async () => json(catalog)
+  const parsed = await getChatModels()
+  assert.equal(parsed.models.length, 12)
+  assert.equal(parsed.models[0].fallbackModelId, 'glm-4-flash-250414')
+  assert.equal(parsed.models[1].fallbackModelId, undefined)
+  globalThis.fetch = async () => json({ ...catalog, models: [...catalog.models, { id: 'extra-10', label: '过多', available: true }] })
+  await assert.rejects(getChatModels(), /格式/)
+  for (const fallbackModelId of ['', null, 'missing', 'glm-4.7-flash']) {
+    const invalid = modelCatalog(); invalid.models[0].fallbackModelId = fallbackModelId
+    globalThis.fetch = async () => json(invalid)
+    await assert.rejects(getChatModels(), /格式/)
+  }
+})
+
+test('fallback updates the same streaming turn then allows deltas and a business terminal event', async () => {
+  const { consumeChatStream } = await import('../src/api/chat.ts')
+  const events = []
+  const body = event('start', { conversationId: cid, turn: turn() })
+    + event('fallback', { conversationId: cid, turn: fallbackTurn() })
+    + event('delta', { requestId: rid, text: '备用回复' })
+    + event('done', { conversationId: cid, turn: fallbackTurn({ status: 'completed', answer: '备用回复' }) })
+  await consumeChatStream(stream(body), value => events.push(value), cid, rid)
+  assert.deepEqual(events.map(value => value.type), ['start', 'fallback', 'delta', 'done'])
+  assert.equal(events[1].turn.requestedModelId, 'glm-4.7-flash')
+  assert.equal(events[1].turn.modelId, 'glm-4-flash-250414')
+  assert.equal(events[1].turn.status, 'streaming')
+  assert.equal(events[3].turn.answer, '备用回复')
+})
+
+test('fallback is not a terminal event and EOF still requires reconciliation', async () => {
+  const { consumeChatStream } = await import('../src/api/chat.ts')
+  const events = []
+  const body = event('start', { conversationId: cid, turn: turn() }) + event('fallback', { conversationId: cid, turn: fallbackTurn() })
+  await assert.rejects(consumeChatStream(stream(body), value => events.push(value), cid, rid), /中断/)
+  assert.deepEqual(events.map(value => value.type), ['start', 'fallback'])
+})
+
+test('fallback rejects wrong order, duplicates, partial output and inconsistent turn identity', async () => {
+  const { consumeChatStream } = await import('../src/api/chat.ts')
+  const start = event('start', { conversationId: cid, turn: turn() })
+  const fallback = event('fallback', { conversationId: cid, turn: fallbackTurn() })
+  const cases = [
+    fallback,
+    start + fallback + fallback,
+    start + event('delta', { requestId: rid, text: '部分' }) + fallback,
+    event('start', { conversationId: cid, turn: turn({ answer: '已保存部分' }) }) + fallback,
+    event('start', { conversationId: cid, turn: turn({ status: 'completed' }) }) + fallback,
+    start + event('fallback', { conversationId: otherCid, turn: fallbackTurn() }),
+    start + event('fallback', { conversationId: cid, turn: fallbackTurn({ requestId: otherCid }) }),
+    ...[
+      { status: 'completed' }, { answer: '混合正文' }, { error: '错误' },
+      { requestedModelId: 'other' }, { requestedModelLabel: '其他模型' },
+      { modelId: 'glm-4.7-flash' }, { content: '其他输入' }, { createdAt: '2026-11-13T00:00:00.000Z' },
+    ].map(fields => start + event('fallback', { conversationId: cid, turn: fallbackTurn(fields) })),
+  ]
+  for (const body of cases) await assert.rejects(consumeChatStream(stream(body), () => {}, cid, rid), /格式/)
 })
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
@@ -229,4 +314,98 @@ test('newer conversation reads win and failed done retains partial answer for ed
   assert.equal(store.turns[0].status, 'failed')
   assert.equal(store.turns[0].answer, '部分结果')
   store.editTurn(store.turns[0]); assert.equal(store.draft, '你好')
+})
+
+test('store keeps fallback busy, appends output to one turn and retains the original selection', async () => {
+  let controller; let requestId
+  const { store } = await setup({ models: () => json(modelCatalog()), send: (_, options) => {
+    requestId = JSON.parse(options.body).requestId
+    return new Response(new ReadableStream({ start(value) { controller = value } }), { headers: { 'Content-Type': 'text/event-stream' } })
+  } })
+  store.setDraft('你好'); const sent = store.send(); await tick()
+  controller.enqueue(new TextEncoder().encode(event('start', { conversationId: cid, turn: turn({ requestId }) }) + event('fallback', { conversationId: cid, turn: fallbackTurn({ requestId }) })))
+  await tick()
+  assert.equal(store.turns.length, 1)
+  assert.equal(store.turns[0].modelId, 'glm-4-flash-250414')
+  assert.equal(store.turns[0].status, 'streaming')
+  assert.equal(store.busy, true)
+  assert.equal(store.sendError, '')
+  assert.equal(store.selectedModelId, 'glm-4.7-flash')
+  store.setModel('glm-4-flash-250414')
+  assert.equal(store.selectedModelId, 'glm-4.7-flash')
+  controller.enqueue(new TextEncoder().encode(event('delta', { requestId, text: '备用的' }))); await tick()
+  assert.equal(store.turns[0].answer, '备用的')
+  controller.enqueue(new TextEncoder().encode(event('delta', { requestId, text: '回复' }) + event('done', { conversationId: cid, turn: fallbackTurn({ requestId, status: 'completed', answer: '备用的回复' }) })))
+  controller.close(); await sent
+  assert.equal(store.turns.length, 1)
+  assert.equal(store.turns[0].answer, '备用的回复')
+  assert.equal(store.turns[0].requestedModelId, 'glm-4.7-flash')
+  assert.equal(store.busy, false)
+})
+
+test('leaving after fallback still cancels the active generation and ignores its delayed output', async () => {
+  let controller; let requestId; let signal; let cancels = 0
+  const { store } = await setup({ models: () => json(modelCatalog()), send: (_, options) => {
+    requestId = JSON.parse(options.body).requestId; signal = options.signal
+    return new Response(new ReadableStream({ start(value) { controller = value } }), { headers: { 'Content-Type': 'text/event-stream' } })
+  }, cancel: () => { cancels++; return json(fallbackTurn({ requestId, status: 'canceled' })) } })
+  store.setDraft('你好'); const sent = store.send(); await tick()
+  controller.enqueue(new TextEncoder().encode(event('start', { conversationId: cid, turn: turn({ requestId }) }) + event('fallback', { conversationId: cid, turn: fallbackTurn({ requestId }) }))); await tick()
+  await store.selectConversation(otherCid)
+  assert.equal(cancels, 1)
+  assert.equal(signal.aborted, true)
+  controller.enqueue(new TextEncoder().encode(event('delta', { requestId, text: '迟到回复' }) + event('done', { conversationId: cid, turn: fallbackTurn({ requestId, status: 'completed', answer: '迟到回复' }) }))); controller.close(); await sent
+  assert.equal(store.selectedConversationId, otherCid)
+  assert.deepEqual(store.turns, [])
+})
+
+test('stopping a fallback turn preserves actual model and partial output over a late completion', async () => {
+  let controller; let requestId; let finishCancel
+  const { store } = await setup({ models: () => json(modelCatalog()), send: (_, options) => {
+    requestId = JSON.parse(options.body).requestId
+    return new Response(new ReadableStream({ start(value) { controller = value } }), { headers: { 'Content-Type': 'text/event-stream' } })
+  }, cancel: () => new Promise(resolve => { finishCancel = () => resolve(json(fallbackTurn({ requestId, status: 'canceled', answer: '备用部分' }))) }) })
+  store.setDraft('你好'); const sent = store.send(); await tick()
+  controller.enqueue(new TextEncoder().encode(event('start', { conversationId: cid, turn: turn({ requestId }) }) + event('fallback', { conversationId: cid, turn: fallbackTurn({ requestId }) }) + event('delta', { requestId, text: '备用部分' }))); await tick()
+  assert.equal(store.turns[0].answer, '备用部分')
+  const stopped = store.stop(); await tick()
+  controller.enqueue(new TextEncoder().encode(event('done', { conversationId: cid, turn: fallbackTurn({ requestId, status: 'completed', answer: '迟到完成' }) }))); controller.close(); await sent
+  finishCancel(); await stopped
+  assert.equal(store.turns[0].status, 'canceled')
+  assert.equal(store.turns[0].answer, '备用部分')
+  assert.equal(store.turns[0].modelId, 'glm-4-flash-250414')
+  assert.equal(store.turns[0].requestedModelId, 'glm-4.7-flash')
+  assert.equal(store.busy, false)
+})
+
+test('refresh restores requested selection for fallback history and supports old history and manual backup choice', async () => {
+  let saved = fallbackTurn({ status: 'completed', answer: '保存回复' })
+  const { store } = await setup({ models: () => json(modelCatalog()), detail: id => json({ conversation: conversation(id), turns: [saved] }) })
+  assert.equal(store.turns[0].modelId, 'glm-4-flash-250414')
+  assert.equal(store.selectedModelId, 'glm-4.7-flash')
+  store.setModel('glm-4-flash-250414')
+  assert.equal(store.selectedModelId, 'glm-4-flash-250414')
+  await store.refresh()
+  assert.equal(store.selectedModelId, 'glm-4.7-flash')
+  saved = turn({ modelId: 'glm-4-flash-250414', modelLabel: 'GLM-4-Flash-250414', status: 'completed', answer: '旧备用回复' })
+  await store.refresh()
+  assert.equal(store.selectedModelId, 'glm-4-flash-250414')
+  assert.equal(store.turns[0].requestedModelId, 'glm-4-flash-250414')
+})
+
+test('identity changes ignore delayed fallback events and clear the former model choice', async () => {
+  let controller; let requestId; let signal
+  const { store, authStore, runInAction } = await setup({ models: () => json(modelCatalog()), send: (_, options) => {
+    requestId = JSON.parse(options.body).requestId; signal = options.signal
+    return new Response(new ReadableStream({ start(value) { controller = value } }), { headers: { 'Content-Type': 'text/event-stream' } })
+  }, cancel: () => json(turn({ requestId, status: 'canceled' })) })
+  store.setDraft('你好'); const sent = store.send(); await tick()
+  controller.enqueue(new TextEncoder().encode(event('start', { conversationId: cid, turn: turn({ requestId }) }))); await tick()
+  runInAction(() => { authStore.user = null; authStore.identityVersion += 1 })
+  assert.equal(signal.aborted, true)
+  controller.enqueue(new TextEncoder().encode(event('fallback', { conversationId: cid, turn: fallbackTurn({ requestId }) }) + event('done', { conversationId: cid, turn: fallbackTurn({ requestId, status: 'completed', answer: '旧身份回复' }) }))); controller.close(); await sent
+  assert.deepEqual(store.turns, [])
+  assert.deepEqual(store.models, [])
+  assert.equal(store.selectedModelId, '')
+  assert.equal(store.busy, false)
 })

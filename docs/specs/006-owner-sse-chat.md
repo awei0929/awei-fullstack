@@ -1,6 +1,6 @@
 # SPEC-006：站主后台 SSE 多模型对话
 
-- 编号：006；状态：已上线，真实普通对话/记忆召回通过；线上停用对照及较长流式回复受GLM繁忙影响，详见文末；更新日期：2026-11-12。
+- 编号：006；状态：原对话/记忆已上线；P6免费备用与429切换已完成本地及真实模型验证，待发布；更新日期：2026-11-12。
 - 开发基准：`c6d19ff`；发布提交：`a681b28`。保留原 README、STATE 和 SSE 分析记录。仅站主后台可用；用户后续已明确授权提交、推送、部署与线上验证，替代初始不发布边界。
 - 前置：[SPEC-001](001-session-auth.md)、[SPEC-003](003-personal-site.md)、[可行性分析](../ai/tasks/sse-chat-feasibility.md)。本规格替代分析中的待定开放对象与模型选择。
 
@@ -8,7 +8,7 @@
 
 在站主 `/admin` 增加“AI 对话”分区，默认模型为免费 `glm-4.7-flash`，支持创建/切换会话、持久化历史、安全Markdown展示、逐段输出、停止生成、错误/中断展示、按后端配置选择多个模型，以及手动管理的跨会话长期记忆。默认只有 GLM；API Key 只在服务端环境配置中保存。
 
-本轮不包含游客或普通用户访问、附件/语音/图片、工具调用、联网搜索、知识库、自动提炼记忆、后台续跑、自动重发生成、删除历史、付费模型自动回退、Redis/MQ 或多实例执行。配置其他厂商不代表实际调用验证完成。
+本轮不包含游客或普通用户访问、附件/语音/图片、工具调用、联网搜索、知识库、自动提炼记忆、后台续跑、无限自动重试、删除历史、付费模型自动回退、Redis/MQ 或多实例执行。P6仅允许指定免费备用模型的单次429切换。配置其他厂商不代表实际调用验证完成。
 
 ## 用户行为
 
@@ -34,22 +34,24 @@
 类型：
 
 ```ts
-type ChatModel = { id: string; label: string; available: boolean }
+type ChatModel = { id: string; label: string; available: boolean; fallbackModelId?: string }
 type ChatConversation = { id: string; title: string; createdAt: string; updatedAt: string }
 type ChatStatus = 'streaming' | 'completed' | 'canceled' | 'failed' | 'interrupted'
 type ChatTurn = {
   requestId: string; content: string; answer: string; modelId: string; modelLabel: string;
+  requestedModelId: string; requestedModelLabel: string;
   status: ChatStatus; error: string | null; createdAt: string; updatedAt: string;
 }
 type ChatEvent =
   | { type: 'start'; conversationId: string; turn: ChatTurn }
+  | { type: 'fallback'; conversationId: string; turn: ChatTurn }
   | { type: 'delta'; requestId: string; text: string }
   | { type: 'done'; conversationId: string; turn: ChatTurn }
 ```
 
 - SSE `event` 对应 type，`data` 为上面 JSON；只有成功收到并验证 `done` 才按其业务终态结束。可发送 SSE 注释心跳（15秒）。不依赖传输 EOF 或 SSE id 判断业务完成。
 - requestId 为客户端生成 UUID；content trim 后1–4000个Unicode字符；modelId 为后端白名单。未知字段、路径/输入/模型无效400；匿名401、非站主403、不属于站主的资源404；活动运行冲突409或429；模型未配置503。流开始前保持标准JSON错误，流开始后错误转为 failed 的 done，不泄露密钥或上游原始响应。
-- 同一会话+requestId只创建一轮、最多调用模型一次；同标识不同内容/模型409。已完成的同请求可重放保存的 start/done，活动重复请求409，不追加用户消息。
+- 同一会话+requestId只创建一轮；除P6限定的首次429后切一次免费备用外，不重复调用模型。同标识不同内容/原选模型409。已完成的同请求可重放保存的 start/done，活动重复请求409，不追加用户消息。
 - 同一站主最多一个活动生成；每会话最多100轮（达到上限400并提示新建会话），历史展示最新50个会话。不静默删除旧记录。
 - Mongo 可用一个独立 conversation 文档内嵌有界 turns；并发受理、完成/取消使用条件更新，避免旧结果覆盖终态。保存阶段性正文（节流）与最终结果；数据库写入失败不能发送 completed。
 - 每次模型调用只带最近10轮 completed 的用户/助手对话及当前输入，历史按总32000字符预算从旧到新裁剪、保留当前输入；模型最多输出4096 tokens，应用保存/展示答案最多16000字符。超出按失败/受限结束并保留部分正文，不能伪装完整成功。
@@ -60,7 +62,7 @@ type ChatEvent =
 - 沿用 Nest 12.3.2、Node fetch、React/MobX、Mongo，无新增运行依赖。实际选择 Nest Controller 中受控 Express SSE：受理持久化完成后才flushHeaders，使前置错误仍返回标准JSON，并将response.close准确绑定上游abort。未采用原候选`@Sse`+Observable，业务事件合同不变，生命周期由HTTP与浏览器测试验证。
 - 上游采用 Chat Completions 兼容接口，默认 `https://open.bigmodel.cn/api/paas/v4` + `/chat/completions`，模型 `glm-4.7-flash`，stream=true，默认关闭思考（仅消费 delta.content，不展示 reasoning_content）。解析必须处理UTF-8跨块、CRLF、跨chunk事件、多行data、注释、DONE和异常EOF；限制单事件大小，防止无限缓冲。
 - 默认 GLM_API_KEY 留空：应用正常启动，模型 available=false；填入后重启后端生效。可选 GLM_BASE_URL 用于服务端指定兼容地址（默认官方）。绝不接收前端传来的URL、Key、system提示词或任意上游参数。
-- `CHAT_MODELS_JSON` 可选，最多10个额外模型，结构 `[{"id":"other-model","label":"其他模型","model":"provider-model-id","baseUrl":"https://provider.example/v1","apiKeyEnv":"OTHER_LLM_API_KEY","disableThinking":false}]`；GLM为内置模型，id不得重复。可用性由引用的环境变量决定，客户端仅得到id/label/available，不返回Key、Key变量名或baseUrl。非兼容协议需后续增加适配器。
+- `CHAT_MODELS_JSON` 可选，最多10个额外模型，结构 `[{"id":"other-model","label":"其他模型","model":"provider-model-id","baseUrl":"https://provider.example/v1","apiKeyEnv":"OTHER_LLM_API_KEY","disableThinking":false}]`；两个GLM免费内置模型id不得重复。可用性由引用的环境变量决定，客户端仅得到id/label/available及可选fallbackModelId，不返回Key、Key变量名或baseUrl。非兼容协议需后续增加适配器。
 - 服务端配置的baseUrl须HTTPS；仅允许回环HTTP作为本地开发/测试模型服务，不跟随跨域重定向转发Authorization。配置错误提供不含原始配置/密钥的明确错误，不能回退付费模型。
 - Session只在请求入口检查；生成最长120秒，前端退出/身份变化取消；不承诺跨标签撤销瞬时生效。新增 chat 路由纳入日志和 no-store。复用站主Guard时将其移至已共享Auth职责并保留旧路径兼容，或导出既有Guard；不得复制两套站主判断。
 - 不新建分支/worktree，不改真实.env、不读取或输出真实凭据。原本机27017需要认证，本轮另启一次性Mongo容器 `nest-chat-verification-20261112`（--rm），显式使用本机127.0.0.1:27019和随机临时库，不使用连接线上库的backend/.env；根代理验收后清理本次容器。
@@ -206,3 +208,26 @@ type ChatEvent =
 - 唯一合成测试记忆已停用；另建空会话进行停用对照，但多次真实调用均429，尚未获得可判定回答。较长输出也遇429，不能把短回答成功视为已完成线上长流/停止验收；本地对应功能已有隔离测试和真实GLM对照证据。
 - 已排除进程环境Key覆盖、错误base URL、env链接及未重启问题；同服务器官方诊断明确返回429/1305“当前访问量过大”。64/4096两个输出上限也均有直接调用成功，未据此修改配置或自动切换付费模型。成功与繁忙均真实发生，不宣称持续稳定。
 - 官网公共配置仍v7且发布前后逐字节一致；合成验收会话和已停用记忆保留，不清空生产数据。此前“线上完全未验”的边界由本节替代，未验项目仍按上线记录说明；真机软键盘、其他供应商及持续负载未新增验证。
+
+### P6：免费备用模型与429自动切换（2026-11-12）
+
+用户明确要求再接免费备用模型并在429时自动切换。基准`896d358`，保留原README/STATE未提交改动。既有Nest原生fetch/POST SSE、Mongo单轮记录、React/MobX继续使用，无新增依赖。
+
+选择与依据：默认`glm-4.7-flash` → `glm-4-flash-250414`，备用可复用现有GLM_API_KEY与官方地址。[官方模型页](https://docs.bigmodel.cn/cn/guide/models/free/glm-4-flash-250414)明确免费与流式；本轮合成问候真实调用HTTP200/DONE、3个正文增量、1274ms。GLM-4.5-Flash[已下线并路由4.7](https://docs.bigmodel.cn/cn/guide/models/free/glm-4.5-flash)，无法提供独立备用。独立供应商能隔离平台故障，但需要另一份Key；首轮采用立即可接入的同平台免费模型，不把它描述为独立供应商容灾或稳定性保证。
+
+合同与验收：
+
+- AC-18：新增内置免费模型`glm-4-flash-250414`，label=`GLM-4-Flash-250414`，同GLM_API_KEY/GLM_BASE_URL，disableThinking=false；原4.7仍默认。额外白名单最多10项、不能覆盖两个内置id。只有4.7固定指向该备用，额外模型和手动选备用均不自动连锁；缺Key不调用。目录`ChatModel`可选`fallbackModelId`公开该关系，最多12模型。
+- AC-19：仅适配器可信的上游HTTP429、尚未输出任何正文、未取消/断开/超时，才在同一轮切换一次。401/403/其他HTTP、网络错误、流内错误和已输出部分内容都保持原错误/部分正文，不拼接两种模型的答案。两次调用共享同一messages快照（历史+启用记忆）、requestId、数据库轮次和总时限，不重置计时，不产生第二个start，不无限重试。
+- AC-20：保留`requestedModelId/requestedModelLabel`为用户原选择，`modelId/modelLabel`记录实际尝试模型；旧记录缺requested字段时回落原model字段。重放幂等比较原选择；刷新/重新进入会话后的下拉仍取原选择。切换元数据先以streaming条件持久化，再发`fallback={type:'fallback',conversationId,turn}`；该turn状态streaming、正文为空、requested为原模型。取消竞争、超时或持久化失败不得启动新上游。终态/查询/重启恢复应保留实际模型信息。
+- AC-21：前端校验fallback的会话/请求/顺序（start之后、无正文、最多一次），只更新该轮模型信息，不把fallback当done。消息标题显示实际模型及“因限流自动切换自…”说明；选择4.7时在输入区说明繁忙将尝试备用。停止、切会话、身份变化继续沿用原隔离逻辑；旧历史可显示。
+- AC-22：真实HTTP隔离测试验证429→备用成功/失败、未切换条件、取消/超时竞争、同记忆快照、幂等与刷新；前端实际模块验证事件及UI状态。真实浏览器验证切换提示→增量→完成、停止与刷新、旧历史。真实模型单独用合成内容且不写默认线上库；失败与未验明确记录。
+
+实施清单：
+
+- [x] P6.1 后端：先为`backend/test/chat-fallback.e2e.test.mjs`添加失败用例；实现config/types/schema、结构化上游429错误、service单次切换与CAS竞争保护；14项专项及最终140/140、9套件含build通过。
+- [x] P6.2 前端：先在`frontend/test/chat.test.mjs`增加fallback契约/状态失败用例；更新types/api/store与ChatPanel提示、最多12模型解析，实际模块51/51与lint/build通过。
+- [x] P6.3 整合：27019独立随机库、本地上游fixture完成Chrome桌面/390/320浏览器切换/增量/停止/刷新/旧历史/手选备用/错误恢复；真实供应商3轮自然429→备用200全部成功，普通/记忆召回/停用未知均通过。独立审查无P0/P1/P2。隔离容器/库/媒体已清理，原3000/5173/27018已核对恢复，未写线上测试数据。
+- [ ] P6.4 沿此前AI功能发布授权提交/推送/部署，验证线上自然429切换、记忆与停用对照，单独记录生产结果。
+
+P6本地与真实证据：[整合记录](../ai/tasks/006-fallback-integration.md)、[后端](../ai/tasks/006-fallback-backend.md)、[前端](../ai/tasks/006-fallback-frontend.md)、[独立审查](../ai/tasks/006-fallback-review.md)。2026-11-12 20:58真实HTTP三轮主模型均429/1305、备用均200，依次599/666/517ms、4/11/1个delta；每轮仅一个start/fallback/done，GET历史一致。记忆的随机代号仅位于system，停用后全新会话仅user且回答“未知”；主备messages逐字段相同。此记录证明真实切换可用，不保证同供应商持续稳定，生产结果待P6.4另记。

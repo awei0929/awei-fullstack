@@ -96,13 +96,13 @@ UsersModule 只向外导出 UsersService，AuthModule 不重复注册用户模�
 
 服务器磁盘上传合同见[SPEC-004](../specs/004-disk-file-uploads.md)。`POST /api/site/file-assets`复用Session/Owner/CSRF，multipart唯一file，图片5MiB、PDF/ZIP/TXT/DOCX/XLSX/PPTX附件20MiB；音频原接口15MiB保留。文件校验、随机命名、写盘与公开读取保留在SiteModule资产业务，文件与附件下载名元数据位于同一`SITE_ASSETS_DIR`，不新增Mongo集合或存储依赖。GET仅接受UUID文件名与白名单扩展名，附件强制下载并保留安全原名；上传不改站点版本。后台独立上传区、封面、公司/项目Markdown共享上传状态和身份保护，结果只改草稿；Markdown专用URL类型允许本站附件路径，联系配置仍仅HTTP(S)。全部文件上传完成即可公开访问，不随隐藏项目变私密；部署与回滚保留媒体目录，备份需同时包含磁盘与Mongo。
 
-站主AI对话见[SPEC-006](../specs/006-owner-sse-chat.md)。独立`ChatModule`和Mongo会话文档负责真实历史及终态；`POST /api/chat/conversations/:id/stream`在认证/站主/CSRF与受理持久化完成后，由受控Express响应输出SSE，前置错误保留JSON状态码。Node原生fetch调用服务端白名单中的Chat Completions兼容模型，默认GLM-4.7-Flash；Key只在后端环境变量中，客户端仅获得模型id/label/available。共享SiteOwnerGuard现归AuthModule，原site路径保留再导出兼容。
+站主AI对话见[SPEC-006](../specs/006-owner-sse-chat.md)。独立`ChatModule`和Mongo会话文档负责真实历史及终态；`POST /api/chat/conversations/:id/stream`在认证/站主/CSRF与受理持久化完成后，由受控Express响应输出SSE，前置错误保留JSON状态码。Node原生fetch调用服务端白名单中的Chat Completions兼容模型，默认GLM-4.7-Flash；Key只在后端环境变量中，客户端仅获得模型id/label/available及可选fallbackModelId。共享SiteOwnerGuard现归AuthModule，原site路径保留再导出兼容。
 
-生成由AbortController、单站主活动锁、requestId幂等和Mongo条件更新控制；停止、断连、超时不会被EOF误判为完成，最终保存成功后才发送done。每会话100轮、列表最近50个会话、上下文最近10个完成轮次/32000字符，答案16000字符/4096 tokens有界。首版为单进程且连接断开停止生成；不支持多实例协调、后台续跑或自动重发。重启遗留streaming记录按保存的期限转为interrupted。前端ChatStore校验身份/会话/请求版本，独立POST fetch读取SSE；ChatPanel属于后台分区，官网草稿和预览仍由原SiteAdminStore维护。
+生成由AbortController、单站主活动锁、requestId幂等和Mongo条件更新控制；停止、断连、超时不会被EOF误判为完成，最终保存成功后才发送done。每会话100轮、列表最近50个会话、上下文最近10个完成轮次/32000字符，答案16000字符/4096 tokens有界。单进程且连接断开停止生成；不支持多实例协调、后台续跑或无限重试。仅GLM-4.7-Flash在尚无正文的HTTP429后尝试一次免费GLM-4-Flash-250414，共享原上下文与总时限，CAS保存模型变更后发送fallback事件。requestedModel字段保留原选择，model字段保留实际尝试，旧记录读取时归一；原选择用于幂等与刷新后的下拉。重启遗留streaming记录按保存的期限转为interrupted。前端ChatStore校验身份/会话/请求版本，独立POST fetch读取SSE；ChatPanel属于后台分区，官网草稿和预览仍由原SiteAdminStore维护。
 
 聊天工作区使用桌面历史侧栏、窄屏模态抽屉和底部输入区，支持已加载会话的标题搜索、上翻暂停跟随与返回最新。`ChatMarkdown`复用react-markdown/remark-gfm展示表格与代码，禁止原始HTML、限制链接且不自动加载模型图片；整条回复与代码复制只在用户点击时写剪贴板。官网编辑仍保留原有布局与草稿，聊天不占用其保存流程。
 
-跨会话记忆由`ChatMemoryService`维护在独立`chat_memories`集合，每个owner唯一文档内保存最多20条，每条trim后1–500个Unicode码点；原子新增限制数量，更新/删除只改目标项。`/api/chat/memories`读写复用Session/Owner，写入另验CSRF，所有Mongo操作按可信ownerId过滤。每次新生成受理前读取启用项快照，组成一条system背景并提示当前用户明确要求优先，再加入原有会话上下文；无启用项时保持原messages。记忆内容发送给当轮选定模型，运行期间编辑只影响后续请求，不改写历史答案。
+跨会话记忆由`ChatMemoryService`维护在独立`chat_memories`集合，每个owner唯一文档内保存最多20条，每条trim后1–500个Unicode码点；原子新增限制数量，更新/删除只改目标项。`/api/chat/memories`读写复用Session/Owner，写入另验CSRF，所有Mongo操作按可信ownerId过滤。每次新生成受理前读取启用项快照，组成一条system背景并提示当前用户明确要求优先，再加入原有会话上下文；无启用项时保持原messages。记忆内容发送给当轮使用的模型，含429自动切换的备用；运行期间编辑只影响后续请求，不改写历史答案。
 
 独立`ChatMemoryStore`处理身份与请求版本、写入互斥及错误保留；首次完整读取成功后才允许保存。`ChatMemoryPanel`提供查看、添加、编辑、启停和确认删除，回复“记住”打开同一编辑器；超500字保留全文供摘录。记忆由站主显式保存，不自动提取/摘要，不使用localStorage、向量库或额外模型调用。
 

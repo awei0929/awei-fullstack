@@ -2,6 +2,12 @@ import { Injectable } from '@nestjs/common';
 import type { ModelMessage, ModelSettings } from '../types/chat.type.js';
 import { sseData } from './sse-parser.js';
 
+// 仅可信HTTP状态创建此本地错误；流内供应商错误或错误文案不能触发自动切换。
+export class ModelRateLimitError extends Error {
+  readonly status = 429;
+  constructor() { super('模型请求过于频繁或额度不足，请稍后重试'); this.name = 'ModelRateLimitError'; }
+}
+
 // 服务端兼容适配器将厂商SSE转换为纯文本增量，不让上游协议进入Controller或浏览器。
 @Injectable()
 export class ChatCompletionsProvider {
@@ -14,7 +20,7 @@ export class ChatCompletionsProvider {
     if (!response.ok || !response.body || !response.headers.get('content-type')?.includes('text/event-stream')) {
       await response.body?.cancel();
       if (response.status === 401 || response.status === 403) throw new Error('模型鉴权失败，请检查服务端配置');
-      if (response.status === 429) throw new Error('模型请求过于频繁或额度不足，请稍后重试');
+      if (response.status === 429) throw new ModelRateLimitError();
       throw new Error('模型服务暂时不可用，请稍后重试');
     }
     for await (const data of sseData(response.body)) {

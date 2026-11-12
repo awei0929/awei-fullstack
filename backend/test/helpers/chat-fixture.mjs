@@ -4,12 +4,15 @@ import { createServer } from 'node:http';
 export async function modelFixture() {
   const calls = [];
   const sockets = new Set();
+  let handler;
   let aborted = 0;
   const server = createServer(async (request, response) => {
     let raw = ''; for await (const chunk of request) raw += chunk;
     const body = JSON.parse(raw); calls.push({ body, authorization: request.headers.authorization, url: request.url });
     let finished = false;
     response.on('close', () => { if (!finished) aborted++; });
+    // 个别竞争测试在真实HTTP边界暂停响应；业务、流解析和Mongo写入仍使用生产实现。
+    if (handler && await handler({ body, request, response })) { finished = response.writableEnded; return; }
     const mode = body.messages.at(-1).content;
     if (mode === 'redirect') { response.writeHead(302, { Location: '/unexpected' }); response.end(); finished = true; return; }
     if (/^http-(401|429|500)$/.test(mode)) { response.writeHead(Number(mode.slice(5))); response.end('secret upstream diagnostic'); finished = true; return; }
@@ -34,6 +37,7 @@ export async function modelFixture() {
   server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   return { url: `http://127.0.0.1:${server.address().port}/v1`, calls, get aborted() { return aborted; },
+    handle(next) { handler = next; },
     async close() { for (const socket of sockets) socket.destroy(); await new Promise(resolve => server.close(resolve)); } };
 }
 

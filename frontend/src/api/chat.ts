@@ -30,24 +30,30 @@ function parseConversation(value: unknown): ChatConversation {
 export function parseChatTurn(value: unknown): ChatTurn {
   const item = object(value)
   if (!['streaming', 'completed', 'canceled', 'failed', 'interrupted'].includes(String(item.status))) return invalid()
-  return { requestId: uuid(item.requestId), content: text(item.content, 4000, true), answer: text(item.answer, 16000), modelId: text(item.modelId, 200, true), modelLabel: text(item.modelLabel, 200, true), status: item.status as ChatStatus, error: item.error === null ? null : text(item.error, 4000), createdAt: date(item.createdAt), updatedAt: date(item.updatedAt) }
+  const modelId = text(item.modelId, 200, true)
+  const modelLabel = text(item.modelLabel, 200, true)
+  const legacy = !('requestedModelId' in item) && !('requestedModelLabel' in item)
+  const requestedModelId = legacy ? modelId : text(item.requestedModelId, 200, true)
+  const requestedModelLabel = legacy ? modelLabel : text(item.requestedModelLabel, 200, true)
+  return { requestId: uuid(item.requestId), content: text(item.content, 4000, true), answer: text(item.answer, 16000), requestedModelId, requestedModelLabel, modelId, modelLabel, status: item.status as ChatStatus, error: item.error === null ? null : text(item.error, 4000), createdAt: date(item.createdAt), updatedAt: date(item.updatedAt) }
 }
 function parseEvent(value: unknown): ChatEvent {
   const item = object(value)
   if (item.type === 'delta') return { type: 'delta', requestId: uuid(item.requestId), text: text(item.text, 16000) }
-  if (item.type === 'start' || item.type === 'done') return { type: item.type, conversationId: uuid(item.conversationId), turn: parseChatTurn(item.turn) }
+  if (item.type === 'start' || item.type === 'fallback' || item.type === 'done') return { type: item.type, conversationId: uuid(item.conversationId), turn: parseChatTurn(item.turn) }
   return invalid()
 }
 
 export async function getChatModels(): Promise<{ models: ChatModel[]; defaultModelId: string }> {
   const result = object(await request<unknown>('/chat/models'))
-  const models = list(result.models, 11, value => {
+  const models = list(result.models, 12, value => {
     const item = object(value)
     if (typeof item.available !== 'boolean') return invalid()
-    return { id: text(item.id, 200, true), label: text(item.label, 200, true), available: item.available }
+    return { id: text(item.id, 200, true), label: text(item.label, 200, true), available: item.available, ...('fallbackModelId' in item ? { fallbackModelId: text(item.fallbackModelId, 200, true) } : {}) }
   })
   const defaultModelId = text(result.defaultModelId, 200, true)
   if (!models.some(model => model.id === defaultModelId) || new Set(models.map(model => model.id)).size !== models.length) return invalid()
+  if (models.some(model => model.fallbackModelId && (model.fallbackModelId === model.id || !models.some(target => target.id === model.fallbackModelId)))) return invalid()
   return { models, defaultModelId }
 }
 export async function getChatConversations(): Promise<ChatConversation[]> {
@@ -69,7 +75,8 @@ export async function cancelChatTurn(id: string, requestId: string, csrfToken: s
   return turn
 }
 export async function consumeChatStream(body: ReadableStream<Uint8Array>, onEvent: (event: ChatEvent) => void, conversationId: string, requestId: string): Promise<void> {
-  let started = false
+  let started: ChatTurn | null = null
+  let switched = false
   let length = 0
   for await (const message of readSseEvents(body)) {
     let value: unknown
@@ -84,8 +91,14 @@ export async function consumeChatStream(body: ReadableStream<Uint8Array>, onEven
       if (event.conversationId !== conversationId || event.turn.requestId !== requestId) return invalid()
       if (event.type === 'start') {
         if (started) return invalid()
-        started = true
+        started = event.turn
         length = Array.from(event.turn.answer).length
+      } else if (event.type === 'fallback') {
+        if (!started || switched || length !== 0 || started.status !== 'streaming'
+          || event.turn.status !== 'streaming' || event.turn.answer !== '' || event.turn.error !== null
+          || event.turn.requestedModelId !== started.requestedModelId || event.turn.requestedModelLabel !== started.requestedModelLabel
+          || event.turn.modelId === started.modelId || event.turn.content !== started.content || event.turn.createdAt !== started.createdAt) return invalid()
+        switched = true
       } else if (!started || event.turn.status === 'streaming') return invalid()
     }
     onEvent(event)

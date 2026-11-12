@@ -34,7 +34,7 @@ describe('站主聊天真实HTTP', () => {
   it('无Key正常列出不可用模型、发送503且不落轮次，不泄漏配置', async () => {
     state.app.get(ConfigService).set('GLM_API_KEY', ''); const convo = await create();
     const response = await owner.request('/chat/models'); assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
-    assert.deepEqual(await response.json(), { models: [{ id: 'glm-4.7-flash', label: 'GLM-4.7-Flash', available: false }], defaultModelId: 'glm-4.7-flash' });
+    assert.deepEqual(await response.json(), { models: [{ id: 'glm-4.7-flash', label: 'GLM-4.7-Flash', available: false, fallbackModelId: 'glm-4-flash-250414' }, { id: 'glm-4-flash-250414', label: 'GLM-4-Flash-250414', available: false }], defaultModelId: 'glm-4.7-flash' });
     assert.equal((await send(convo.id)).status, 503); assert.equal((await detail(convo.id)).turns.length, 0);
   });
   it('UTF-8分片、CRLF、多行data与注释生成增量、done并保存历史', async () => {
@@ -105,7 +105,7 @@ describe('站主聊天真实HTTP', () => {
   });
   it('第二模型来自服务端白名单，前端不获地址、变量名或Key', async () => {
     const settings = state.app.get(ConfigService); settings.set('SECOND_KEY', 'second-fixture'); settings.set('CHAT_MODELS_JSON', JSON.stringify([{ id: 'second', label: '第二模型', model: 'provider-2', baseUrl: upstream.url, apiKeyEnv: 'SECOND_KEY', disableThinking: false }]));
-    const catalog = await owner.request('/chat/models').then(r => r.json()); assert.deepEqual(catalog.models[1], { id: 'second', label: '第二模型', available: true });
+    const catalog = await owner.request('/chat/models').then(r => r.json()); assert.deepEqual(catalog.models.find(model => model.id === 'second'), { id: 'second', label: '第二模型', available: true });
     const convo = await create(); const result = await collect(await send(convo.id, '你好', randomUUID(), { modelId: 'second' })); assert.equal(result.at(-1).turn.modelLabel, '第二模型');
     assert.equal(upstream.calls[0].body.model, 'provider-2'); assert.equal(upstream.calls[0].authorization, 'Bearer second-fixture'); assert.equal(upstream.calls[0].body.thinking, undefined);
   });

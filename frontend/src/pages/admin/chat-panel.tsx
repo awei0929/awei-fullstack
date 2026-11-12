@@ -37,6 +37,8 @@ export const ChatPanel = observer(function ChatPanel() {
   const conversation = store.conversations.find(item => item.id === selected)
   const sendError = visibleSendError(store.sendError, lastTurn?.error)
   const generating = store.sending || store.stopping || store.hasStreamingTurn
+  const fallbackModelId = store.models.find(model => model.id === store.selectedModelId)?.fallbackModelId
+  const fallbackModel = store.models.find(model => model.id === fallbackModelId && model.available)
 
   useEffect(() => {
     store.activate()
@@ -141,6 +143,7 @@ export const ChatPanel = observer(function ChatPanel() {
               : <div className={styles.messageColumn}>{store.turns.map(turn => <article key={turn.requestId} className={styles.turn}>
                 <div className={styles.question}><div className={styles.messageHeading}><strong>你</strong><button type="button" disabled={store.busy} onClick={() => { store.editTurn(turn); focusInput() }}>重新编辑</button></div><p>{turn.content}</p></div>
                 <div className={styles.answer}><div className={styles.messageHeading}><strong>{turn.modelLabel}</strong>{turn.status !== 'completed' && <span className={`${styles.turnStatus} ${turn.status === 'failed' || turn.status === 'interrupted' ? styles.failureStatus : ''}`}>{statuses[turn.status]}</span>}</div>
+                  {turn.modelId !== turn.requestedModelId && <p className={styles.fallbackNotice}>因限流自动切换自{turn.requestedModelLabel}</p>}
                   {turn.answer ? <ChatMarkdown content={turn.answer} /> : <p className={styles.answerPlaceholder}>{turn.status === 'streaming' ? '正在思考…' : '本次没有生成回复'}</p>}
                   {turn.error && <p role="alert" className={styles.turnError}>{turn.error}</p>}
                   {turn.answer && turn.status !== 'streaming' && <div className={styles.messageActions}><ChatCopyButton text={turn.answer} label="复制回复" className={styles.copyButton} /><MemorySaveButton content={turn.answer} /></div>}
@@ -160,6 +163,7 @@ export const ChatPanel = observer(function ChatPanel() {
             <span className={styles.srOnly} role="status" aria-live="polite">{store.stopping ? '正在停止…' : generating ? '正在生成回复…' : ''}</span>
             {generating ? <Button className={styles.stopButton} loading={store.stopping} disabled={store.stopping} onClick={() => void store.stop()}>停止生成</Button> : <Button className={styles.sendButton} type="primary" htmlType="submit" disabled={!store.canSend}>发送<span aria-hidden="true"> ↑</span></Button>}
           </div>
+          {fallbackModel && <p className={styles.fallbackHint}>繁忙时将尝试免费备用 {fallbackModel.label}</p>}
         </div>
         <div className={styles.composerFootnote}><p id="chat-input-hint"><span>Enter 换行</span><span>Ctrl / ⌘ + Enter 发送</span></p><span className={count > 4000 ? styles.overLimit : ''}>{count} / 4000</span></div>
       </form>

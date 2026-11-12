@@ -27,7 +27,7 @@ export const ChatMemoryPanel = observer(function ChatMemoryPanel() {
   return <>
     <button className={styles.entry} type="button" onClick={() => store.openManager()} disabled={store.forbidden} aria-label="管理记忆"><MemoryMark /><span>记忆</span>{store.enabledCount > 0 && <small>{store.enabledCount}</small>}</button>
     <Modal className={styles.modal} open={store.open} title="长期记忆" width={680} footer={null} onCancel={store.close} closable={!store.busy} keyboard={!store.busy} mask={{ closable: !store.busy }} afterOpenChange={visible => { if (visible) { if (store.editorOpen) inputRef.current?.focus(); else addRef.current?.focus() } }}>
-      <div className={styles.intro}><p>把希望以后还记得的偏好与背景，留在这里</p><span>启用的记忆会随消息发送给所选模型，修改将在后续对话生效</span></div>
+      <div className={styles.intro}><p>把希望以后还记得的偏好与背景，留在这里</p><span>启用的记忆会随消息发送给所选模型，自动切换的备用模型也会收到；当前免费备用同属智谱。修改将在后续对话生效</span></div>
       <div className={styles.toolbar}><p><strong>{store.enabledCount}</strong> 条启用 <span>共 {store.memories.length} / 20 条</span></p><button ref={addRef} type="button" className={styles.add} disabled={store.busy || store.memories.length >= 20} onClick={() => store.startNew()}>添加记忆</button></div>
       {store.loadError && <Alert type="error" title={store.loadError} action={<Button size="small" disabled={store.busy} onClick={() => void store.load()}>重新读取</Button>} />}
       {store.notice && <p className={styles.notice} role="status">{store.notice}</p>}

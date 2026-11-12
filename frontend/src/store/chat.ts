@@ -172,7 +172,7 @@ export class ChatStore {
         if (!this.current(identity, view)) return
         this.turns = detail.turns
         this.updateConversation(detail.conversation)
-        const previousModel = detail.turns.at(-1)?.modelId
+        const previousModel = detail.turns.at(-1)?.requestedModelId
         if (previousModel && this.models.some(model => model.id === previousModel && model.available)) this.selectedModelId = previousModel
       })
     } catch (error) {
@@ -228,7 +228,7 @@ export class ChatStore {
       this.draft = ''
       const conversation = this.conversations.find(item => item.id === run.conversationId)
       if (conversation) this.updateConversation({ ...conversation, title: this.turns.length === 1 ? Array.from(event.turn.content).slice(0, 40).join('') : conversation.title, updatedAt: event.turn.updatedAt })
-    } else {
+    } else if (event.type === 'done') {
       run.done = true
       this.sendError = event.turn.error || ''
     }

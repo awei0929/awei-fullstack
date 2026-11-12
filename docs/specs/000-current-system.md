@@ -5,8 +5,8 @@
 - 更新日期：2026-11-12（同步SPEC-004/006及聊天工作区/手动记忆增量入口，原基线历史验证不改写）。
 - 官网增量合同以[SPEC-003](003-personal-site.md)为准；P24整体移除作品档案、项目详情与站主项目配置，不影响本基线的独立`/tasks`、认证和任务数据隔离。
 - 图片、PDF与附件上传增量见[SPEC-004](004-disk-file-uploads.md)，沿用站主/Session/CSRF和独立磁盘媒体；不改变本基线任务与认证合同。
-- 站主后台SSE聊天增量见[SPEC-006](006-owner-sse-chat.md)：独立ChatModule/Mongo历史，默认GLM-4.7-Flash，按后端白名单扩展兼容模型，复用Session/Owner/CSRF；不进入公开官网配置或个人任务集合。工作区支持历史标题搜索、上翻暂停跟随/返回最新、安全Markdown及回复/代码复制，窄屏历史抽屉与底部输入区独立于官网编辑布局。
-- SPEC-006手动长期记忆另存Mongo，最多20条、每条trim后1–500个Unicode码点；可管理或从回复“记住”，支持编辑、启停、确认删除，超限内容由用户摘录。每次生成将启用项作为背景发送给当轮所选模型，跨会话可用，修改只影响后续请求；不自动提取或摘要。上述聊天增量的实际验收、真实模型与线上部署边界按SPEC-006记录，不沿用本基线历史验证结论。
+- 站主后台SSE聊天增量见[SPEC-006](006-owner-sse-chat.md)：独立ChatModule/Mongo历史，默认GLM-4.7-Flash，未输出时遇429仅尝试一次免费GLM-4-Flash-250414，保存原选/实际模型；按后端白名单扩展其他兼容模型，复用Session/Owner/CSRF；不进入公开官网配置或个人任务集合。工作区支持历史标题搜索、上翻暂停跟随/返回最新、安全Markdown及回复/代码复制，窄屏历史抽屉与底部输入区独立于官网编辑布局。
+- SPEC-006手动长期记忆另存Mongo，最多20条、每条trim后1–500个Unicode码点；可管理或从回复“记住”，支持编辑、启停、确认删除，超限内容由用户摘录。每次生成将启用项作为背景发送给当轮使用的模型（含自动备用），跨会话可用，修改只影响后续请求；不自动提取或摘要。上述聊天增量的实际验收、真实模型与线上部署边界按SPEC-006记录，不沿用本基线历史验证结论。
 - 代码基准：bd2b983 加当前 SPEC-001 / SPEC-002 未提交改动；原 d688983 基线验证保留在历史记录中。
 - 依据：[任务 Controller](../../backend/src/tasks/tasks.controller.ts)、[Service](../../backend/src/tasks/tasks.service.ts)、[认证 Controller](../../backend/src/auth/auth.controller.ts)、[公共 Controller](../../backend/src/public/public.controller.ts)、[任务 HTTP 测试](../../backend/test/tasks.e2e.test.mjs)、[认证 HTTP 测试](../../backend/test/auth.e2e.test.mjs)。
 - 结构：用户模型与服务属于 UsersModule；AuthModule 导入它，负责认证入口、会话与独立 Guard。目录整理及其验证见 [SPEC-002](002-auth-module-organization.md)，HTTP 与数据合同不变。

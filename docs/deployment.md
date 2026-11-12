@@ -71,7 +71,7 @@
 
 ## SSE 对话部署检查
 
-聊天功能合同见 [SPEC-006](specs/006-owner-sse-chat.md)，Key申请及多模型配置见 [README](../README.md#站主后台-ai-对话)。以下是上线步骤，不表示本轮已修改服务器或验证正式链路。
+聊天功能合同见 [SPEC-006](specs/006-owner-sse-chat.md)，Key申请及多模型配置见 [README](../README.md#站主后台-ai-对话)。以下步骤用于部署与复核；2026-11-12实际发布和验收结果见[上线记录](ai/tasks/006-chat-deployment.md)。
 
 1. 在服务器持久环境文件 `/home/ubuntu/apps/nest/backend/.env` 增加 `GLM_API_KEY`，保留原数据库、Session、站主和媒体配置。默认模型为 `glm-4.7-flash`，单轮时限 `CHAT_TIMEOUT_MS=120000`；如需多模型再增加白名单配置。真实环境文件保持600权限，不进入发布包。
 2. 核对 Nginx `/api/chat/` 路由可立即转发流数据。可为该前缀单独设置下面的location，或将相关设置合并到已有代理；保留已有TLS、站点及可信转发头配置。部署应用代码不会自动修改Nginx。

@@ -17,7 +17,7 @@
 | 003 | [个人官网与站主配置](docs/specs/003-personal-site.md) | 已验证，P28能力三卡/详情与站主Markdown履历；P24独立作品档案移除仍有效 |
 | 004 | [服务器磁盘文件上传](docs/specs/004-disk-file-uploads.md) | 已上线并验证；图片、PDF、附件公开上传、下载及重启持久化 |
 | 005 | [推送后自动构建部署](docs/specs/005-automatic-deployment.md) | 已验证，main 自动构建/SSH 发布、日志与失败回退 |
-| 006 | [站主后台 SSE 多模型对话](docs/specs/006-owner-sse-chat.md) | 本地已验证，GLM-4.7-Flash与可配置模型；真实GLM已验，线上待验证 |
+| 006 | [站主后台 SSE 多模型对话](docs/specs/006-owner-sse-chat.md) | 已上线；真实普通对话/记忆召回通过，部分线上验收受GLM繁忙影响 |
 
 ## OpenSpec 引用模式
 

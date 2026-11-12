@@ -5,9 +5,13 @@ import { ConfigService } from '@nestjs/config';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
 import { createConnection } from 'mongoose';
-import { AppModule } from '../../dist/app.module.js';
 import { UsersService } from '../../dist/users/users.service.js';
 import { configureApp } from '../../dist/app.setup.js';
+
+// 动态加载根模块前固定测试模式，禁止ConfigModule读取开发者可能连接线上的真实.env。
+assert.ok(process.env.MONGODB_URI, 'HTTP测试必须显式提供隔离MONGODB_URI');
+process.env.NODE_ENV = 'test';
+const { AppModule } = await import('../../dist/app.module.js');
 
 // 每个用例启动真实Nest应用和独立数据库；port=0交给系统分配空闲端口。
 // 数据库名只能是测试前缀+UUID，后续清理前也会重复校验，避免误删开发数据。

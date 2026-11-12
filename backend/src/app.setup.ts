@@ -44,7 +44,7 @@ export async function configureApp(app: INestApplication): Promise<void> {
   await store.collectionP;
   // 个人数据和认证响应不交给浏览器/代理缓存；/i与Express默认不区分大小写的路由保持一致。
   app.use((request: Request, response: Response, next: NextFunction) => {
-    if (/^\/api\/(auth|tasks|stats|site)(?:\/|$)/i.test(request.path)) response.setHeader('Cache-Control', 'no-store');
+    if (/^\/api\/(auth|tasks|stats|site|chat)(?:\/|$)/i.test(request.path)) response.setHeader('Cache-Control', 'no-store');
     next();
   });
   // 必须在Controller与Guard之前安装，后续才能通过request.session读取身份。

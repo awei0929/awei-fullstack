@@ -14,7 +14,7 @@ interface RequestOptions extends RequestInit {
   csrfToken?: string
 }
 
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function requestResponse(path: string, options: RequestOptions = {}): Promise<Response> {
   const { csrfToken, ...init } = options
   const headers = new Headers(init.headers)
   if (csrfToken) headers.set('X-CSRF-Token', csrfToken)
@@ -27,13 +27,13 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       credentials: 'same-origin',
       cache: 'no-store',
     })
-  } catch {
+  } catch (error) {
+    if (init.signal?.aborted) throw error
     throw new Error('无法连接服务，请检查网络后重试')
   }
 
-  const body: unknown = await response.json().catch(() => null)
-
   if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null)
     const message = body && typeof body === 'object' && 'message' in body
       ? body.message
       : null
@@ -48,6 +48,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     )
   }
 
+  return response
+}
+
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await requestResponse(path, options)
+  const body: unknown = await response.json().catch(() => null)
   if (body === null) throw new Error('接口没有返回有效的 JSON 数据')
   return body as T
 }

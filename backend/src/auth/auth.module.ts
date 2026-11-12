@@ -1,3 +1,4 @@
+import { SiteOwnerGuard } from './guards/site-owner.guard.js';
 import { Module } from '@nestjs/common';
 import { UsersModule } from '../users/users.module.js';
 import { AuthService } from './auth.service.js';
@@ -15,9 +16,9 @@ import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard.js';
   controllers: [AuthController],
   // providers 由 Nest 创建并管理；默认在各自注册范围内为单例，导出服务可由导入方复用。
   // @UseGuards 传入守卫类时，Nest还会在使用方模块上下文管理守卫，不代表所有模块共用一个守卫对象。
-  providers: [AuthService, SessionGuard, CsrfGuard, AuthRateLimitGuard],
+  providers: [AuthService, SessionGuard, CsrfGuard, AuthRateLimitGuard, SiteOwnerGuard],
   // 任务/统计模块导入 AuthModule 后复用认证能力，无需重复注册 AuthService。
   // 登录限流守卫只供本模块的认证入口使用；UsersService 由 UsersModule 独立管理。
-  exports: [AuthService, SessionGuard, CsrfGuard],
+  exports: [AuthService, SessionGuard, CsrfGuard, SiteOwnerGuard],
 })
 export class AuthModule {}

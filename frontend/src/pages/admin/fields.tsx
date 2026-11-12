@@ -45,6 +45,7 @@ export function Icon({ name }: { name: Section }) {
     contact: <><path d="m3 10 18-7-7 18-3-8Z" /><path d="m11 13 10-10" /></>,
     appearance: <><path d="M3 6h18M3 12h18M3 18h18" /><circle cx="8" cy="6" r="2" /><circle cx="16" cy="12" r="2" /><circle cx="9" cy="18" r="2" /></>,
     files: <><path d="M14 3H5v18h14V8Z" /><path d="M14 3v5h5M12 17v-6m-3 3 3-3 3 3" /></>,
+    chat: <><path d="M3 4h18v13H9l-6 4V4Z" /><path d="M7 9h10M7 13h6" /></>,
   }
   return <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
 }

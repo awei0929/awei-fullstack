@@ -1,6 +1,6 @@
 # 架构概览
 
-核对日期：2026-11-08。类型：当前实现结构；官网正在按 [SPEC-003](../specs/003-personal-site.md) 实施，验证以该规格记录为准。原系统摘要见 [SPEC-000](../specs/000-current-system.md)，认证与会话见 [SPEC-001](../specs/001-session-auth.md)，模块整理见 [SPEC-002](../specs/002-auth-module-organization.md)。
+核对日期：2026-11-12。类型：当前实现结构；官网按 [SPEC-003](../specs/003-personal-site.md) 实施，站主聊天增量见 [SPEC-006](../specs/006-owner-sse-chat.md)，验证以各规格记录为准。原系统摘要见 [SPEC-000](../specs/000-current-system.md)，认证与会话见 [SPEC-001](../specs/001-session-auth.md)，模块整理见 [SPEC-002](../specs/002-auth-module-organization.md)。
 更新触发：模块关系、存储方式、运行依赖或请求处理链发生变化。
 
 ## 结构
@@ -9,7 +9,7 @@
 
 ```text
 浏览器
-  → React 页面 → MobX AuthStore / TasksStore → API/request
+  → React 页面 → MobX AuthStore / TasksStore / SiteAdminStore / ChatStore / ChatMemoryStore → API
   → Vite /api 代理（开发环境，同源 Cookie）
   → express-session / connect-mongo → NestJS Guard / Controller / Service
   → Mongoose → MongoDB
@@ -20,6 +20,7 @@ AppModule
   ├─ AuthModule：认证入口、Session、CSRF、认证限流，导入 UsersModule
   │    └─ UsersModule：用户模型、持久化、密码哈希与校验，导出 UsersService
   ├─ SiteModule：公开官网、版本化配置、唯一站主权限与媒体，导入 AuthModule
+  ├─ ChatModule：站主聊天、模型白名单、SSE、历史、取消与手动记忆，导入 AuthModule
   ├─ PublicModule：固定只读示例与示例统计，导入 SystemModule
   ├─ TasksModule：个人任务 Controller / Service / Schema，导入 AuthModule
   ├─ SystemModule：提供本次运行时长
@@ -45,6 +46,10 @@ AppModule
 | 认证状态与身份版本 | [auth.ts](../../frontend/src/store/auth.ts) |
 | 页面、任务请求状态与异步身份隔离 | [页面](../../frontend/src/pages/tasks/index.tsx) / [TasksStore](../../frontend/src/store/tasks.ts) |
 | 同源请求、CSRF 头与 HTTP 错误解析 | [http.ts](../../frontend/src/api/http.ts) |
+| 站主聊天路由、受理/终态与上游适配 | [chat.controller.ts](../../backend/src/chat/chat.controller.ts) / [chat.service.ts](../../backend/src/chat/chat.service.ts) / [provider](../../backend/src/chat/providers/chat-completions.provider.ts) |
+| 聊天状态、流读取与后台交互 | [ChatStore](../../frontend/src/store/chat.ts) / [聊天API](../../frontend/src/api/chat.ts) / [ChatPanel](../../frontend/src/pages/admin/chat-panel.tsx) |
+| 站主记忆持久化、原子限额与模型上下文 | [ChatMemoryService](../../backend/src/chat/chat-memory.service.ts) / [记忆Schema](../../backend/src/chat/schemas/chat-memory.schema.ts) |
+| 记忆管理与安全回复展示 | [ChatMemoryStore](../../frontend/src/store/chat-memory.ts) / [ChatMemoryPanel](../../frontend/src/pages/admin/chat-memory-panel.tsx) / [ChatMarkdown](../../frontend/src/components/chat-markdown/index.tsx) |
 
 UsersModule 只向外导出 UsersService，AuthModule 不重复注册用户模型或服务；用户模块不依赖认证 DTO 或 Session。AuthModule 的主文件保留在模块根，Guard、配置、类型与 DTO 分别放入 `guards/`、`config/`、`types/`、`dto/`。目录约定统一见 [后端规则](../../backend/AGENTS.md#模块与目录组织)。
 
@@ -90,3 +95,15 @@ UsersModule 只向外导出 UsersService，AuthModule 不重复注册用户模�
 能力详情集中在`SiteContent.capabilityDetails`：技术介绍、公司三个Markdown栏目、最多12份公司项目。读取历史缺失分区只补响应；PUT要求完整分区，避免旧页面静默清空履历。`readPublic`在服务端仅投影visible=true项目，站主读取与保存仍返回全部数据，沿用整站版本CAS与Session/Owner/CSRF。Markdown使用react-markdown和remark-gfm，关闭原始HTML并限制URL；封面支持安全URL与SPEC-004的新图片上传入口。后台技术栈/公司/项目Tab共享原草稿与iframe消息协议，弹窗仅约束iframe内焦点与滚动，不阻塞父页编辑。详情见SPEC-003 P28。
 
 服务器磁盘上传合同见[SPEC-004](../specs/004-disk-file-uploads.md)。`POST /api/site/file-assets`复用Session/Owner/CSRF，multipart唯一file，图片5MiB、PDF/ZIP/TXT/DOCX/XLSX/PPTX附件20MiB；音频原接口15MiB保留。文件校验、随机命名、写盘与公开读取保留在SiteModule资产业务，文件与附件下载名元数据位于同一`SITE_ASSETS_DIR`，不新增Mongo集合或存储依赖。GET仅接受UUID文件名与白名单扩展名，附件强制下载并保留安全原名；上传不改站点版本。后台独立上传区、封面、公司/项目Markdown共享上传状态和身份保护，结果只改草稿；Markdown专用URL类型允许本站附件路径，联系配置仍仅HTTP(S)。全部文件上传完成即可公开访问，不随隐藏项目变私密；部署与回滚保留媒体目录，备份需同时包含磁盘与Mongo。
+
+站主AI对话见[SPEC-006](../specs/006-owner-sse-chat.md)。独立`ChatModule`和Mongo会话文档负责真实历史及终态；`POST /api/chat/conversations/:id/stream`在认证/站主/CSRF与受理持久化完成后，由受控Express响应输出SSE，前置错误保留JSON状态码。Node原生fetch调用服务端白名单中的Chat Completions兼容模型，默认GLM-4.7-Flash；Key只在后端环境变量中，客户端仅获得模型id/label/available。共享SiteOwnerGuard现归AuthModule，原site路径保留再导出兼容。
+
+生成由AbortController、单站主活动锁、requestId幂等和Mongo条件更新控制；停止、断连、超时不会被EOF误判为完成，最终保存成功后才发送done。每会话100轮、列表最近50个会话、上下文最近10个完成轮次/32000字符，答案16000字符/4096 tokens有界。首版为单进程且连接断开停止生成；不支持多实例协调、后台续跑或自动重发。重启遗留streaming记录按保存的期限转为interrupted。前端ChatStore校验身份/会话/请求版本，独立POST fetch读取SSE；ChatPanel属于后台分区，官网草稿和预览仍由原SiteAdminStore维护。
+
+聊天工作区使用桌面历史侧栏、窄屏模态抽屉和底部输入区，支持已加载会话的标题搜索、上翻暂停跟随与返回最新。`ChatMarkdown`复用react-markdown/remark-gfm展示表格与代码，禁止原始HTML、限制链接且不自动加载模型图片；整条回复与代码复制只在用户点击时写剪贴板。官网编辑仍保留原有布局与草稿，聊天不占用其保存流程。
+
+跨会话记忆由`ChatMemoryService`维护在独立`chat_memories`集合，每个owner唯一文档内保存最多20条，每条trim后1–500个Unicode码点；原子新增限制数量，更新/删除只改目标项。`/api/chat/memories`读写复用Session/Owner，写入另验CSRF，所有Mongo操作按可信ownerId过滤。每次新生成受理前读取启用项快照，组成一条system背景并提示当前用户明确要求优先，再加入原有会话上下文；无启用项时保持原messages。记忆内容发送给当轮选定模型，运行期间编辑只影响后续请求，不改写历史答案。
+
+独立`ChatMemoryStore`处理身份与请求版本、写入互斥及错误保留；首次完整读取成功后才允许保存。`ChatMemoryPanel`提供查看、添加、编辑、启停和确认删除，回复“记住”打开同一编辑器；超500字保留全文供摘录。记忆由站主显式保存，不自动提取/摘要，不使用localStorage、向量库或额外模型调用。
+
+HTTP测试强制显式MONGODB_URI，在导入AppModule前设置NODE_ENV=test，ConfigModule在test模式忽略真实.env。测试上游为本地合成流；运行检查不能默认读取可能指向线上库的开发配置。Key申请、多模型与测试命令见[README](../../README.md#站主后台-ai-对话)，Nginx缓冲/超时配置见[部署手册](../deployment.md#sse-对话部署检查)。

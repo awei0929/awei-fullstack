@@ -1,3 +1,5 @@
+import { ChatModule } from './chat/chat.module.js';
+import { ChatController } from './chat/chat.controller.js';
 import { SiteModule } from './site/site.module.js';
 import { SiteController } from './site/site.controller.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -25,12 +27,15 @@ import { SystemModule } from './system/system.module.js';
     // forRoot 读取 backend/.env；isGlobal 使各模块可以注入 ConfigService。
     ConfigModule.forRoot({
       isGlobal: true,
+      // HTTP测试只使用调用者显式传入的测试环境，绝不能从真实.env补入线上连接或模型Key。
+      ignoreEnvFile: process.env.NODE_ENV === 'test',
       envFilePath: fileURLToPath(new URL('../.env', import.meta.url)),
     }),
     DatabaseModule,
     AuthModule,
     PublicModule,
     SiteModule,
+    ChatModule,
     TasksModule,
     SystemModule,
     StatsModule,
@@ -52,6 +57,6 @@ export class AppModule implements NestModule {
       .apply(RequestLoggerMiddleware)
       // forRoutes 指定需要记录的 Controller，包含它们全部HTTP方法；不打印密码、Cookie或请求体。
       // 全局 /api 前缀由 Nest 统一处理，不需要在这里重复拼写。
-      .forRoutes(TasksController, StatsController, AuthController, PublicController, SiteController);
+      .forRoutes(TasksController, StatsController, AuthController, PublicController, SiteController, ChatController);
   }
 }

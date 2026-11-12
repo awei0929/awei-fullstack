@@ -68,3 +68,29 @@
 ## 本地验证发布脚本
 
 从项目根目录运行 `python3 scripts/test-deploy.py`。测试只使用随机临时目录，依赖安装、服务重启、HTTP 探针由命令替身模拟；覆盖非法归档、失败恢复、手动回退和发布锁，不读取本机真实 env，不连接线上或数据库。
+
+## SSE 对话部署检查
+
+聊天功能合同见 [SPEC-006](specs/006-owner-sse-chat.md)，Key申请及多模型配置见 [README](../README.md#站主后台-ai-对话)。以下是上线步骤，不表示本轮已修改服务器或验证正式链路。
+
+1. 在服务器持久环境文件 `/home/ubuntu/apps/nest/backend/.env` 增加 `GLM_API_KEY`，保留原数据库、Session、站主和媒体配置。默认模型为 `glm-4.7-flash`，单轮时限 `CHAT_TIMEOUT_MS=120000`；如需多模型再增加白名单配置。真实环境文件保持600权限，不进入发布包。
+2. 核对 Nginx `/api/chat/` 路由可立即转发流数据。可为该前缀单独设置下面的location，或将相关设置合并到已有代理；保留已有TLS、站点及可信转发头配置。部署应用代码不会自动修改Nginx。
+
+```nginx
+location /api/chat/ {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Connection "";
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 180s;
+}
+```
+
+3. `nginx -t` 检查通过后再reload；按既有发布流程部署/重启后端。在正式HTTPS后台登录，确认文字逐段到达、停止生成、刷新历史均正常。不能仅以本地直连流式测试代替该项。
+
+`proxy_read_timeout` 衡量相邻两次读取上游的空闲间隔，不是整轮总时长。应用心跳用于维持空闲连接；模型调用总时限由后端单独限制。当前单实例发布会重启后端，正在生成的回复可能中断，页面应显示中断并保留已保存内容，不自动重新调用模型。

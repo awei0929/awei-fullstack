@@ -199,17 +199,82 @@ DTO、数据库 Schema 与公开响应独立；用户及密码哈希不直接序
 
 前端在身份切换时清空数据并使旧回调失效；旧请求即使完成，也不能覆盖新用户的页面。取消请求不能撤销已经在服务端执行的操作。
 
+## 站主后台 AI 对话
+
+在 `/admin` 的“AI 对话”分区使用，只有 `SITE_OWNER_USER_ID` 对应的已登录站主可访问。聊天历史与手动保存的跨会话记忆独立保存到 MongoDB，不进入公开官网配置或预览；切换后台分区保留官网草稿。默认模型为 `glm-4.7-flash`。合同、实际验收与未验证边界见 [SPEC-006](docs/specs/006-owner-sse-chat.md)。
+
+### 使用聊天工作区
+
+- 桌面从历史侧栏选择会话，窄屏通过“历史”打开抽屉；搜索匹配最近50个已加载会话的标题。新对话的建议只填入输入框，编辑后再发送。
+- 输入区保留在工作区底部，Enter 换行，Ctrl / ⌘ + Enter 发送。回复逐段显示，可停止生成；向上阅读时暂停自动跟随，点击“返回最新”回到底部。
+- 回复支持 Markdown、表格和代码块，可复制整条回复或代码；代码与宽表格在局部滚动。原始 HTML 不执行，模型提供的图片只显示说明，不自动加载。
+- 失败或中断保留已收到的正文，可重新编辑问题后手动发送；不会自动重发。
+
+### 使用长期记忆
+
+点击聊天顶部“记忆”管理偏好与背景，或在一条回复下点击“记住”，编辑后保存。支持查看、编辑、启用/停用和确认删除。每位站主最多20条，每条去除首尾空白后为1–500个Unicode码点；回复超过上限时保留全文供手动摘录，不静默截断。
+
+启用项在每次新生成前读取，作为背景发送给**当轮所选模型**，新会话也可使用。记忆修改、停用或删除只影响后续请求，不改写已有回复；当前生成继续使用开始时的记忆。最近10轮聊天上下文与长期记忆分别维护，记忆不会自动从对话提取或生成摘要。
+
+### 申请并配置 GLM API Key
+
+1. 在[智谱开放平台](https://open.bigmodel.cn/)注册登录，按控制台要求完成账号开通。
+2. 打开[标准 API Key 页面](https://bigmodel.cn/usercenter/proj-mgmt/apikeys)，创建“模型标准 API”用途的 Key。个人/团队 Coding Plan 的新 Key 与标准 API Key 分开管理，不能直接混用；参见[官方申请说明](https://docs.bigmodel.cn/cn/guide/start/quick-start)及[分类说明](https://docs.bigmodel.cn/cn/coding-plan/notice/api-key-management)。
+3. 在已有 `backend/.env` 中增加下面配置，保留原数据库、会话密钥和站主 ID：
+
+```dotenv
+# 只填写在后端真实.env；这里是占位符，不是可用密钥。
+GLM_API_KEY=替换为你创建的标准API密钥
+# 不填地址时使用以下官方默认值。
+GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+# 单轮最长生成时间，单位毫秒；默认120秒。
+CHAT_TIMEOUT_MS=120000
+```
+
+4. 重启后端，登录站主后台 → AI 对话 → 选择 GLM-4.7-Flash → 新建对话并发送消息。Key 留空时官网照常运行，聊天显示模型未配置并禁用发送。
+
+截至2026-11-12，[官方定价](https://docs.bigmodel.cn/cn/guide/start/pricing)将 GLM-4.7-Flash 输入、输出标为免费；账号的并发、速率和开通条件以控制台为准。应用不自动切换付费模型，不启用另收费的搜索或其他工具。
+
+真实 Key 不写进前端、`VITE_` 环境变量、README、聊天消息或 Git。生产环境需要单独配置服务器持久环境文件，自动发布不会把本机 `.env` 上传。配置完成后的真实模型可用性仍需实际发送验证。
+
+### 配置多个模型
+
+后端使用 Node 原生 `fetch` 调用 Chat Completions 兼容接口，再转换为本项目 SSE 事件；前端使用 `fetch` 流式读取，MobX 管理状态。模型目录由服务端控制，页面不能提交任意模型地址或 Key。
+
+GLM 为内置默认项。可以在 `backend/.env` 增加最多10个其他兼容模型；下面是配置格式示例，需替换为供应商真实信息：
+
+```dotenv
+OTHER_LLM_API_KEY=替换为其他供应商密钥
+CHAT_MODELS_JSON='[{"id":"other-model","label":"另一个兼容模型","model":"provider-model-id","baseUrl":"https://provider.example/v1","apiKeyEnv":"OTHER_LLM_API_KEY","disableThinking":false}]'
+```
+
+- `id` 是本项目的唯一模型标识，不能与内置 `glm-4.7-flash` 重复；`model` 是供应商实际模型名。
+- `baseUrl` 填接口根路径，代码追加 `/chat/completions`；生产使用HTTPS，本地测试可使用回环HTTP。
+- `apiKeyEnv` 指向保存Key的环境变量名，不能直接放Key。未配置对应Key的模型不可发送。
+- 重启后端后，后台下拉列表显示模型，可在下一轮发送前切换；历史回复保留当时的模型名称。
+- 此扩展适用于兼容 Chat Completions 的文本流接口。其他协议需要新增后端适配；不同模型的参数、额度、收费和回答效果须各自验证。
+
+### 运行边界与排查
+
+- 当前同时只允许站主的一轮生成；重复请求标识不重复调用。每会话最多100轮，达到上限后新建会话。
+- “停止生成”会请求后端取消模型调用并保存状态；切会话、离开聊天或断网也会中断当前流。刷新能读取已经保存的历史，不承诺关闭页面后继续生成。
+- 无Key先检查后端环境变量并重启；401/403先重新登录并核对站主；上游限流或繁忙时保留当前结果，稍后手动重试。
+- 正式发布前按[部署手册](docs/deployment.md#sse-对话部署检查)核对Nginx缓冲/超时。服务器重启会中断活动生成，遗留运行会按过期时间转为中断状态。
+- 本地连接线上数据库时，对话与记忆管理会直接写入线上数据。开发与浏览器测试必须另外使用隔离Mongo，不能直接运行默认开发服务当测试环境。
+
 ## 验证
 
-从项目根目录运行，要求本地 MongoDB 可用：
+从项目根目录运行，要求隔离测试 MongoDB 可用。测试必须显式指定连接地址，不读取真实 `backend/.env`；不要使用线上数据库或本机的线上隧道地址：
 
 ```bash
-npm test --prefix backend
+# 示例指向本机一次性测试Mongo；先确认该实例已启动。
+MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test --prefix backend
+node --test frontend/test/*.test.mjs
 npm run lint --prefix frontend
 npm run build --prefix frontend
 ```
 
-后端测试构建实际代码，并使用随机 awei_e2e_ 数据库启动真实 HTTP 服务，结束后只清理对应测试库。测试覆盖认证、CSRF、限流、用户隔离、任务原有边界和跨应用重启；实际结果以 SPEC 验证记录为准。
+后端测试构建实际代码，并使用随机 awei_e2e_ 数据库启动真实 HTTP 服务，结束后只清理对应测试库。测试覆盖认证、CSRF、限流、用户隔离、任务原有边界、聊天流/取消/模型错误和跨应用重启；聊天上游为本机模拟服务，不调用真实模型。实际结果以 SPEC 验证记录为准。
 
 前端 build 包含 TypeScript 检查，不需要重复运行 check。当前没有前端 test 脚本；浏览器验收单独记录，构建成功不代表交互全部通过。
 
@@ -234,12 +299,14 @@ backend/src/auth/        认证入口、Session与认证守卫
   types/                会话响应与请求类型扩展
   dto/                  注册登录输入校验
 backend/src/tasks/       私有任务CRUD
+backend/src/chat/        站主聊天、模型适配、流式与历史
 backend/src/stats/       用户级任务统计
 backend/src/database/    MongoDB连接
 backend/test/            隔离数据库HTTP验证
 frontend/src/api/        HTTP与认证API
-frontend/src/store/      身份及任务状态
-frontend/src/pages/      任务页和交互
+frontend/src/store/      身份、任务、官网草稿及聊天状态
+frontend/src/pages/      官网、后台与任务页
+frontend/test/           实际聊天模块的Node定向验证
 openspec/changes/        变更引用，正文位于docs/specs/
 docs/ai/STATE.md         当前状态与接续入口
 ```

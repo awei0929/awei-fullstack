@@ -1,4 +1,4 @@
-export type Section = 'home' | 'capabilities' | 'profile' | 'contact' | 'appearance' | 'files'
+export type Section = 'home' | 'capabilities' | 'profile' | 'contact' | 'appearance' | 'files' | 'chat'
 export type CapabilityEditorTab = 'technology' | 'company' | 'projects'
 
 export const sections: { id: Section; label: string; subtitle: string }[] = [
@@ -8,4 +8,5 @@ export const sections: { id: Section; label: string; subtitle: string }[] = [
   { id: 'contact', label: '联系入口', subtitle: '为下一次对话留一个入口。' },
   { id: 'appearance', label: '外观与动效', subtitle: '调整这个空间的节奏。' },
   { id: 'files', label: '文件上传', subtitle: '上传公开图片、PDF 与常用附件。' },
+  { id: 'chat', label: 'AI 对话', subtitle: '站主的创作工作区' },
 ]

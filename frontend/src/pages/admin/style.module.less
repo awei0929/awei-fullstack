@@ -134,32 +134,45 @@
 }
 @media (prefers-reduced-motion: reduce) { .admin *, .gate * { transition: none !important; } }
 
-// 聊天沿用后台身份与分区，单独约束高度；官网编辑仍保留原有长页布局。
-// clip 不产生可编程滚动容器，焦点恢复不能再把整个后台外壳向上推移。
-.chatAdmin { height: 100dvh; min-height: 0; overflow: clip; background: #292c23; }
-.chatAdmin .sidebar { height: 100%; min-height: 0; overflow-y: auto; background: #22251c; }
-.chatAdmin .main { display: flex; flex-direction: column; min-height: 0; height: 100%; }
-.chatAdmin .header { flex-shrink: 0; min-height: 72px; padding-block: 16px; }
+// 仅聊天使用窄导航和纸白外壳；官网编辑保持原有布局。
+.chatAdmin { height: 100dvh; min-height: 0; grid-template-columns: 80px minmax(0, 1fr); overflow: clip; background: #f6f6f2; }
+.chatAdmin .sidebar { height: 100%; min-height: 0; overflow-y: auto; padding: 24px 8px 16px; background: #272c23; border-right: 1px solid #3b4232; }
+.chatAdmin .brand { margin: 0 auto 32px; color: #e1e8cd; font-size: 28px; letter-spacing: -1.5px; }
+.chatAdmin .brand > span { display: none; }
+.chatAdmin .sidebar nav { display: grid; gap: 4px; }
+.chatAdmin .navItem { min-height: 56px; margin: 0; flex-direction: column; justify-content: center; gap: 8px; padding: 8px 4px; color: #bfc8b2; border-radius: 8px; letter-spacing: 0; font-size: 10px; line-height: 12px; }
+.chatAdmin .navItem svg { width: 18px; height: 18px; flex-shrink: 0; }
+.chatAdmin .navItem.active { background: #444e35; color: #f3f5ec; }
+.chatAdmin .navItem.active > i { display: none; }
+.chatAdmin .owner { display: flex; flex-direction: column; gap: 8px; padding: 20px 0 16px; margin: auto 0 0; border-top: 0; }
+.chatAdmin .owner img { height: 32px; width: 32px; }
+.chatAdmin .owner > div { display: none; }
+.chatAdmin .owner button { grid-column: auto; width: auto; max-width: 100%; margin: 0; padding: 4px 12px; font-size: 11px; }
+.chatAdmin .sidebarReturn { margin: 0 4px; padding-top: 16px; font-size: 11px; text-align: center; letter-spacing: 0; color: #bfc8b2; }
+.chatAdmin .main { display: flex; flex-direction: column; min-height: 0; height: 100%; color: #292c27; }
+.chatAdmin .header { flex-shrink: 0; min-height: 56px; margin: 0; padding: 12px 24px; border-bottom: 1px solid #dddfd6; background: #fafaf7; }
 .chatAdmin .pageTitle { gap: 16px; }
-.chatAdmin .pageTitle h1 { font-size: 20px; font-weight: 500; letter-spacing: 0; }
-.chatAdmin .pageTitle p { border: 0; padding-left: 0; }
+.chatAdmin .pageTitle h1 { font-size: 16px; font-weight: 500; letter-spacing: 0; }
+.chatAdmin .pageTitle p { border: 0; padding-left: 0; color: #616857; font-size: 12px; letter-spacing: 0; }
+.chatAdmin .headerActions .outlineButton { min-height: 32px; padding: 6px 12px; border-color: #d5dacb; background: transparent; color: #606b4a; font-size: 12px; letter-spacing: 0; }
 .chatAdmin .headerActions .dirty { display: none; }
 .chatAdmin .statusMessages { flex-shrink: 0; margin-block: 8px 0; }
-.chatDraftNotice { flex-shrink: 0; margin: 8px 28px; color: #d3bd96; font-size: 12px; line-height: 1.6; }
-.mobileChatLinks { display: none; }
+.chatAdmin .errorBanner { color: #a04b32; background: #fff5ee; border-color: #e9cfc0; }
+.chatAdmin .errorBanner button { color: #a04b32; }
+.chatDraftNotice { flex-shrink: 0; margin: 0; padding: 8px 24px; border-bottom: 1px solid #e7dfd0; background: #faf4e8; color: #80653d; font-size: 12px; line-height: 1.6; }
+.mobileChatLinks, .chatMobileBrand { display: none; }
 @media (max-width: 1000px) and (min-width: 761px) {
   .chatAdmin .header .outlineButton { display: inline-flex; }
 }
 @media (max-width: 760px) {
   .chatAdmin { padding-bottom: 0; }
-  .chatAdmin .header { min-height: 52px; margin-inline: 16px; padding-block: 12px; }
-  .chatAdmin .pageTitle h1 { font-size: 15px; }
-  .chatAdmin .mobileBrand { font-size: 24px; }
-  .chatAdmin .mobileControls { flex-shrink: 0; display: flex; align-items: center; gap: 12px; margin: 0; padding: 8px 16px; border-bottom: 1px solid @line; }
-  .chatAdmin .mobileControls > label { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; letter-spacing: 0; }
-  .chatAdmin .mobileControls select { flex: 1; min-width: 0; width: auto; margin: 0; height: 36px; padding: 6px 8px; font-size: 13px; }
+  .chatAdmin .header { display: none; }
+  .chatAdmin .mobileControls { flex-shrink: 0; display: flex; align-items: center; gap: 12px; margin: 0; padding: 8px 12px; border-bottom: 1px solid #3b4232; background: #272c23; }
+  .chatAdmin .mobileControls > label { display: flex; align-items: center; flex: 1; min-width: 0; font-size: 0; white-space: nowrap; letter-spacing: 0; }
+  .chatAdmin .mobileControls select { flex: 1; min-width: 0; max-width: 128px; width: auto; margin: 0; height: 36px; padding: 6px 8px; font-size: 13px; border-color: #59634c; color: #e1e8cd; background: #343c2c; }
+  .chatMobileBrand { display: block; color: #e1e8cd; font: 600 22px/1 Arial, sans-serif; letter-spacing: -.5px; }
   .mobileChatLinks { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-  .mobileChatLinks button, .mobileChatLinks a { color: @muted; text-decoration: none; border: 0; background: transparent; padding: 8px 0; font-size: 12px; white-space: nowrap; }
-  .chatDraftNotice { margin: 8px 16px; }
+  .mobileChatLinks button, .mobileChatLinks a { color: #bfc8b2; text-decoration: none; border: 0; background: transparent; padding: 8px 0; font-size: 11px; white-space: nowrap; }
+  .chatDraftNotice { padding: 8px 12px; }
   .chatAdmin .statusMessages { margin-inline: 12px; }
 }

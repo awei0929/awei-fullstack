@@ -100,7 +100,7 @@ UsersModule 只向外导出 UsersService，AuthModule 不重复注册用户模�
 
 生成由AbortController、单站主活动锁、requestId幂等和Mongo条件更新控制；停止、断连、超时不会被EOF误判为完成，最终保存成功后才发送done。每会话100轮、列表最近50个会话、上下文最近10个完成轮次/32000字符，答案16000字符/4096 tokens有界。单进程且连接断开停止生成；不支持多实例协调、后台续跑或无限重试。仅GLM-4.7-Flash在尚无正文的HTTP429后尝试一次免费GLM-4-Flash-250414，共享原上下文与总时限，CAS保存模型变更后发送fallback事件。requestedModel字段保留原选择，model字段保留实际尝试，旧记录读取时归一；原选择用于幂等与刷新后的下拉。重启遗留streaming记录按保存的期限转为interrupted。前端ChatStore校验身份/会话/请求版本，独立POST fetch读取SSE；ChatPanel属于后台分区，官网草稿和预览仍由原SiteAdminStore维护。
 
-聊天工作区使用桌面历史侧栏、窄屏模态抽屉和底部输入区，支持已加载会话的标题搜索、上翻暂停跟随与返回最新。`ChatMarkdown`复用react-markdown/remark-gfm展示表格与代码，禁止原始HTML、限制链接且不自动加载模型图片；整条回复与代码复制只在用户点击时写剪贴板。官网编辑仍保留原有布局与草稿，聊天不占用其保存流程。
+聊天工作区使用深色窄导航、纸白阅读卡、桌面历史侧栏、窄屏模态抽屉和底部输入区，支持已加载会话的标题搜索、上翻暂停跟随与返回最新。`ChatMarkdown`复用react-markdown/remark-gfm展示表格与代码，禁止原始HTML、限制链接且不自动加载模型图片；整条回复与代码复制只在用户点击时写剪贴板。单轮observer与memo隔离已完成Markdown的重复解析，滚动按帧合并并尊重上翻；后端阶段保存为单在途/最新快照，终态等待保存且本进程Run负责结算，防止查询过期恢复抢先丢失正文。官网编辑仍保留原有布局与草稿，聊天不占用其保存流程。
 
 跨会话记忆由`ChatMemoryService`维护在独立`chat_memories`集合，每个owner唯一文档内保存最多20条，每条trim后1–500个Unicode码点；原子新增限制数量，更新/删除只改目标项。`/api/chat/memories`读写复用Session/Owner，写入另验CSRF，所有Mongo操作按可信ownerId过滤。每次新生成受理前读取启用项快照，组成一条system背景并提示当前用户明确要求优先，再加入原有会话上下文；无启用项时保持原messages。记忆内容发送给当轮使用的模型，含429自动切换的备用；运行期间编辑只影响后续请求，不改写历史答案。
 

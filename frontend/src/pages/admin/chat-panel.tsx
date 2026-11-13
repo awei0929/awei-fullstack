@@ -1,15 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Alert, Button, Input, Select, Spin } from 'antd'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Alert, Button, ConfigProvider, Input, Select, Spin, theme } from 'antd'
+import { reaction } from 'mobx'
 import { observer } from 'mobx-react-lite'
 import { chatStore as store } from '../../store/chat'
-import { ChatMarkdown } from '../../components/chat-markdown'
-import { ChatCopyButton } from '../../components/chat-markdown/copy-button'
-import { ChatMemoryPanel, MemorySaveButton } from './chat-memory-panel'
-import type { ChatStatus } from '../../types/chat'
+import { ChatMemoryPanel } from './chat-memory-panel'
+import { ChatTurnCard } from './chat-turn'
+import { createChatScroll } from './chat-scroll'
+import type { ChatTurn } from '../../types/chat'
 import { filterConversations, isNearConversationEnd, shouldSendFromKeyboard, visibleSendError, selectHistoryConversation } from './chat-workspace'
 import styles from './chat-panel.module.less'
 
-const statuses: Record<ChatStatus, string> = { streaming: '生成中', completed: '已完成', canceled: '已停止', failed: '生成失败', interrupted: '连接中断' }
 const suggestions = [
   { title: '官网文案', description: '让介绍更清楚，也更像自己', draft: '我想打磨个人官网的介绍文案。请先问我目标读者、个人经历和希望呈现的语气，再一起整理。' },
   { title: '项目梳理', description: '把做过的事情讲出重点', draft: '我想整理一段项目经历。请帮我从背景、负责的工作、技术选择和结果四个方面梳理，并先问我需要补充的信息。' },
@@ -19,6 +19,8 @@ const dateLabel = (value: string) => new Date(value).toLocaleDateString('zh-CN',
 
 export const ChatPanel = observer(function ChatPanel() {
   const messagesRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<ReturnType<typeof createChatScroll> | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const historyDialogRef = useRef<HTMLDialogElement>(null)
   const followOutput = useRef(true)
@@ -26,12 +28,7 @@ export const ChatPanel = observer(function ChatPanel() {
   const [search, setSearch] = useState('')
   const [showLatest, setShowLatest] = useState(false)
   const lastTurn = store.turns.at(-1)
-  const answer = lastTurn?.answer
-  const lastStatus = lastTurn?.status
   const selected = store.selectedConversationId
-  const previousSelected = useRef(selected)
-  const turnCount = store.turns.length
-  const loadingConversation = store.loadingConversation
   const count = Array.from(store.draft.trim()).length
   const conversations = filterConversations(store.conversations, search)
   const conversation = store.conversations.find(item => item.id === selected)
@@ -50,18 +47,22 @@ export const ChatPanel = observer(function ChatPanel() {
       store.deactivate()
     }
   }, [])
-  useLayoutEffect(() => {
-    // 切会话才重置跟随；增量到达时尊重用户正在阅读的历史位置。
-    if (previousSelected.current !== selected) { previousSelected.current = selected; followOutput.current = true }
-    const area = messagesRef.current
-    if (area && followOutput.current) { area.scrollTop = area.scrollHeight; setShowLatest(false) }
-  }, [selected, answer, lastStatus, turnCount, loadingConversation])
   useEffect(() => {
-    const area = messagesRef.current
-    if (!area) return
-    const resize = new ResizeObserver(() => { if (followOutput.current) area.scrollTop = area.scrollHeight })
-    resize.observe(area)
-    return () => resize.disconnect()
+    const scroll = createChatScroll({ area: () => messagesRef.current, following: () => followOutput.current, onFollow: () => setShowLatest(false) })
+    scrollRef.current = scroll
+    let previousSelected = store.selectedConversationId
+    // 订阅流的尺寸信号，不让活动正文成为整页 React 渲染的依赖。
+    const dispose = reaction(() => [store.selectedConversationId, store.turns.at(-1)?.answer, store.turns.at(-1)?.status, store.turns.length, store.loadingConversation], () => {
+      if (previousSelected !== store.selectedConversationId) {
+        previousSelected = store.selectedConversationId
+        followOutput.current = true
+      }
+      scroll.schedule()
+    }, { fireImmediately: true })
+    const resize = new ResizeObserver(scroll.schedule)
+    if (messagesRef.current) resize.observe(messagesRef.current)
+    if (contentRef.current) resize.observe(contentRef.current)
+    return () => { dispose(); resize.disconnect(); scroll.cancel(); scrollRef.current = null }
   }, [])
   useEffect(() => {
     const dialog = historyDialogRef.current
@@ -78,11 +79,12 @@ export const ChatPanel = observer(function ChatPanel() {
     return () => desktop.removeEventListener('change', closeOnDesktop)
   }, [])
 
-  function focusInput() { requestAnimationFrame(() => inputRef.current?.focus()) }
+  const focusInput = useCallback(() => { requestAnimationFrame(() => inputRef.current?.focus()) }, [])
+  const editTurn = useCallback((turn: ChatTurn) => { store.editTurn(turn); focusInput() }, [focusInput])
   function jumpToLatest() {
     followOutput.current = true
     setShowLatest(false)
-    if (messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight
+    scrollRef.current?.schedule()
   }
   function send() {
     if (!store.canSend) return
@@ -105,22 +107,22 @@ export const ChatPanel = observer(function ChatPanel() {
   function historyContents(mobile = false) {
     return <>
       <div className={styles.historyHeading}><h2 id={mobile ? 'chat-history-title' : undefined}>历史对话</h2><span>{store.conversations.length}</span>{mobile && <button type="button" className={styles.closeHistory} aria-label="关闭历史对话" onClick={() => setHistoryOpen(false)}>关闭</button>}</div>
-      <Button className={styles.newButton} disabled={store.creating || store.loading || store.forbidden} loading={store.creating} onClick={() => void createConversation()}>＋ 新对话</Button>
+      <Button className={styles.newButton} disabled={store.creating || store.loading || store.forbidden} loading={store.creating} onClick={() => void createConversation()}>＋ 开始新对话</Button>
       <Input className={styles.historySearch} aria-label={mobile ? '搜索历史对话' : '搜索对话'} placeholder="搜索对话" value={search} allowClear onChange={event => setSearch(event.target.value)} />
       <nav className={styles.historyList} aria-label="历史会话">
-        {store.loading && !store.conversations.length ? <p className={styles.historyEmpty}>正在读取历史…</p> : conversations.length ? conversations.map(item => <button key={item.id} type="button" className={`${styles.historyItem} ${item.id === selected ? styles.selectedConversation : ''}`} aria-current={item.id === selected ? 'true' : undefined} disabled={store.creating || store.forbidden} onClick={() => void selectConversation(item.id)}><span>{item.title}</span><time dateTime={item.updatedAt}>{dateLabel(item.updatedAt)}</time></button>) : <p className={styles.historyEmpty}>{search.trim() ? '没有找到相关对话' : '新的想法，会留在这里'}</p>}
+        {store.loading && !store.conversations.length ? <p className={styles.historyEmpty}>正在读取历史…</p> : conversations.length ? conversations.map(item => <button key={item.id} type="button" className={`${styles.historyItem} ${item.id === selected ? styles.selectedConversation : ''}`} aria-current={item.id === selected ? 'true' : undefined} disabled={store.creating || store.forbidden} onClick={() => void selectConversation(item.id)}><span><strong>{item.title}</strong><time dateTime={item.updatedAt}>{dateLabel(item.updatedAt)} 更新</time></span></button>) : <p className={styles.historyEmpty}>{search.trim() ? '没有找到相关对话' : '新的想法，会留在这里'}</p>}
       </nav>
-      <p className={styles.historyFootnote}>仅站主可见</p>
+      <p className={styles.historyFootnote}><span aria-hidden="true">HEY.</span>私人的想法，慢慢整理</p>
     </>
   }
 
-  return <section className={styles.panel} aria-label="AI 对话工作区">
+  return <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm, token: { colorPrimary: '#555f3c', colorBgBase: '#ffffff', colorText: '#272925', colorTextSecondary: '#656961', colorTextPlaceholder: '#777b73', colorBorder: '#dcded7', borderRadius: 8, fontFamily: 'inherit' } }}><section className={styles.panel} aria-label="AI 对话工作区">
     <aside className={styles.history}>{historyContents()}</aside>
     <dialog ref={historyDialogRef} className={styles.historyDialog} aria-labelledby="chat-history-title" onCancel={event => { event.preventDefault(); setHistoryOpen(false) }} onClose={() => setHistoryOpen(false)} onClick={event => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX > rect.right || event.clientX < rect.left || event.clientY < rect.top || event.clientY > rect.bottom) setHistoryOpen(false) } }}>{historyContents(true)}</dialog>
     <div className={styles.conversation}>
       <header className={styles.threadHeader}>
         <button type="button" className={styles.historyToggle} aria-label="打开历史对话" aria-haspopup="dialog" aria-expanded={historyOpen} onClick={() => setHistoryOpen(true)}><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 4h14v12H3zM8 4v12" stroke="currentColor" strokeWidth="1.5" /></svg><span>历史</span></button>
-        <div className={styles.threadTitle}><h2 title={conversation?.title}>{conversation?.title ?? '新对话'}</h2><p>{store.loadingConversation ? '正在读取…' : '思考、写作与技术讨论'}</p></div>
+        <div className={styles.threadTitle}><h2 title={conversation?.title}>{conversation?.title ?? '新对话'}</h2><p>{store.loadingConversation ? '正在读取…' : '仅站主可见 · 自动保存'}</p></div>
         <div className={styles.threadActions}>
           <ChatMemoryPanel />
           <Button className={styles.refreshButton} aria-label="刷新对话" title="刷新对话" disabled={store.busy || store.loadingConversation} loading={store.loading} onClick={() => void store.refresh()}><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M16 7a6 6 0 1 0 0 6M16 3v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></Button>
@@ -134,21 +136,13 @@ export const ChatPanel = observer(function ChatPanel() {
       </div>}
       <div className={styles.messageRegion}>
         <div ref={messagesRef} className={styles.messages} aria-label="对话消息" tabIndex={0} onScroll={() => { const area = messagesRef.current; if (area) { const nearEnd = isNearConversationEnd(area); followOutput.current = nearEnd; setShowLatest(!nearEnd) } }}>
-          {store.loadingConversation ? <div className={styles.empty}><Spin /><p>正在读取会话…</p></div>
+          <div ref={contentRef} className={styles.messageContent}>{store.loadingConversation ? <div className={styles.empty}><Spin /><p>正在读取会话…</p></div>
             : !store.turns.length ? <div className={styles.empty}>
-              <p className={styles.emptyEyebrow}>你的创作工作区</p><h2>把想法整理成下一步</h2><p>从官网文案、项目经历，或一个技术问题开始</p>
+              <p className={styles.emptyEyebrow}><span aria-hidden="true">HEY.</span> 私人写作台</p><h2>让脑海里的想法<br />在这里有个着落</h2><p>写一段更像你的介绍，梳理一个项目，<br className={styles.emptyBreak} />或把技术问题聊清楚</p>
               <div className={styles.suggestions}>{suggestions.map(item => <button key={item.title} type="button" disabled={store.busy || store.forbidden} onClick={() => { store.setDraft(item.draft); focusInput() }}><strong>{item.title}<span aria-hidden="true">↗</span></strong><span>{item.description}</span></button>)}</div>
               <p className={styles.suggestionHint}>选择一个方向，编辑后再发送</p>
             </div>
-              : <div className={styles.messageColumn}>{store.turns.map(turn => <article key={turn.requestId} className={styles.turn}>
-                <div className={styles.question}><div className={styles.messageHeading}><strong>你</strong><button type="button" disabled={store.busy} onClick={() => { store.editTurn(turn); focusInput() }}>重新编辑</button></div><p>{turn.content}</p></div>
-                <div className={styles.answer}><div className={styles.messageHeading}><strong>{turn.modelLabel}</strong>{turn.status !== 'completed' && <span className={`${styles.turnStatus} ${turn.status === 'failed' || turn.status === 'interrupted' ? styles.failureStatus : ''}`}>{statuses[turn.status]}</span>}</div>
-                  {turn.modelId !== turn.requestedModelId && <p className={styles.fallbackNotice}>因限流自动切换自{turn.requestedModelLabel}</p>}
-                  {turn.answer ? <ChatMarkdown content={turn.answer} /> : <p className={styles.answerPlaceholder}>{turn.status === 'streaming' ? '正在思考…' : '本次没有生成回复'}</p>}
-                  {turn.error && <p role="alert" className={styles.turnError}>{turn.error}</p>}
-                  {turn.answer && turn.status !== 'streaming' && <div className={styles.messageActions}><ChatCopyButton text={turn.answer} label="复制回复" className={styles.copyButton} /><MemorySaveButton content={turn.answer} /></div>}
-                </div>
-              </article>)}</div>}
+              : <div className={styles.messageColumn}>{store.turns.map(turn => <ChatTurnCard key={turn.requestId} turn={turn} busy={store.busy} onEdit={editTurn} />)}</div>}</div>
         </div>
         {showLatest && <button className={styles.latestButton} type="button" onClick={jumpToLatest}>↓ 返回最新</button>}
       </div>
@@ -168,5 +162,5 @@ export const ChatPanel = observer(function ChatPanel() {
         <div className={styles.composerFootnote}><p id="chat-input-hint"><span>Enter 换行</span><span>Ctrl / ⌘ + Enter 发送</span></p><span className={count > 4000 ? styles.overLimit : ''}>{count} / 4000</span></div>
       </form>
     </div>
-  </section>
+  </section></ConfigProvider>
 })

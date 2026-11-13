@@ -1,20 +1,20 @@
-@text: #f4e8d1;
-@muted: #b8b09b;
-@border: #f4e8d11f;
-.entry, .inlineButton { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: transparent; color: @muted; font: inherit; font-size: 12px; padding: 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+@text: #292c27;
+@muted: #656b5e;
+@border: #dce1d3;
+.entry, .inlineButton { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; background: transparent; color: @muted; font: inherit; font-size: 12px; padding: 8px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
 .entry { min-height: 36px; padding-inline: 12px; }
 .entry svg, .inlineButton svg { width: 16px; height: 16px; flex: none; }
 .entry small { font-size: 12px; font-variant-numeric: tabular-nums; color: @text; }
-.entry:hover:not(:disabled), .inlineButton:hover:not(:disabled) { background: #f4e8d10d; color: @text; }
-.entry:focus-visible, .inlineButton:focus-visible { outline: 2px solid #d99a60; outline-offset: 2px; }
+.entry:hover:not(:disabled), .inlineButton:hover:not(:disabled) { background: #eef1e7; color: @text; }
+.entry:focus-visible, .inlineButton:focus-visible { outline: 2px solid #68794b; outline-offset: 2px; }
 .entry:disabled, .inlineButton:disabled { opacity: .45; cursor: not-allowed; }
-.modal :global(.ant-modal-content) { background: #2b2d25; border: 1px solid @border; padding: 24px; }
+.modal :global(.ant-modal-container), .modal :global(.ant-modal-content) { background: #fff; border: 1px solid @border; padding: 24px; }
 .modal :global(.ant-modal-header) { background: transparent; margin-bottom: 16px; }
 .modal :global(.ant-modal-title) { font-size: 20px; font-weight: 500; color: @text; }
-.modal :global(.ant-modal-body) { max-height: calc(100dvh - 200px); overflow-y: auto; scrollbar-color: #686651 transparent; }
-.modal :global(.ant-input) { background: #24261f; color: @text; font-size: 14px; line-height: 1.75; padding: 12px; }
-.modal :global(.ant-btn-primary) { background: #e4d6b8; color: #27291f; border-color: #e4d6b8; box-shadow: none; }
-.modal button:focus-visible { outline: 2px solid #d99a60; outline-offset: 2px; }
+.modal :global(.ant-modal-body) { max-height: calc(100dvh - 200px); overflow-y: auto; scrollbar-color: #bac3ae transparent; }
+.modal :global(.ant-input) { border-color: @border; background: #f6f7f2; color: @text; font-size: 14px; line-height: 1.75; padding: 12px; }
+.modal :global(.ant-btn-primary) { background: #555f3c; color: #fff; border-color: #555f3c; box-shadow: none; }
+.modal button:focus-visible { outline: 2px solid #68794b; outline-offset: 2px; }
 .modal button:disabled { cursor: not-allowed; opacity: .45; }
 .intro p { margin: 0 0 8px; font-size: 14px; color: @text; line-height: 1.65; }
 .intro span { display: block; color: @muted; font-size: 12px; line-height: 1.75; }
@@ -22,39 +22,39 @@
 .toolbar p { color: @muted; font-size: 12px; margin: 0; }
 .toolbar strong { color: @text; font-size: 16px; font-weight: 500; }
 .toolbar p span { margin-left: 12px; }
-.add, .textAction { border: 0; color: @text; cursor: pointer; font: inherit; font-size: 12px; background: transparent; border-radius: 6px; padding: 8px; }
+.add, .textAction { border: 0; color: @text; cursor: pointer; font: inherit; font-size: 12px; background: transparent; border-radius: 8px; padding: 8px; }
 .add { border: 1px solid @border; padding: 8px 12px; }
-.add:hover:not(:disabled), .textAction:hover:not(:disabled) { background: #f4e8d10d; }
-.editor { border: 1px solid #d99a6066; border-radius: 8px; padding: 16px; background: #24261f; margin-bottom: 16px; }
+.add:hover:not(:disabled), .textAction:hover:not(:disabled) { background: #eef1e7; }
+.editor { border: 1px solid #c5ceb5; border-radius: 8px; padding: 16px; background: #f6f7f2; margin-bottom: 16px; }
 .editor label { display: block; font-size: 13px; color: @text; margin-bottom: 12px; }
 .editorFooter { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .editorFooter > span { margin-right: auto; font-size: 12px; color: @muted; font-variant-numeric: tabular-nums; }
 .list { display: grid; gap: 12px; }
-.item { border: 1px solid @border; border-left: 2px solid #bc9c6d; border-radius: 8px; padding: 16px; }
-.item.inactive { border-left-color: #5e6053; }
+.item { border: 1px solid @border; border-left: 2px solid #798a57; border-radius: 8px; padding: 16px; }
+.item.inactive { border-left-color: #c3c8ba; }
 .itemTop, .itemBottom { display: flex; align-items: center; gap: 12px; color: @muted; font-size: 12px; }
 .itemTop { justify-content: space-between; }
 .content { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.8; color: @text; margin: 12px 0; }
 .inactive .content { color: @muted; }
 .itemBottom time { margin-right: auto; font-variant-numeric: tabular-nums; }
 .itemBottom button { padding-block: 4px; }
-.empty { padding: 28px 16px; text-align: center; color: @muted; background: #24261f; border-radius: 8px; }
-.empty > svg { width: 32px; height: 32px; color: #c7ac7d; }
+.empty { padding: 28px 16px; text-align: center; color: @muted; background: #f6f7f2; border-radius: 8px; }
+.empty > svg { width: 32px; height: 32px; color: #798a57; }
 .empty h3 { font-size: 16px; font-weight: 500; margin: 12px 0; color: @text; }
 .empty p { font-size: 13px; line-height: 1.8; margin: 8px 0 0; }
 .footnote { color: @muted; font-size: 12px; line-height: 1.75; margin: 16px 0 0; }
 .notice, .error { margin: 0 0 12px; font-size: 12px; line-height: 1.75; overflow-wrap: anywhere; }
-.notice { color: #c5d0aa; }
-.error, .editorFooter > .error { color: #e8ad94; }
+.notice { color: #556836; }
+.error, .editorFooter > .error { color: #a04b32; }
 .editor > .error { margin: 8px 0 0; }
-.confirm { background: #e8ad9409; border-top: 1px solid #e8ad9438; padding-top: 12px; margin-top: 12px; }
-.confirm p { color: #e8ad94; font-size: 12px; margin: 0 0 12px; }
+.confirm { background: #fff8f4; border-top: 1px solid #e9cfc0; padding-top: 12px; margin-top: 12px; }
+.confirm p { color: #a04b32; font-size: 12px; margin: 0 0 12px; }
 .confirm > div { display: flex; gap: 8px; justify-content: flex-end; }
-.confirm button { background: transparent; color: @text; border: 1px solid @border; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
-.confirm .deleteButton { border-color: #b76c4f; color: #edb79f; }
+.confirm button { background: transparent; color: @text; border: 1px solid @border; border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+.confirm .deleteButton { border-color: #b76c4f; color: #a04b32; }
 @media (max-width: 760px) {
   .modal { top: 20px; padding-bottom: 20px; max-width: calc(100vw - 24px); margin: 0 auto; }
-  .modal :global(.ant-modal-content) { padding: 20px 16px; }
+  .modal :global(.ant-modal-container), .modal :global(.ant-modal-content) { padding: 20px 16px; }
   .modal :global(.ant-modal-body) { max-height: calc(100dvh - 112px); }
   .modal :global(.ant-input) { font-size: 16px; }
   .editor, .item { padding: 12px; }

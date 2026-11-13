@@ -14,6 +14,7 @@ import type { ChatConversation, ChatEvent, ChatStatus, ChatTurn, ModelMessage, M
 interface Run {
   ownerId: string; conversationId: string; turn: ChatTurn; model: ModelSettings; messages: ModelMessage[];
   controller: AbortController; answer: string; savedAt: number; deadline: number; fallbackModel?: ModelSettings;
+  checkpoint?: Promise<void>; pendingCheckpoint?: string; checkpointFailed?: boolean;
   ending?: Promise<ChatTurn>; timer?: ReturnType<typeof setTimeout>;
 }
 export interface PreparedChat { conversationId: string; turn: ChatTurn; run?: Run }
@@ -141,20 +142,35 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
   private async consume(run: Run, emit: (event: ChatEvent) => void): Promise<void> {
     if (this.stopped(run)) return;
     for await (const text of this.provider.generate(run.model, run.messages, run.controller.signal)) {
-      // 每次上游/数据库await后检查同一截止时间，不依赖计时器是否已获得事件循环执行机会。
+      // 每次上游await后检查同一截止时间；阶段保存独立推进，不阻塞继续消费和转发增量。
       if (this.stopped(run)) break;
       const remaining = 16000 - Array.from(run.answer).length;
       const points = Array.from(text); const accepted = points.slice(0, remaining).join('');
       run.answer += accepted;
       if (accepted) emit({ type: 'delta', requestId: run.turn.requestId, text: accepted });
       if (points.length > remaining) throw new Error('回复超过16000字符限制，已保留部分内容');
-      if (Date.now() - run.savedAt >= 250) {
-        await this.conversations.updateOne({ ownerId: run.ownerId, id: run.conversationId, turns: { $elemMatch: { requestId: run.turn.requestId, status: 'streaming' } } },
-          { $set: { 'turns.$.answer': run.answer, 'turns.$.updatedAt': new Date() } }).exec();
-        if (this.stopped(run)) break;
-        run.savedAt = Date.now();
-      }
+      this.checkpoint(run);
     }
+  }
+  private checkpoint(run: Run): void {
+    // 每轮最多一个写库任务；在途期间只替换最新快照，不按token排队，避免慢Mongo拖慢SSE。
+    if (run.checkpoint) { run.pendingCheckpoint = run.answer; return; }
+    if (Date.now() - run.savedAt < 250) return;
+    run.pendingCheckpoint = run.answer;
+    // 先登记Promise再开始执行，保证取消/完成能等待它，写失败也不会留下未处理的拒绝。
+    run.checkpoint = Promise.resolve().then(async () => {
+      while (run.pendingCheckpoint !== undefined && !this.stopped(run)) {
+        const answer = run.pendingCheckpoint; run.pendingCheckpoint = undefined; run.savedAt = Date.now();
+        await this.conversations.updateOne({ ownerId: run.ownerId, id: run.conversationId, turns: { $elemMatch: { requestId: run.turn.requestId, status: 'streaming' } } },
+          { $set: { 'turns.$.answer': answer, 'turns.$.updatedAt': new Date() } }).exec();
+        // 快写仍保持250ms节流；慢写结束后可马上保存合并快照，但绝不并行或越过终态。
+        if (Date.now() - run.savedAt < 250) break;
+      }
+    }).catch(() => {
+      run.checkpointFailed = true;
+      // 上游可能还在等待下一个token，失败要主动abort；这里不能await finish，否则自等死锁。
+      void this.finish(run, 'failed', '保存回复失败，请刷新确认结果');
+    }).finally(() => { run.checkpoint = undefined; run.pendingCheckpoint = undefined; });
   }
   private stopped(run: Run): boolean {
     if (!run.ending && Date.now() >= run.deadline) void this.finish(run, 'interrupted', '生成超时，已保留部分回复');
@@ -178,9 +194,14 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
   }
   private finish(run: Run, status: Exclude<ChatStatus, 'streaming'>, error: string | null): Promise<ChatTurn> {
     if (run.ending) return run.ending;
-    // await前固定终态，abort停止上游，Mongo CAS防止迟到完成覆盖取消。
+    // await前固定终态并abort；等待已开始的保存，再用完整正文做终态CAS，旧快照不能覆盖取消。
     run.controller.abort(); if (run.timer) clearTimeout(run.timer);
-    run.ending = this.persistTerminal(run.ownerId, run.conversationId, run.turn.requestId, run.answer, status, error).catch(async () => {
+    run.ending = (async () => {
+      await run.checkpoint;
+      // DONE可能早于在途写失败。不能先报completed；已有取消/超时决定仍保持优先。
+      if (run.checkpointFailed && status !== 'canceled' && status !== 'interrupted') { status = 'failed'; error = '保存回复失败，请刷新确认结果'; }
+      return this.persistTerminal(run.ownerId, run.conversationId, run.turn.requestId, run.answer, status, error);
+    })().catch(async () => {
       const message = '保存回复失败，请刷新确认结果';
       try { return await this.persistTerminal(run.ownerId, run.conversationId, run.turn.requestId, run.answer, 'failed', message); }
       catch { return { ...run.turn, answer: run.answer, status: 'failed', error: message, updatedAt: new Date().toISOString() }; }
@@ -199,7 +220,10 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
   }
   private async recover(ownerId: string): Promise<void> {
     // 每个查询仍带ownerId；新进程标识不同，旧streaming即使未超时也不会永久挂起。
-    await this.conversations.updateMany({ ownerId, active: true, $or: [{ expiresAt: { $lte: new Date() } }, { runtimeId: { $ne: this.runtimeId } }] },
+    // 本进程持有的run可能正在等待阶段保存，其终态/完整正文由同一finish负责。
+    // 只排除这一会话与runtime，避免到期读查询抢先用旧快照结束它；无句柄的孤立记录仍需恢复。
+    const run = this.runs.get(ownerId);
+    await this.conversations.updateMany({ ownerId, active: true, $or: [{ expiresAt: { $lte: new Date() } }, { runtimeId: { $ne: this.runtimeId } }], ...(run ? { $nor: [{ id: run.conversationId, runtimeId: this.runtimeId }] } : {}) },
       { $set: { active: false, expiresAt: null, 'turns.$[turn].status': 'interrupted', 'turns.$[turn].error': '生成已中断，请重新编辑后发送', 'turns.$[turn].updatedAt': new Date() } },
       { arrayFilters: [{ 'turn.status': 'streaming' }] }).exec();
   }

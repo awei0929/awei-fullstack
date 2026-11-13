@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import Markdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -46,8 +47,8 @@ const components: Components = {
   },
 }
 
-export function ChatMarkdown({ content }: { content: string }) {
+export const ChatMarkdown = memo(function ChatMarkdown({ content }: { content: string }) {
   return <div className={styles.markdown}>
     <Markdown remarkPlugins={[remarkGfm]} skipHtml urlTransform={safeChatUrl} components={components}>{content}</Markdown>
   </div>
-}
+})

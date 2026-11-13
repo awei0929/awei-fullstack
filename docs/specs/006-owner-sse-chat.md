@@ -1,6 +1,6 @@
 # SPEC-006：站主后台 SSE 多模型对话
 
-- 编号：006；状态：P6已上线；P7整体UI与流式修复完成三轮本地验收，待发布与第四轮生产验收；更新日期：2026-11-13。
+- 编号：006；状态：P7整体UI与流式修复已上线，四轮验收完成；更新日期：2026-11-13。
 - 开发基准：`c6d19ff`；首版发布：`a681b28`；P6发布：`8ffd678`。保留原 README、STATE 和 SSE 分析记录。仅站主后台可用；用户后续已明确授权提交、推送、部署与线上验证，替代初始不发布边界。
 - 前置：[SPEC-001](001-session-auth.md)、[SPEC-003](003-personal-site.md)、[可行性分析](../ai/tasks/sse-chat-feasibility.md)。本规格替代分析中的待定开放对象与模型选择。
 
@@ -261,8 +261,10 @@ P6本地与真实证据：[整合记录](../ai/tasks/006-fallback-integration.md
 - [x] P7.2 UI：修改`frontend/src/pages/admin/chat-panel.tsx`/Less、聊天专属后台外壳、记忆样式、`components/chat-markdown`；可按展示职责提取消息组件。先为行为改动加有意义的回归断言，再实现；纯配色/间距不写镜像测试。使用现有React/MobX/AntD/Less、原有图标笔触，不添加框架。
 - [x] P7.3 流式：根据P7.1证据修正后端保存与前端重复解析/同步滚动阻塞，保持接口不变。先红测慢保存时增量继续、快照合并/终态有序、失败/取消竞争；前端验证旧回复不重解析、流中状态与清理。后端实现归`backend/src/chat`，测试归`backend/test`；前端实现归原分层与`frontend/test`。
 - [x] P7.4 根整合：隔离本地服务和合成内容，执行R1–R3真实浏览器验收；必要检查按改动运行后端HTTP、前端实际模块、lint/build。独立审查与问题修正，记录`006-chat-redesign-integration.md`，不保存截图/视觉快照。
-- [ ] P7.5 发布：仅提交本次相关文件/文档，推送main并监测现有Actions；保留服务器Key/数据/Nginx配置，核对产物、健康与官网内容，执行R4并回写发布证据。测试账号/临时库/容器清理，生产合成记录保留、测试记忆停用。
+- [x] P7.5 发布：仅提交本次相关文件/文档，推送main并监测现有Actions；保留服务器Key/数据/Nginx配置，核对产物、健康与官网内容，执行R4并回写发布证据。测试账号/临时库/容器清理，生产合成记录保留、测试记忆停用。
 
 重点风险：浅色内容受全局暗色AntD主题影响；极长模型标签和标题撑宽；每个delta重绘整列和同步滚动；异步阶段保存与终态/取消竞争；上游自身首字等待与应用卡顿混淆。分别由P7.2样式与窄屏、P7.3定向测试及P7.4/5测量覆盖。
 
-P7本地实际结果（2026-11-12–13）：[整合与三轮验收](../ai/tasks/006-chat-redesign-integration.md)、[前端](../ai/tasks/006-chat-redesign-frontend.md)、[后端](../ai/tasks/006-stream-backend.md)、[诊断](../ai/tasks/006-stream-diagnosis.md)、[独立审查](../ai/tasks/006-chat-redesign-review.md)。最终后端150/150、前端55/55、lint/build通过；修正导航退出裁切、小字对比、原生帧API接收者以及慢保存跨截止时间被recover提前终态的P1。固定版本实见持续增量、上翻保持、停止/刷新1338可见字符一致，记忆启停及320窄屏回退停止通过。等待第四轮正式HTTPS，不将本地fixture流畅度或120ms注入探针当作生产性能保证。
+P7本地实际结果（2026-11-12–13）：[整合与三轮验收](../ai/tasks/006-chat-redesign-integration.md)、[前端](../ai/tasks/006-chat-redesign-frontend.md)、[后端](../ai/tasks/006-stream-backend.md)、[诊断](../ai/tasks/006-stream-diagnosis.md)、[独立审查](../ai/tasks/006-chat-redesign-review.md)。最终后端150/150、前端55/55、lint/build通过；修正导航退出裁切、小字对比、原生帧API接收者以及慢保存跨截止时间被recover提前终态的P1。固定版本实见持续增量、上翻保持、停止/刷新1338可见字符一致，记忆启停及320窄屏回退停止通过。R4正式HTTPS结果见下文，不将本地fixture流畅度或120ms注入探针当作生产性能保证。
+
+P7生产实际结果（2026-11-13）：功能`529a742`推送main，[Actions 43372961685](https://github.com/awei0929/awei-fullstack/actions/runs/43372961685)三job成功；CI后端150/150、部署24/24、前端lint/build，服务第二次健康检查通过，首页匹配发布包。正式Chrome确认纸白卡片/窄导航，真实4.7增量6→20字符后完成12条/345可见字符；下一轮自然429转免费备用，停止后14字符与整页刷新一致。记忆面板2条均停用、官网v7逐字节未变；新增1会话/2轮合成记录保留。R4记忆仅查面板，本轮跨会话启停对照在R3，线上对照沿用P6；主模型首次观察文字约7.7秒，未宣称上游持续稳定或测得浏览器帧率。四轮已完成，完整证据及产物校验见[发布记录](../ai/tasks/006-chat-redesign-deployment.md)。

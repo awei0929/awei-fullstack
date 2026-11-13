@@ -1,11 +1,11 @@
 # 工作区交接状态
 
-## 2026-11-13：AI对话整体重设计与流式调优（三轮本地已验，准备发布）
+## 2026-11-13：AI对话整体重设计与流式调优（已上线，四轮验收完成）
 
 - 用户选纸白阅读区＋深色导航，全权委托设计，授权3–5轮验收与部署；基准`5379a08`，合同[SPEC-006 P7](../specs/006-owner-sse-chat.md)。重做窄导航、白色AI阅读卡、用户便笺、输入/空态/历史/记忆浅色样式；旧回复独立订阅/memo，滚动按帧。
 - 后端单在途阶段保存/合并快照消除消费await，终态等待保存并守护当前run不被过期恢复抢占；已关闭独立审查P1。注入120ms保存最大增量间隔122→23ms、成簇10→0，不是生产Mongo测量。官方备用基线首段356ms、441delta/782字、总14256ms，节奏仍有374ms间隔。
 - 最终后端150/150、10套件含build，前端55/55、lint/build通过；审查P1/P2全闭环。R1桌面1440、R2平板768/390/320、R3长历史/连续与成批流/回退/断流/双429/停止刷新/记忆启停/草稿通过。修正退出裁切、浅色小字对比、原生帧API绑定，最终可见正文6→668→1300，停止刷新1338一致。
-- [整合三轮](tasks/006-chat-redesign-integration.md)、[前端](tasks/006-chat-redesign-frontend.md)、[后端](tasks/006-stream-backend.md)、[诊断](tasks/006-stream-diagnosis.md)、[审查](tasks/006-chat-redesign-review.md)。测试账号退出、tab关闭/视口重置、27019专用容器及临时库移除，原3000watcher恢复，5173/27018保留；原README23行/STATE30行无关历史差异未混入。接下来按本次授权提交发布并做R4生产验收。
+- [整合三轮](tasks/006-chat-redesign-integration.md)、[前端](tasks/006-chat-redesign-frontend.md)、[后端](tasks/006-stream-backend.md)、[诊断](tasks/006-stream-diagnosis.md)、[审查](tasks/006-chat-redesign-review.md)。测试账号退出、tab关闭/视口重置、27019专用容器及临时库移除，原3000watcher恢复，5173/27018保留；原README23行/STATE30行无关历史差异未混入。功能`529a742`已推送main，[Actions 43372961685](https://github.com/awei0929/awei-fullstack/actions/runs/43372961685)三job成功，健康通过、首页匹配发布包；[发布记录](tasks/006-chat-redesign-deployment.md)。R4真实4.7逐步输出至12条/345可见字符；下一轮自然429回退、停止14字符整页刷新一致。记忆面板2条均停用，官网v7逐字节未变；新增1会话/2轮合成记录保留。首字观察约7.7秒，免费模型节奏仍有限制。
 
 ## 2026-11-12：免费备用与429自动切换（已上线并验证）
 

@@ -1,16 +1,22 @@
 # 工作区交接状态
 
+## 2026-11-14：历史文档整理与 P8 取消
+
+- 用户决定不再接入新模型；[SPEC-006 P8](../specs/006-owner-sse-chat.md#p8更快免费主模型接入已取消2026-11-14)仅保留取消原因与现状，移除接入计划、验收待办及未提交调研草稿。现有GLM主备模型、自动切换和记忆保持，不再继续P8。
+- 整理[本地连接线上数据库说明](../../README.md#本地连接线上数据库)，保留此前服务器部署/HTTPS、隧道连接、站主密码重置与飞书部署手册的完成记录；历史记录不表示本轮重新执行或验证。
+- 用户已授权将这批文档提交并推送，基准`b519fa2`。文档差异检查、链接/锚点、脚本名称与忽略规则核对通过，P8无残留待办或失效研究链接。应用代码未变，未重跑测试、构建或浏览器验收；使用`[skip ci]`跳过重复部署。
+
 ## 2026-11-14：前端信息精简与交互打磨（已上线并验证）
 
 - 用户要求按新 UI/UX 原则检查并修改当前前端；[SPEC-007](../specs/007-ui-clarity.md) 记录范围/设计/验收。沿用官网与聊天品牌，精简重复说明并打磨分组、布局和操作区。
 - 基准 `8b263ad`；22个前端文件精修，最终lint/build/diff检查通过，聊天相关55/55回归通过；Chrome桌面/平板/390/320按范围验证目录/登录/草稿保护/预览/保存、聊天流/停止/失败/回退/历史/记忆与任务创建，独立审查重要问题已闭环。
 - [整合验收与边界](tasks/007-ui-integration.md)、[公开页](tasks/007-public-ui.md)、[聊天](tasks/007-chat-ui.md)、[审查](tasks/007-ui-review.md)、[隔离环境](tasks/007-ui-fixture.md)。临时前后端/模型/库/容器已清理，原27017保留；测试标签关闭、视口重置。未新增真实模型、生产写入交互、多浏览器或真机软键盘验收。
-- 用户追加授权后，沿用已验证源码与本地结果，功能`0b04b19`已推送main；[Actions 43560815456](https://github.com/awei0929/awei-fullstack/actions/runs/43560815456)三job成功，CI后端150/150、部署24/24、前端lint/build通过。线上首页/后台/任务入口及首页4个静态资源与发布包一致，正常TLS与公共接口通过，官网v7逐字节未变；[发布记录](tasks/007-ui-deployment.md)。仅提交本次规则/前端/验收文档，原README、STATE历史、SPEC-006/P8与研究记录继续留在工作区；文档回写跳过重复CI。
+- 用户追加授权后，沿用已验证源码与本地结果，功能`0b04b19`已推送main；[Actions 43560815456](https://github.com/awei0929/awei-fullstack/actions/runs/43560815456)三job成功，CI后端150/150、部署24/24、前端lint/build通过。线上首页/后台/任务入口及首页4个静态资源与发布包一致，正常TLS与公共接口通过，官网v7逐字节未变；[发布记录](tasks/007-ui-deployment.md)。仅提交本次规则/前端/验收文档，当时未纳入的README和历史记录在本轮文档整理中一并归档，P8已按用户决定取消；应用版本不变。
 
 ## 2026-11-14：前端 UI/UX 原则补充
 
 - 按用户要求在 [AGENTS 入口](../../AGENTS.md) 增加 [前端 UI/UX 原则](../../AGENT.md#前端-uiux-原则) 引用，正文统一维护在 AGENT.md：减少不必要的辅助标签与说明，让布局表达内容关系，重视 UI/UX 打磨。
-- 本次仅改规则与交接文档，基准 `8b263ad`；保留原有未提交改动及 P8 进度，无应用代码变更。
+- 本次仅改规则与交接文档，基准 `8b263ad`；当时保留其他未提交文档，无应用代码变更。
 - 已核对新增条文与前端交互约定一致，新增文件与章节链接有效，`git diff --check` 通过；纯文档改动未运行应用测试。
 
 ## 2026-11-13：AI对话整体重设计与流式调优（已上线，四轮验收完成）
@@ -87,6 +93,11 @@
 - 已验证构建失败不发布、受限命令拒绝、手动回退当前bootstrap的幂等入口；不同目标回退/恶意输入/故障恢复/并发为隔离测试，未冒充线上故障注入。首次SSH上传约6分24秒、依赖安装3秒；CI Mongo有官方临时rseq兼容项。文档回写不改变已验证应用/依赖/工作流，沿用本次结果。
 - 当轮仅发布自动部署配置，SPEC-004由用户后续追加授权发布，结果见上方。证据：[整合](tasks/005-deployment-integration.md)、[运行器](tasks/005-deploy-runtime.md)、[工作流](tasks/005-deploy-workflow.md)、[审查](tasks/005-deployment-review.md)。日常提交后推main并查看Actions；回退按部署手册，不自行发布其他未提交功能。
 
+## 2026-11-09：飞书部署手册（已保存）
+
+- 用户要求总结部署流程，并指定直接操作飞书 App。在已登录飞书的“我的文档库”新建[个人官网服务器部署与维护手册](https://my.feishu.cn/wiki/JQeHw48nGiH4KxkVS2Gcace7nXg)，已确认云端保存。12章、28个命令或配置代码块，覆盖首次部署、迁移、Mongo临时兼容项、systemd、Nginx、IP HTTPS续期、验收、日常发布备份、本地隧道及排障。
+- 命令带中文注释，区分Mac/服务器及首次初始化/日常操作；不包含真实密码、Session密钥、私钥、哈希或完整真实连接串。明确以已上线9b12524为基准，含后续登录验证，未冒充线上保存/上传已验；并行SPEC-004仍按其单独发布流程处理。已核对飞书目录、关键代码换行、续期和发布命令、正文首尾与保存状态；没有修改其它文档、分享权限或服务器。保留现有代码和文档改动，不提交或推送。
+
 ## 2026-11-09：服务器磁盘文件上传（本机已验证，未部署）
 
 - 用户授权图片、PDF、附件上传并告知流程；已确认全公开、仅站主可上传。沿用9b12524及当前分支，保留原README/STATE改动，无提交、推送、部署或真实env改动。合同：[SPEC-004](../specs/004-disk-file-uploads.md)。
@@ -94,6 +105,31 @@
 - 后端最终95/95、6套件含build；前端实际模块68/68、Markdown SSR5/5、lint无警告/build通过；独立审查1项P2已修，限定复核58项通过。根Chrome156桌面1440/手机390实际上传/错误重试/中文下载/草稿/保存v3刷新/公开图片及附件/忙状态/10000字保留/重建应用后媒体持久化通过。证据：[整合](tasks/004-disk-uploads-integration.md)、[后端](tasks/004-disk-uploads-backend.md)、[前端](tasks/004-disk-uploads-frontend.md)、[审查](tasks/004-disk-uploads-review.md)。
 - 全程测试显式使用原本机Mongo127.0.0.1:27017及随机临时库/媒体，未沿真实backend/.env连接线上。4个明确归属的浏览器fixture库、临时媒体/Cookie/样例/缓存已清理；3001/5174已停，原本机与线上业务数据保留，无截图。
 - 下一步按[README接入流程](../../README.md#图片pdf与附件上传接入)发布：确认服务器持久目录与ubuntu读写、已有/api/代理加25m、构建/同步前端并重启后端，再做线上上传验证。服务器配置/HTTPS上传未在本轮实操，真机/多浏览器/断电边界未扩大声明。
+
+## 2026-11-08：站主密码重置（已验证）
+
+- 用户明确授权重置线上账号 55555 为其指定密码；通过已配置隧道仅更新该站主的 Argon2id passwordHash 与 updatedAt，应用 id、账号及官网内容保留。明文密码与哈希未写入项目文件、文档或输出日志。
+- 已核对保存后的哈希验证成功，并定向撤销该账号 1 个旧登录会话。正式 HTTPS 接口实测：新密码登录 200、站主配置读取 200、官网仍 v6；随后测试会话退出 200。本地后端共用线上数据库，使用同一新密码；原独立本机数据库未在本轮修改。无应用源码改动、未运行集成测试、未提交或推送。
+
+## 2026-11-08：本地项目切换线上数据库（已配置并验证）
+
+- 用户授权本地项目改用线上数据库，并明确确认安装项目专用 SSH 公钥及将服务器连接信息同步至本机忽略配置。沿用 `9b12524`，保留上轮已有 STATE 修改，不提交、推送或改应用源码。
+- 本机 `~/.ssh/config` 新增 `nest-db`，密钥 `~/.ssh/nest-mongodb-tunnel_ed25519` 私钥留本机；隧道 `127.0.0.1:27018 → 159.75.18.65 → 127.0.0.1:27017` 已在后台运行，可用 `ssh -O check nest-db` 检查、`ssh -fN nest-db` 建立。服务器公钥以 restrict/permitopen 限制正向目的地，禁止交互终端、agent/X11 和远程命令；保留原 authorized_keys 并备份。
+- 本地 `backend/.env` 已改用服务器现有认证信息与隧道端口，仅更换 MONGODB_URI；原 SESSION_SECRET 与 SITE_OWNER_USER_ID 保留（站主应用 id 已比对一致），本地 NODE_ENV 未设 production。环境备份 `.local/db-connection/.env.before-remote` 权限 600 且被 Git 忽略；服务器及本机的一次性凭据传输文件均已删除，未输出密码或真实连接串。
+- 原生 MongoClient 只读验证：隧道连接成功、ping 成功、`awei` 官网单例 v6、账号 55555 的应用 id 与服务器配置及本机原配置一致；改完后直接读取最终 `backend/.env` 再验证通过，文件权限 600、无进程环境变量覆盖、SESSION_SECRET 与备份相同、传输临时文件已删除。SSH 隧道仍运行，专用密钥远程命令执行按预期被拒绝。未启动 Nest 或写入业务数据，不对线上实例运行集成测试或站主初始化；本地后端下次启动即读取此连接。
+- 使用方式与边界写入 [README](../../README.md#本地连接线上数据库)：本地写入会直接影响线上，Session/限流共享；媒体文件不会随数据库同步，正式媒体经线上后台上传。本地 MongoDB 和原数据保留用于回退；电脑重启或断网后需先重建隧道。独立只读复核未发现实质文档问题，`git diff --check` 通过；本轮仅 README/STATE 为跟踪文件改动。
+
+## 2026-11-08：服务器部署与 HTTPS（已完成）
+
+- 用户先逐步自行部署，随后授权代为配置 Nginx；已明确同意 Let’s Encrypt v1.8 协议、IP 证书测试/正式签发与自动续期，以及将 HTTPS 443 从单个来源 IP 扩大至所有 IPv4。部署代码基准 `9b12524`，本轮未改应用源码或重新提交/推送。
+- 腾讯云 Ubuntu 26.04，服务器代码 `/home/ubuntu/apps/nest`；Node 24、Docker/Compose、Nginx 已安装。`nest-backend.service` 以 ubuntu 用户启动 `backend/dist/main.js`，仅监听 `127.0.0.1:3000`；MongoDB Compose 服务 `mongodb`、命名卷 `awei_mongodb_data`，仅映射 `127.0.0.1:27017`。真实环境文件留服务器、权限 600，不进入仓库。
+- 用户原 `awei` 数据库备份已恢复（报告 0 文档失败），原站主以应用 `id` 关联，公开配置仍 v6；媒体恢复至 `/home/ubuntu/nest-data/site-assets`，图片及 WAV 各一份。迁移备份在 `/home/ubuntu/nest-migration`；账号密码未重置，现有数据未覆盖或重新初始化。
+- Nginx 静态站点 `/var/www/nest`，配置 `/etc/nginx/sites-available/nest`；`/api/` 保留 URI 代理后端，`/admin` 与 `/admin/preview` 走 SPA。80 的 ACME 路径使用 `/var/www/letsencrypt`，其余跳转 HTTPS。正式地址 `https://159.75.18.65/`，后台 `/admin`；443 已按用户确认公开，3000/27017 未公开。
+- Certbot 5.9.0 独立安装于 `/opt/certbot`，生产 IP 证书 `nest-ip` 已签发（本次到期 2026-11-15）；`nest-certbot-renew.timer` 已启用且有下次执行时间，每天两次并随机延迟一小时内，成功续期后检查并重载 Nginx。`renew --cert-name nest-ip --dry-run --run-deploy-hooks --no-random-sleep-on-renew` 完整演练成功，部署 hook 的 Nginx 检查与重载通过；短期证书依赖该定时器，80 挑战路径须持续可用。
+- 已实测：`nginx -t` 成功；Nginx、后端、续期 timer 均 active；服务器内可信 HTTPS 首页/后台入口与构建文件一致、API v6、媒体可读、Cookie Secure/HttpOnly/SameSite=Lax。公网 curl HTTPS 200 且 TLS 校验结果 0、HTTP 301 到 HTTPS、API v6、`/admin/preview` 200；Chrome 真实打开首页、切换能力场景、打开/关闭技术详情与站主登录面板，页面图片加载完成。原 HTTP 的 `crypto.randomUUID` 错误由 HTTPS 解决，未修改源码降级。
+- MongoDB 镜像当前 `mongo:8.0`（8.0.34）误拦 Ubuntu `uname`；实际 `/proc/version_signature` 上游为已修复的 7.0.14。服务器私有 `compose.override.yaml` 临时设 `GLIBC_TUNABLES=glibc.pthread.rseq=1` 后 healthy；这是镜像维护者的临时兼容办法，待 MongoDB 官方包含 SERVER-131779 的修复版本实际发布后再评估移除，不把尚未发布的 8.0.37 当作可用镜像。
+- 收尾实测 Nginx、后端、Docker、续期 timer 均 enabled/active，MongoDB healthy，3000/27017 只绑定回环；本轮公开探针已删除，续期目录保留。Chrome HTTPS 页面无本轮新增错误，最终保留官网首页；本地仅更新本交接文档，`git diff --check` 通过。
+- 以上为首次部署时的历史证据；当时未验证服务器站主实际密码登录、后台保存/上传。后续登录、上传和自动发布结果以本文件较新记录及对应SPEC为准，不把旧记录作为当前待办。
 
 ## 2026-11-08：个人官网提交交接
 

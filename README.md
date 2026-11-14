@@ -29,7 +29,7 @@ npm ci --prefix backend
 npm ci --prefix frontend
 ```
 
-根 `.env` 的 MongoDB 密码与 `backend/.env` 中的 MONGODB_URI 必须对应。已有数据库卷不因修改环境变量自动更换密码。真实配置不进入 Git。
+使用本机 Compose 数据库时，根 `.env` 的 MongoDB 密码与 `backend/.env` 中的 MONGODB_URI 必须对应；连接服务器数据库时，使用服务器的认证信息。已有数据库卷不因修改环境变量自动更换密码。真实配置不进入 Git。
 
 后端还需要 SESSION_SECRET，至少32字符，并在重启间保持稳定。可用以下命令在缺失或仍为模板值时生成随机值到本地文件，不打印密钥：
 
@@ -53,6 +53,27 @@ PYSECRET
 ```
 
 配置名称和默认值以 [backend/.env.example](backend/.env.example) 为准。生产启用 HTTPS 与 Secure Cookie；部署在反向代理后时只信任实际代理，不无条件信任转发来源。
+
+### 本地连接线上数据库
+
+此工作机于2026-11-08配置了 SSH 别名 `nest-db`，将 `127.0.0.1:27018` 转发至服务器的 `127.0.0.1:27017`；本地 `backend/.env` 使用隧道端口与服务器认证信息，服务器 MongoDB 仅监听回环地址。该配置记录见 [STATE](docs/ai/STATE.md#2026-11-08本地项目切换线上数据库已配置并验证)。SSH 配置和专用私钥保存在本机 `~/.ssh/`，不进入仓库。
+
+新机器需要先配置获授权的 SSH 连接、专用密钥和本地端口转发，再填写自己的 `backend/.env`；使用下列命令前，需设置同名别名及连接复用。已配置的工作机在重启或网络中断后，启动本地后端前先检查并恢复隧道：
+
+```bash
+# 已有隧道时复用；尚未建立时在后台连接服务器
+ssh -O check nest-db >/dev/null 2>&1 || ssh -fN nest-db
+
+# 查看隧道状态；正常时显示 Master running
+ssh -O check nest-db
+
+# 在项目根目录启动使用线上数据库的本地后端
+npm run start:dev --prefix backend
+```
+
+此模式下，本地后端的写入会直接影响线上 `awei` 数据，Session 和登录限流也使用同一数据库。本地 HTTP 开发使用本机固定的 `SESSION_SECRET`，不设置 `NODE_ENV=production`；前端仍请求本地 `/api`。不要通过线上连接运行集成测试或 `site:owner:init` 站主初始化命令；测试需显式指定隔离 MongoDB，参见[验证](#验证)。
+
+媒体仍由各台机器的 `SITE_ASSETS_DIR` 本地目录保存，切换数据库不会同步文件。本地新上传的文件若只保存在电脑上，线上站点无法读取；正式媒体应通过线上后台上传。此工作机切换前的环境备份记录为 `.local/db-connection/.env.before-remote`，该路径受 Git 忽略规则保护，原本地数据库保留用于回退；新机器需自行备份原配置。
 
 ## 启动
 

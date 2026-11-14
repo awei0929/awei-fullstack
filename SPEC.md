@@ -17,7 +17,7 @@
 | 003 | [个人官网与站主配置](docs/specs/003-personal-site.md) | 已验证，P28能力三卡/详情与站主Markdown履历；P24独立作品档案移除仍有效 |
 | 004 | [服务器磁盘文件上传](docs/specs/004-disk-file-uploads.md) | 已上线并验证；图片、PDF、附件公开上传、下载及重启持久化 |
 | 005 | [推送后自动构建部署](docs/specs/005-automatic-deployment.md) | 已验证，main 自动构建/SSH 发布、日志与失败回退 |
-| 006 | [站主后台 SSE 多模型对话](docs/specs/006-owner-sse-chat.md) | P7纸白聊天UI与流式修复已上线，四轮验收完成 |
+| 006 | [站主后台 SSE 多模型对话](docs/specs/006-owner-sse-chat.md) | P7已上线并完成四轮验收；P8新模型接入已取消 |
 | 007 | [前端信息精简与交互打磨](docs/specs/007-ui-clarity.md) | 已上线并验证；精简辅助文案、打磨现有布局与交互 |
 
 ## OpenSpec 引用模式

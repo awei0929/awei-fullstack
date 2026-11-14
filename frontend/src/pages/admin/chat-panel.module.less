@@ -25,10 +25,8 @@
 .selectedConversation strong { font-weight: 500; }
 .selectedConversation::before { content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 2px 2px 0; background: @olive; }
 .historyEmpty { font-size: 13px; color: @muted; line-height: 1.8; padding: 8px; margin: 0; }
-.historyFootnote { display: flex; flex-direction: column; gap: 8px; margin: 16px 8px 0; padding-top: 16px; border-top: 1px solid @line; color: @muted; font-size: 11px; }
-.historyFootnote > span { color: #737d56; font: 600 16px/1 Arial, sans-serif; }
 .conversation { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.threadHeader { flex-shrink: 0; min-height: 72px; display: flex; align-items: center; gap: 16px; padding: 12px 32px; border-bottom: 1px solid @line; background: #fafaf7; }
+.threadHeader { flex-shrink: 0; min-height: 64px; display: flex; align-items: center; gap: 16px; padding: 12px 32px; border-bottom: 1px solid @line; background: #fafaf7; }
 .threadTitle { flex: 1; min-width: 0; }
 .threadTitle h2 { margin: 0; color: @ink; font-size: 14px; line-height: 24px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .threadTitle p { margin: 0; font-size: 11px; line-height: 20px; color: @muted; }
@@ -45,18 +43,13 @@
 .messageContent { min-width: 0; min-height: 100%; display: flex; flex-direction: column; }
 .messageColumn { width: 100%; max-width: 800px; margin-inline: auto; }
 .empty { width: 100%; flex: 1; max-width: 800px; margin: 0 auto; display: flex; justify-content: center; flex-direction: column; align-items: flex-start; color: @secondary; padding: 16px 0 24px; }
-.empty > .emptyEyebrow { display: flex; align-items: center; gap: 12px; color: @secondary; font-size: 12px; margin: 0 0 24px; }
-.emptyEyebrow > span { color: @olive; font: 600 20px/1 Arial, sans-serif; }
-.empty h2 { font-size: clamp(28px, 2.6vw, 40px); line-height: 1.4; font-weight: 500; margin: 0 0 16px; color: @ink; letter-spacing: -.5px; }
+.empty h2 { font-size: clamp(28px, 2.6vw, 40px); line-height: 1.4; font-weight: 500; margin: 0; color: @ink; letter-spacing: -.5px; }
 .empty > p { font-size: 14px; line-height: 1.9; margin: 0; }
-.emptyBreak { display: none; }
-.suggestions { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 32px; }
+.suggestions { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
 .suggestions button { display: flex; flex-direction: column; gap: 8px; padding: 16px; text-align: left; border: 1px solid @line; border-radius: 8px; background: #fff; color: @ink; transition: border-color .16s, background .16s; }
 .suggestions button:hover:not(:disabled) { background: #f9faf5; border-color: #a7b090; }
-.suggestions strong { display: flex; justify-content: space-between; gap: 8px; align-items: center; width: 100%; font-size: 14px; font-weight: 500; }
-.suggestions strong span { color: #a8683c; font-size: 16px; }
+.suggestions strong { font-size: 14px; font-weight: 500; }
 .suggestions button > span { color: @secondary; font-size: 12px; line-height: 1.7; }
-.empty > .suggestionHint { margin-top: 12px; color: @muted; font-size: 11px; }
 .turn { min-width: 0; margin-bottom: 32px; }
 .turn:last-child { margin-bottom: 8px; }
 .question { width: fit-content; max-width: 88%; min-width: 160px; margin: 0 0 20px auto; padding: 12px 20px 16px; border: 1px solid #e0e3d7; border-radius: 12px 12px 4px 12px; background: #eaede3; }
@@ -69,10 +62,9 @@
 .answerHeader { display: flex; gap: 12px; align-items: center; min-width: 0; padding: 20px 24px 16px; }
 .assistantAvatar { width: 36px; height: 36px; flex: none; display: flex; align-items: center; justify-content: center; border: 1px solid #dce1d1; border-radius: 8px; background: #f0f2e9; color: @olive; font: 600 22px/1 Arial, sans-serif; }
 .assistantAvatar > span { color: #ad6b3c; }
-.assistantIdentity { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
-.assistantIdentity strong { color: @ink; font-size: 13px; line-height: 16px; font-weight: 500; }
-.assistantIdentity > span { color: @muted; font-size: 11px; line-height: 16px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
-.turnStatus { display: flex; align-items: center; gap: 6px; flex: none; align-self: flex-start; padding-top: 4px; color: @muted; font-size: 11px; line-height: 20px; }
+.assistantIdentity { flex: 1; min-width: 0; }
+.assistantIdentity strong { display: block; color: @ink; font-size: 13px; line-height: 20px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.turnStatus { display: flex; align-items: center; gap: 6px; flex: none; color: @muted; font-size: 11px; line-height: 20px; }
 .turnStatus > i { width: 4px; height: 4px; border-radius: 50%; background: #b6bba9; }
 .streamingStatus { color: @olive; }
 .streamingStatus > i { background: @olive; }
@@ -102,9 +94,10 @@
 .composerControls .stopButton { min-height: 36px; color: @olive; border-color: #c3cbb4; background: #f0f3e9; box-shadow: none; }
 .fallbackHint { color: @muted; font-size: 11px; line-height: 1.6; margin: 8px 0 0; overflow-wrap: anywhere; }
 .composerFootnote { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: @muted; font-size: 11px; line-height: 20px; font-variant-numeric: tabular-nums; }
-.composerFootnote p { display: flex; gap: 16px; margin: 0; }
+.composerFootnote p { margin: 0; }
 .composerFootnote > span { white-space: nowrap; }
 .overLimit, .limit { color: #a04b32; }
+.nearLimit { color: @secondary; font-weight: 500; }
 .limit { font-size: 12px; margin-block: 0; }
 .sendError { font-size: 13px; overflow-wrap: anywhere; }
 .srOnly { position: absolute; height: 1px; width: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -133,16 +126,12 @@
   .notices { padding: 8px 12px 0; }
   .messages { padding: 20px 12px 12px; }
   .empty { padding: 12px 8px; }
-  .empty h2 { font-size: 28px; margin-bottom: 12px; }
+  .empty h2 { font-size: 28px; }
   .empty > p { font-size: 13px; }
-  .empty > .emptyEyebrow { margin-bottom: 20px; }
-  .emptyBreak { display: inline; }
   .suggestions { grid-template-columns: 1fr; margin-top: 24px; gap: 8px; }
   .suggestions button { flex-direction: row; align-items: center; gap: 12px; padding: 12px; }
-  .suggestions strong { width: auto; min-width: 64px; font-size: 13px; }
-  .suggestions strong > span { display: none; }
+  .suggestions strong { min-width: 64px; font-size: 13px; }
   .suggestions button > span { font-size: 11px; }
-  .empty > .suggestionHint { margin-top: 12px; }
   .question { max-width: 94%; padding: 12px 16px; margin-bottom: 16px; }
   .answerHeader { padding: 16px 16px 12px; gap: 8px; }
   .answerBody { padding: 0 16px 20px; }
@@ -156,7 +145,6 @@
   .composerControls :global(.ant-select) { width: 200px; max-width: calc(100% - 88px); }
   .composerControls .sendButton { min-width: 72px; }
   .composerFootnote { align-items: flex-start; gap: 8px; }
-  .composerFootnote p { flex-wrap: wrap; gap: 0 12px; }
   .fallbackHint { font-size: 10px; }
 }
 @media (max-width: 360px) {
@@ -166,7 +154,6 @@
   .empty h2 { font-size: 26px; }
   .suggestions button { gap: 8px; }
   .suggestions strong { min-width: 60px; }
-  .composerFootnote p { gap: 0; flex-direction: column; }
   .answerHeader { flex-wrap: wrap; }
   .turnStatus { font-size: 10px; }
 }

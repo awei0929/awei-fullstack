@@ -6,7 +6,7 @@ import { siteAdminStore as store } from '../../store/site-admin'
 import { CAPABILITY_CATALOG, CAPABILITY_CATEGORIES, MAX_CAPABILITIES_PER_CATEGORY, capabilityIconUrl } from '../../config/site-capabilities'
 import type { SiteCapabilityCategory } from '../../types/site'
 import type { CapabilityEditorTab } from './sections'
-import { Group, TextField } from './fields'
+import { TextField } from './fields'
 import { CapabilityDetailsEditor } from './capability-details-editor'
 import styles from './capabilities-editor.module.less'
 
@@ -29,7 +29,7 @@ const CategoryEditor = observer(function CategoryEditor({ category }: { category
       value: item.icon,
       disabled: item.icon !== currentIcon && usedIcons.has(item.icon),
       searchText: `${item.name} ${item.icon} ${label}`,
-      label: <span className={styles.option}><img src={capabilityIconUrl(item.icon)} alt="" width="20" height="20" /><span>{item.name}<small>{item.category === category ? '本类推荐' : label}</small></span></span>,
+      label: <span className={styles.option}><img src={capabilityIconUrl(item.icon)} alt="" width="20" height="20" /><span>{item.name}{item.category !== category && <small>{label}</small>}</span></span>,
     }
   })
   const filterOption = (input: string, option?: CapabilityOption) => Boolean(option?.searchText.toLowerCase().includes(input.trim().toLowerCase()))
@@ -59,14 +59,14 @@ const CategoryEditor = observer(function CategoryEditor({ category }: { category
     if (store.canEdit) setPendingIcon(undefined)
   }
   return <section className={styles.category} aria-label={`${categoryLabel}能力配置`}>
-    <div className={styles.categoryHeading}><p>按这里的顺序展示在官网。</p><span>{items.length} / {MAX_CAPABILITIES_PER_CATEGORY}</span></div>
-    {!items.length && <p className={styles.empty}>暂未配置。选择一项你想展示的能力，从这里开始。</p>}
+    <div className={styles.categoryHeading}><span>{categoryLabel}</span><span>{items.length} / {MAX_CAPABILITIES_PER_CATEGORY}</span></div>
+    {!items.length && <p className={styles.empty}>暂无能力</p>}
     <ol className={styles.list}>{items.map((item, index) => {
       const iconId = `${id}-${index}-icon`
       const nameId = `${id}-${index}-name`
       const hintId = `${id}-${index}-hint`
       return <li className={styles.item} key={item.icon}>
-        <div className={styles.itemHeading}><strong>能力 {String(index + 1).padStart(2, '0')}</strong><div className={styles.actions}>
+        <div className={styles.itemHeading}><strong>能力 {index + 1}</strong><div className={styles.actions}>
           <button type="button" aria-label={`上移${item.name}`} disabled={!store.canEdit || index === 0} onClick={() => move(index, -1)}>↑</button>
           <button type="button" aria-label={`下移${item.name}`} disabled={!store.canEdit || index === items.length - 1} onClick={() => move(index, 1)}>↓</button>
           <button type="button" className={styles.remove} aria-label={`删除${item.name}`} disabled={!store.canEdit} onClick={() => store.edit(draft => { draft.capabilities[category].splice(index, 1) })}>删除</button>
@@ -79,20 +79,20 @@ const CategoryEditor = observer(function CategoryEditor({ category }: { category
       <label htmlFor={`${id}-add`}>添加到{categoryLabel}</label>
       <Select<string, CapabilityOption> id={`${id}-add`} value={pendingIcon} placeholder="搜索技术或工具" options={options()} showSearch filterOption={filterOption} disabled={!store.canEdit || full} onChange={setPendingIcon} popupMatchSelectWidth={false} classNames={{ popup: { root: styles.popup } }} />
       <button type="button" className={styles.addButton} disabled={!store.canEdit || full || !pendingIcon || usedIcons.has(pendingIcon)} onClick={add}>＋ 添加能力</button>
-      <p className={styles.hint}>{full ? `本类已达 ${MAX_CAPABILITIES_PER_CATEGORY} 项，删除一项后可继续添加。` : '优先显示本类推荐，也可搜索其他类别；已使用图标不能重复添加。'}</p>
+      {full && <p className={styles.hint}>已达 {MAX_CAPABILITIES_PER_CATEGORY} 项，移除后可继续添加</p>}
     </div>
   </section>
 })
 
 export const CapabilitiesEditor = observer(function CapabilitiesEditor({ tab, onTabChange, category, onCategoryChange, projectId, onProjectChange }: { tab: CapabilityEditorTab; onTabChange: (tab: CapabilityEditorTab) => void; category: SiteCapabilityCategory; onCategoryChange: (category: SiteCapabilityCategory) => void; projectId: string | null; onProjectChange: (id: string | null) => void }) {
-  return <Group title="我的能力" description="整理愿意公开展示的技术、公司背景与工程经历；保存全部后统一更新官网。">
+  return <section aria-label="能力编辑">
     <Tabs className={styles.tabs} size="small" activeKey={tab} animated={false} onChange={key => { if (key === 'technology' || key === 'company' || key === 'projects') onTabChange(key) }} items={[
       { key: 'technology', label: '技术栈', forceRender: true, children: <>
-        <TextField label="技术介绍" value={store.draft!.capabilityDetails.technology.introduction} onChange={value => store.edit(draft => { draft.capabilityDetails.technology.introduction = value })} maxLength={2000} multiline rows={4} hint="出现在技术栈详情顶部。以下四类能力保留各自的图标、昵称与顺序，每类最多 12 项。" />
+        <TextField label="技术介绍" value={store.draft!.capabilityDetails.technology.introduction} onChange={value => store.edit(draft => { draft.capabilityDetails.technology.introduction = value })} maxLength={2000} multiline rows={4} />
         <Tabs className={styles.tabs} size="small" activeKey={category} animated={false} onChange={key => { const selected = CAPABILITY_CATEGORIES.find(item => item.id === key); if (selected) onCategoryChange(selected.id) }} items={CAPABILITY_CATEGORIES.map(item => ({ key: item.id, label: item.label, forceRender: true, children: <CategoryEditor category={item.id} /> }))} />
       </> },
       { key: 'company', label: '公司背景', forceRender: true, children: <CapabilityDetailsEditor section="company" /> },
       { key: 'projects', label: '公司项目', forceRender: true, children: <CapabilityDetailsEditor section="projects" projectId={projectId} onProjectChange={onProjectChange} /> },
     ]} />
-  </Group>
+  </section>
 })

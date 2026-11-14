@@ -18,6 +18,7 @@
 | 004 | [服务器磁盘文件上传](docs/specs/004-disk-file-uploads.md) | 已上线并验证；图片、PDF、附件公开上传、下载及重启持久化 |
 | 005 | [推送后自动构建部署](docs/specs/005-automatic-deployment.md) | 已验证，main 自动构建/SSH 发布、日志与失败回退 |
 | 006 | [站主后台 SSE 多模型对话](docs/specs/006-owner-sse-chat.md) | P7纸白聊天UI与流式修复已上线，四轮验收完成 |
+| 007 | [前端信息精简与交互打磨](docs/specs/007-ui-clarity.md) | 已本地验证；精简辅助文案并打磨现有布局，发布进行中 |
 
 ## OpenSpec 引用模式
 

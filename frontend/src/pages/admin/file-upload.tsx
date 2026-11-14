@@ -18,7 +18,7 @@ export const FileUploadResult = observer(function FileUploadResult({ targetKey }
     <textarea id={`${id}-url`} readOnly value={result.asset.url} rows={2} spellCheck={false} onFocus={event => event.target.select()} />
     <label htmlFor={`${id}-markdown`}>Markdown</label>
     <textarea id={`${id}-markdown`} readOnly value={result.markdown} rows={3} spellCheck={false} onFocus={event => event.target.select()} />
-    <small>选中地址或 Markdown 后即可复制。文件已公开，页面引用仍需保存全部。</small>
+    <small>文件已公开，页面引用需保存后生效</small>
   </div>
 })
 
@@ -40,7 +40,7 @@ export const FileUploadControl = observer(function FileUploadControl({ target, m
         if (file) void store.uploadFile(file, target, button.kind)
       }} />
     </label>)}</div>
-    <small>图片最大 5 MiB，附件最大 20 MiB。上传完成即公开；页面引用仍需保存全部。{mode === 'markdown' && '成功后追加到这段正文末尾。'}</small>
+    <small>{mode === 'image' ? '图片最大 5 MiB' : '图片最大 5 MiB，附件最大 20 MiB'}；上传后可公开访问。{mode === 'markdown' && '成功后追加到这段正文末尾。'}</small>
     {uploading && <progress aria-label="文件上传中" />}
     {error && <p className={styles.error} role="alert">{error}</p>}
     {showResult && <FileUploadResult targetKey={key} />}
@@ -48,10 +48,10 @@ export const FileUploadControl = observer(function FileUploadControl({ target, m
 })
 
 export function FileUploadsEditor() {
-  return <Group title="上传图片与附件" description="文件保存在网站服务器的磁盘目录。所有文件均可凭链接公开访问，即使尚未保存、项目隐藏或后来移除引用，也不会变成私密文件。">
-    <p className={styles.formats}>图片：JPG / JPEG、PNG、WebP，最大 5 MiB。<br />附件：PDF、ZIP、TXT、DOCX、XLSX、PPTX，最大 20 MiB。</p>
+  return <Group title="上传图片与附件" description="文件上传后即可凭链接公开访问；隐藏项目或移除引用不会让文件变私密。">
+    <p className={styles.formats}>图片：JPG、PNG、WebP<br />附件：PDF、ZIP、TXT、DOCX、XLSX、PPTX</p>
     <FileUploadControl target={{ type: 'library' }} mode="all" showResult={false} />
     <FileUploadResult />
-    <p className={styles.formats}>这里的上传只生成地址，不会自动修改正文或公开配置。可以复制到相应字段，也可在公司正文、项目正文或封面旁直接上传；确认草稿后点击「保存全部」。当前不提供文件列表、删除或自动清理。</p>
+    <p className={styles.formats}>复制上传后的地址到所需字段，保存后生效。</p>
   </Group>
 }

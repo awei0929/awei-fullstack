@@ -202,18 +202,15 @@ export const SiteLoginPanel = observer(function SiteLoginPanel({ open, onClose, 
     <div className={styles.panel}>
       <button className={styles.close} type="button" onClick={close} disabled={busy} aria-label="关闭登录面板"><span aria-hidden="true">×</span></button>
       <div className={styles.stage} aria-hidden="true">
-        <span className={styles.stageEyebrow}>YOUR LITTLE CORNER</span>
         <p className={styles.stageTitle}>MAKE<br />YOURSELF<br /><span>AT HOME.</span></p>
         <div className={styles.orbit} />
         <span className={styles.spark}>✳</span>
         {!characterFailed && <img src="/site/hero-character.png" alt="" onError={() => setCharacterFailed(true)} />}
-        <span className={styles.stageFooter}>A SMALL SPACE. A WORLD OF IDEAS.</span>
       </div>
       <section className={styles.content}>
-        <p className={styles.eyebrow}><span /> WELCOME BACK</p>
         <h2 ref={headingRef} id={`${id}-title`} tabIndex={-1}>{user ? '欢迎回来。' : '站主登录'}</h2>
-        <p className={styles.description} id={`${id}-description`}>{user ? '已登录，继续照料这个小小世界。' : '从这里，继续打理你的小小世界。'}</p>
-        {status === 'idle' || status === 'loading' ? <div className={styles.waiting} role="status"><span className={styles.loader} aria-hidden="true" /><p>正在恢复登录状态<span>片刻之后，就可以继续。</span></p></div>
+        <p className={styles.description} id={`${id}-description`}>管理官网内容与 AI 对话</p>
+        {status === 'idle' || status === 'loading' ? <div className={styles.waiting} role="status"><span className={styles.loader} aria-hidden="true" /><p>正在恢复登录状态</p></div>
           : status === 'error' ? <div className={styles.state}>
             <p className={styles.restoreHint}>连接后即可继续登录。</p>
             <button type="button" className={styles.primary} data-login-autofocus onClick={retryRestore}>重新连接 <span aria-hidden="true">↗</span></button>
@@ -226,18 +223,17 @@ export const SiteLoginPanel = observer(function SiteLoginPanel({ open, onClose, 
               : <form className={styles.form} noValidate onSubmit={(event) => void submit(event)}>
                 {loggingOut && <p className={styles.hint} role="status">正在完成退出，请稍候再登录…</p>}
                 <div className={styles.field}>
-                  <label htmlFor={`${id}-account`}>账号 <span>ACCOUNT</span></label>
+                  <label htmlFor={`${id}-account`}>账号</label>
                   <input ref={accountRef} id={`${id}-account`} name="account" type="text" inputMode="numeric" autoComplete="username" required data-login-autofocus placeholder="输入站主账号" value={account} disabled={busy} aria-invalid={Boolean(errors.account)} aria-describedby={errors.account ? `${id}-account-error` : undefined} onChange={(event) => { setAccount(event.target.value); setErrors((current) => ({ ...current, account: undefined })); authStore.clearAuthError() }} />
                   {errors.account && <span className={styles.srOnly} id={`${id}-account-error`}>{errors.account}</span>}
                 </div>
                 <div className={styles.field}>
-                  <label htmlFor={`${id}-password`}>密码 <span>PASSWORD</span></label>
+                  <label htmlFor={`${id}-password`}>密码</label>
                   <input ref={passwordRef} id={`${id}-password`} name="password" type="password" autoComplete="current-password" required placeholder="输入密码" value={password} disabled={busy} aria-invalid={Boolean(errors.password)} aria-describedby={errors.password ? `${id}-password-error` : undefined} onChange={(event) => { setPassword(event.target.value); setErrors((current) => ({ ...current, password: undefined })); authStore.clearAuthError() }} />
                   {errors.password && <span className={styles.srOnly} id={`${id}-password-error`}>{errors.password}</span>}
                 </div>
                 <button className={styles.primary} type="submit" disabled={busy}>{submitting ? '正在登录…' : '登录并进入配置'}<span aria-hidden="true">{submitting ? '· · ·' : '↗'}</span></button>
               </form>}
-        <p className={styles.footnote}>留一点空间，给新的灵感。</p>
       </section>
     </div>
   </dialog>

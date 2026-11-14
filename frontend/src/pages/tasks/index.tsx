@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Empty, Form, Input, Modal, Spin, Tag, message } from 'antd'
+import { Alert, Button, Empty, Form, Input, Modal, Spin, message } from 'antd'
 import { observer } from 'mobx-react-lite'
 import { AuthModal } from '../../components/auth-modal'
 import { authStore } from '../../store/auth'
@@ -51,11 +51,7 @@ export const TasksPage = observer(function TasksPage() {
 
       <main className={styles.main}>
         <div className={styles.intro}>
-          <p className={styles.eyebrow}>{authStore.user ? '留一点空间，给重要的事' : '从小事开始，慢慢向前'}</p>
-          <h1>从一条任务开始。</h1>
-          <p className={styles.description}>
-            {authStore.user ? '记录想做的事，专注下一步。你的任务仅自己可见。' : '先看看示例，登录后拥有一份属于自己的任务清单。'}
-          </p>
+          <h1>{authStore.user ? '我的任务' : '任务清单'}</h1>
         </div>
 
         {authStore.logoutError && (
@@ -158,16 +154,15 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
     <>
       {contextHolder}
       <section className={styles.statsPanel} aria-labelledby="stats-heading">
-        <div>
-          <h2 id="stats-heading" className={styles.statsHeading}>{guest ? '示例任务' : '我的任务'}</h2>
+        <div className={styles.statsTotal}>
+          <h2 id="stats-heading" className={styles.statsHeading}>任务总数</h2>
           <div className={styles.statsValue} aria-live="polite">
             {tasksStore.statsLoading ? '…' : tasksStore.stats?.total ?? '—'}
             <span>条</span>
           </div>
         </div>
         <div className={styles.statsDescription}>
-          <Tag color={guest ? 'default' : 'green'}>{guest ? '只读预览' : '仅你可见'}</Tag>
-          <p>{guest ? '示例不会加入你的个人清单' : '创建、删除后自动更新统计'}</p>
+          <span>{guest ? '示例 · 只读' : '仅你可见'}</span>
         </div>
         {tasksStore.statsError && (
           <Alert
@@ -185,9 +180,6 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
           <div className={styles.panelHeader}>
             <div className={styles.headingRow}>
               <h2 id="tasks-heading">{guest ? '示例任务' : '任务列表'}</h2>
-              <span className={styles.count} aria-label={`共 ${tasksStore.tasks.length} 条任务`}>
-                {tasksStore.tasks.length}
-              </span>
             </div>
             <Button onClick={() => void tasksStore.refresh()} loading={refreshing} disabled={busy}>刷新列表</Button>
           </div>
@@ -221,13 +213,11 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
               )}
             </div>
           </Spin>
-          <div className={styles.panelFooter}>{guest ? '登录后，即可创建和管理自己的任务。' : '每一个小小的开始，都算数。'}</div>
         </section>
 
         <section className={`${styles.panel} ${styles.createPanel}`} aria-labelledby="create-heading">
           <div className={styles.panelHeader}><h2 id="create-heading">创建任务</h2></div>
           <div className={styles.formBody}>
-            <p className={styles.formDescription}>下一步，你想完成什么？</p>
             <Form name="create-task" form={form} layout="vertical" onFinish={(values) => void handleCreate(values)} requiredMark={false} disabled={busy}>
               <Form.Item name="title" label="任务标题" rules={[
                 { required: true, whitespace: true, message: '请输入任务标题' },
@@ -244,9 +234,8 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
                 size="large"
                 loading={tasksStore.creating}
                 disabled={refreshing || busy}
-              >创建任务</Button>
+              >{guest ? '登录后创建' : '创建任务'}</Button>
             </Form>
-            <p className={styles.hint}>{guest ? '登录已有账号后开始记录，示例内容保持不变。' : '任务会自动保存，下次登录可以继续。'}</p>
           </div>
         </section>
       </div>
@@ -271,7 +260,7 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
             { required: true, whitespace: true, message: '请输入任务标题' },
             { max: 120, message: '任务标题最多 120 个字符' },
           ]}>
-            <Input maxLength={120} showCount autoComplete="off" />
+            <Input maxLength={120} showCount autoComplete="off" size="large" />
           </Form.Item>
           {tasksStore.editError && <Alert type="error" showIcon title="任务编辑失败" description={tasksStore.editError} />}
         </Form>

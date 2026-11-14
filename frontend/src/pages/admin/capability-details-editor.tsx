@@ -55,7 +55,7 @@ const CompanyEditor = observer(function CompanyEditor() {
     <p className={styles.hint}>介绍你的真实工作经历。留空时，官网显示尚未填写。</p>
     <DetailField label="公司名称" value={company.name} limit={80} onChange={value => store.edit(draft => { draft.capabilityDetails.company.name = value })} />
     <DetailField label="公司简介摘要" value={company.summary} limit={300} multiline onChange={value => store.edit(draft => { draft.capabilityDetails.company.summary = value })} />
-    {markdownFields.map(({ key, label }) => <DetailField key={key} label={`${label} · Markdown`} value={company[key]} limit={10000} multiline markdown marker={key} uploadTarget={{ type: 'company', field: key }} onChange={value => store.edit(draft => { draft.capabilityDetails.company[key] = value })} hint="支持标题、列表、表格、代码块、链接与图片" />)}
+    {markdownFields.map(({ key, label }) => <DetailField key={key} label={`${label} · Markdown`} value={company[key]} limit={10000} multiline markdown marker={key} uploadTarget={{ type: 'company', field: key }} onChange={value => store.edit(draft => { draft.capabilityDetails.company[key] = value })} />)}
   </div>
 })
 
@@ -86,7 +86,7 @@ const ProjectsEditor = observer(function ProjectsEditor({ projectId, onProjectCh
     onProjectChange(next)
   }
   return <div className={styles.details}>
-    <div className={styles.projectHeading}><p className={styles.hint}>项目顺序即官网目录顺序。隐藏后仍保留在草稿中。</p><span>{projects.length} / {MAX_COMPANY_PROJECTS}</span></div>
+    <div className={styles.projectHeading}><p className={styles.hint}>项目目录</p><span>{projects.length} / {MAX_COMPANY_PROJECTS}</span></div>
     {projects.length > 0 && <nav className={styles.projectList} aria-label="选择公司项目">{projects.map((project, index) => <button key={project.id} type="button" aria-pressed={selected?.id === project.id} onClick={() => onProjectChange(project.id)}><span>{String(index + 1).padStart(2, '0')}</span><strong>{project.name.trim() || '未命名项目'}</strong><small>{project.visible ? '公开' : '隐藏'}</small></button>)}</nav>}
     {selected ? <section className={styles.projectEditor} aria-label="当前公司项目">
       <div className={styles.projectActions}>
@@ -98,9 +98,9 @@ const ProjectsEditor = observer(function ProjectsEditor({ projectId, onProjectCh
       <DetailField label="项目简介" value={selected.summary} limit={300} multiline onChange={value => store.edit(draft => { const project = draft.capabilityDetails.projects.find(item => item.id === selected.id); if (project) project.summary = value })} />
       <DetailField label="封面 URL" value={selected.coverUrl} limit={2048} marker={`cover:${selected.id}`} uploadTarget={{ type: 'cover', projectId: selected.id }} invalid={!isSafeSiteUrl(selected.coverUrl, 'image')} hint={isSafeSiteUrl(selected.coverUrl, 'image') ? '可留空；填写 HTTP/HTTPS 图片地址或已有本站图片路径' : '请输入安全的 HTTP/HTTPS 图片地址或已有本站图片路径'} onChange={value => store.edit(draft => { const project = draft.capabilityDetails.projects.find(item => item.id === selected.id); if (project) project.coverUrl = value })} />
       <Toggle label="公开这个项目" checked={selected.visible} onChange={value => store.edit(draft => { const project = draft.capabilityDetails.projects.find(item => item.id === selected.id); if (project) project.visible = value })} hint="关闭后，访客与公开预览均不展示这个项目。" />
-      <DetailField label="项目正文 · Markdown" value={selected.content} limit={20000} multiline markdown uploadTarget={{ type: 'project', projectId: selected.id }} onChange={value => store.edit(draft => { const project = draft.capabilityDetails.projects.find(item => item.id === selected.id); if (project) project.content = value })} hint="可用标题组织业务背景、负责模块、技术栈、难点与贡献" />
+      <DetailField label="项目正文 · Markdown" value={selected.content} limit={20000} multiline markdown uploadTarget={{ type: 'project', projectId: selected.id }} onChange={value => store.edit(draft => { const project = draft.capabilityDetails.projects.find(item => item.id === selected.id); if (project) project.content = value })} />
       <button type="button" className={styles.outlineButton} disabled={!store.canEdit || Boolean(selected.content)} onClick={() => store.edit(draft => { const project = draft.capabilityDetails.projects.find(item => item.id === selected.id); if (project && !project.content) project.content = '## 业务背景\n\n## 负责模块\n\n## 技术栈\n\n## 难点与解决\n\n## 我的贡献\n' })}>插入正文结构</button>
-    </section> : <p className={styles.empty}>还没有公司项目。添加后可以编写真实的工程经历。</p>}
+    </section> : <p className={styles.empty}>暂无公司项目</p>}
     <button type="button" className={styles.addButton} disabled={!store.canEdit || full} onClick={add}>＋ 添加公司项目</button>
     {full && <p className={styles.hint}>已达 {MAX_COMPANY_PROJECTS} 项，删除一项后可继续添加。</p>}
   </div>

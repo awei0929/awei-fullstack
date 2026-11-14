@@ -50,7 +50,6 @@ export const AuthModal = observer(function AuthModal({ open, reason, onClose }: 
       keyboard={!submitting}
       forceRender
     >
-      <p style={{ color: '#758077', lineHeight: 1.8 }}>登录后，创建并管理只属于你的任务。</p>
       {reason && <Alert type="info" showIcon title={reason} style={{ marginBottom: 20 }} />}
       {contextHolder}
       {waitingForLogout && <p role="status" style={{ color: '#758077' }}>正在完成退出，请稍候再登录…</p>}

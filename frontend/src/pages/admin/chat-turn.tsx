@@ -5,7 +5,7 @@ import { MemorySaveButton } from './chat-memory-panel'
 import type { ChatStatus, ChatTurn } from '../../types/chat'
 import styles from './chat-panel.module.less'
 
-const statuses: Record<ChatStatus, string> = { streaming: '正在生成', completed: '已完成', canceled: '已停止', failed: '生成失败', interrupted: '连接中断' }
+const statuses: Record<Exclude<ChatStatus, 'completed'>, string> = { streaming: '正在生成', canceled: '已停止', failed: '生成失败', interrupted: '连接中断' }
 
 // 每轮只订阅自己的正文；活动回复增量不会重新解析已完成回复。
 export const ChatTurnCard = observer(function ChatTurnCard({ turn, busy, onEdit }: { turn: ChatTurn; busy: boolean; onEdit: (turn: ChatTurn) => void }) {
@@ -17,8 +17,8 @@ export const ChatTurnCard = observer(function ChatTurnCard({ turn, busy, onEdit 
     <div className={styles.answer}>
       <div className={styles.answerHeader}>
         <span className={styles.assistantAvatar} aria-hidden="true">H<span>.</span></span>
-        <div className={styles.assistantIdentity}><strong>HEY. 助手</strong><span title={turn.modelLabel}>{turn.modelLabel}</span></div>
-        <span className={`${styles.turnStatus} ${turn.status === 'streaming' ? styles.streamingStatus : ''} ${turn.status === 'failed' || turn.status === 'interrupted' ? styles.failureStatus : ''}`}><i aria-hidden="true" />{turn.status === 'streaming' && !turn.answer ? '等待回复' : statuses[turn.status]}</span>
+        <div className={styles.assistantIdentity}><strong title={turn.modelLabel}>{turn.modelLabel}</strong></div>
+        {turn.status !== 'completed' && <span className={`${styles.turnStatus} ${turn.status === 'streaming' ? styles.streamingStatus : ''} ${turn.status === 'failed' || turn.status === 'interrupted' ? styles.failureStatus : ''}`}><i aria-hidden="true" />{turn.status === 'streaming' && !turn.answer ? '等待回复' : statuses[turn.status]}</span>}
       </div>
       {turn.modelId !== turn.requestedModelId && <p className={styles.fallbackNotice}>因限流自动切换自 {turn.requestedModelLabel}</p>}
       <div className={styles.answerBody}>

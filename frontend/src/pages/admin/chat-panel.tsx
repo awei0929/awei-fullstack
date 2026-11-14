@@ -112,7 +112,6 @@ export const ChatPanel = observer(function ChatPanel() {
       <nav className={styles.historyList} aria-label="历史会话">
         {store.loading && !store.conversations.length ? <p className={styles.historyEmpty}>正在读取历史…</p> : conversations.length ? conversations.map(item => <button key={item.id} type="button" className={`${styles.historyItem} ${item.id === selected ? styles.selectedConversation : ''}`} aria-current={item.id === selected ? 'true' : undefined} disabled={store.creating || store.forbidden} onClick={() => void selectConversation(item.id)}><span><strong>{item.title}</strong><time dateTime={item.updatedAt}>{dateLabel(item.updatedAt)} 更新</time></span></button>) : <p className={styles.historyEmpty}>{search.trim() ? '没有找到相关对话' : '新的想法，会留在这里'}</p>}
       </nav>
-      <p className={styles.historyFootnote}><span aria-hidden="true">HEY.</span>私人的想法，慢慢整理</p>
     </>
   }
 
@@ -122,7 +121,7 @@ export const ChatPanel = observer(function ChatPanel() {
     <div className={styles.conversation}>
       <header className={styles.threadHeader}>
         <button type="button" className={styles.historyToggle} aria-label="打开历史对话" aria-haspopup="dialog" aria-expanded={historyOpen} onClick={() => setHistoryOpen(true)}><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 4h14v12H3zM8 4v12" stroke="currentColor" strokeWidth="1.5" /></svg><span>历史</span></button>
-        <div className={styles.threadTitle}><h2 title={conversation?.title}>{conversation?.title ?? '新对话'}</h2><p>{store.loadingConversation ? '正在读取…' : '仅站主可见 · 自动保存'}</p></div>
+        <div className={styles.threadTitle}><h2 title={conversation?.title}>{conversation?.title ?? '新对话'}</h2>{store.loadingConversation && <p>正在读取…</p>}</div>
         <div className={styles.threadActions}>
           <ChatMemoryPanel />
           <Button className={styles.refreshButton} aria-label="刷新对话" title="刷新对话" disabled={store.busy || store.loadingConversation} loading={store.loading} onClick={() => void store.refresh()}><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M16 7a6 6 0 1 0 0 6M16 3v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></Button>
@@ -138,9 +137,8 @@ export const ChatPanel = observer(function ChatPanel() {
         <div ref={messagesRef} className={styles.messages} aria-label="对话消息" tabIndex={0} onScroll={() => { const area = messagesRef.current; if (area) { const nearEnd = isNearConversationEnd(area); followOutput.current = nearEnd; setShowLatest(!nearEnd) } }}>
           <div ref={contentRef} className={styles.messageContent}>{store.loadingConversation ? <div className={styles.empty}><Spin /><p>正在读取会话…</p></div>
             : !store.turns.length ? <div className={styles.empty}>
-              <p className={styles.emptyEyebrow}><span aria-hidden="true">HEY.</span> 私人写作台</p><h2>让脑海里的想法<br />在这里有个着落</h2><p>写一段更像你的介绍，梳理一个项目，<br className={styles.emptyBreak} />或把技术问题聊清楚</p>
-              <div className={styles.suggestions}>{suggestions.map(item => <button key={item.title} type="button" disabled={store.busy || store.forbidden} onClick={() => { store.setDraft(item.draft); focusInput() }}><strong>{item.title}<span aria-hidden="true">↗</span></strong><span>{item.description}</span></button>)}</div>
-              <p className={styles.suggestionHint}>选择一个方向，编辑后再发送</p>
+              <h2>从一个想法开始</h2>
+              <div className={styles.suggestions}>{suggestions.map(item => <button key={item.title} type="button" disabled={store.busy || store.forbidden} onClick={() => { store.setDraft(item.draft); focusInput() }}><strong>{item.title}</strong><span>{item.description}</span></button>)}</div>
             </div>
               : <div className={styles.messageColumn}>{store.turns.map(turn => <ChatTurnCard key={turn.requestId} turn={turn} busy={store.busy} onEdit={editTurn} />)}</div>}</div>
         </div>
@@ -157,9 +155,9 @@ export const ChatPanel = observer(function ChatPanel() {
             <span className={styles.srOnly} role="status" aria-live="polite">{store.stopping ? '正在停止…' : generating ? '正在生成回复…' : ''}</span>
             {generating ? <Button className={styles.stopButton} loading={store.stopping} disabled={store.stopping} onClick={() => void store.stop()}>停止生成</Button> : <Button className={styles.sendButton} type="primary" htmlType="submit" disabled={!store.canSend}>发送<span aria-hidden="true"> ↑</span></Button>}
           </div>
-          {fallbackModel && <p className={styles.fallbackHint}>繁忙时将尝试免费备用 {fallbackModel.label}</p>}
+          {fallbackModel && <p className={styles.fallbackHint}>繁忙时自动尝试 {fallbackModel.label}（免费）</p>}
         </div>
-        <div className={styles.composerFootnote}><p id="chat-input-hint"><span>Enter 换行</span><span>Ctrl / ⌘ + Enter 发送</span></p><span className={count > 4000 ? styles.overLimit : ''}>{count} / 4000</span></div>
+        <div className={styles.composerFootnote}><p id="chat-input-hint"><span className={styles.srOnly}>Enter 换行，</span>Ctrl / ⌘ + Enter 发送</p><span className={count > 4000 ? styles.overLimit : count >= 3600 ? styles.nearLimit : ''} aria-label={`${count} / 4000 字`}>{count} / 4000</span></div>
       </form>
     </div>
   </section></ConfigProvider>

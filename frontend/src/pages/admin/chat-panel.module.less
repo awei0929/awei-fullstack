@@ -95,7 +95,7 @@
 .fallbackHint { color: @muted; font-size: 11px; line-height: 1.6; margin: 8px 0 0; overflow-wrap: anywhere; }
 .composerFootnote { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: @muted; font-size: 11px; line-height: 20px; font-variant-numeric: tabular-nums; }
 .composerFootnote p { margin: 0; }
-.composerFootnote > span { white-space: nowrap; }
+.composerFootnote > span { margin-left: auto; white-space: nowrap; }
 .overLimit, .limit { color: #a04b32; }
 .nearLimit { color: @secondary; font-weight: 500; }
 .limit { font-size: 12px; margin-block: 0; }
@@ -104,7 +104,7 @@
 .historyDialog { color: @ink; background: #eeefe9; border: 0; border-right: 1px solid @line; width: min(320px, calc(100vw - 32px)); max-width: none; height: 100dvh; max-height: 100dvh; margin: 0; padding: 24px 16px; font-family: inherit; }
 .historyDialog[open] { display: flex; flex-direction: column; }
 .historyDialog::backdrop { background: #20251d80; }
-.closeHistory { padding: 8px; margin: -8px -8px -8px auto; color: @secondary; border: 0; background: none; font-size: 13px; cursor: pointer; }
+.closeHistory { min-width: 44px; min-height: 44px; padding: 8px; margin: -8px -8px -8px auto; color: @secondary; border: 0; background: none; font-size: 13px; cursor: pointer; }
 .historyDialog button { cursor: pointer; }
 .historyDialog :focus-visible { outline: 2px solid @olive; outline-offset: 2px; }
 
@@ -156,5 +156,8 @@
   .suggestions strong { min-width: 60px; }
   .answerHeader { flex-wrap: wrap; }
   .turnStatus { font-size: 10px; }
+}
+@media (hover: none), (pointer: coarse), (max-width: 760px) {
+  .keyboardHint { .srOnly(); }
 }
 @media (prefers-reduced-motion: reduce) { .panel *, .historyDialog * { transition: none !important; } }

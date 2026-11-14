@@ -33,7 +33,7 @@
 
 .dialog .tipViewport { position: sticky; z-index: 8; top: 14px; right: auto; left: auto; width: calc(100% - 92px); height: 0; margin: 0 auto; }
 .panel { position: relative; display: grid; grid-template-columns: .93fr 1fr; min-height: 480px; overflow: hidden; isolation: isolate; }
-.close { position: absolute; z-index: 4; right: 19px; top: 18px; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid #ead8b247; border-radius: 50%; background: #17201024; color: @cream; transition: background 180ms, transform 180ms; span { font-size: 25px; line-height: 1; font-weight: 300; margin-top: -2px; } &:hover:not(:disabled) { background: #f7e7bd17; transform: rotate(90deg); } }
+.close { position: absolute; z-index: 4; right: 19px; top: 18px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid #ead8b247; border-radius: 50%; background: #17201024; color: @cream; transition: background 180ms, transform 180ms; span { font-size: 25px; line-height: 1; font-weight: 300; margin-top: -2px; } &:hover:not(:disabled) { background: #f7e7bd17; transform: rotate(90deg); } }
 .stage { position: relative; overflow: hidden; min-width: 0; border-right: 1px solid #e3cfa626; background: radial-gradient(ellipse at 46% 56%, #bdab735e, #626c3d33 56%, #343e2726 90%); > img { position: absolute; z-index: 2; width: 118%; height: 104%; max-width: none; left: -9%; bottom: -9%; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 18px 20px #1b221e59); } &::after { content: ''; position: absolute; z-index: 3; inset: 75% 0 0; background: linear-gradient(transparent, #3d442dc4); pointer-events: none; } }
 .stageTitle { position: absolute; top: 76px; left: 33px; font-family: Impact, 'Arial Narrow', sans-serif; font-size: 49px; line-height: .98; letter-spacing: -.025em; opacity: .75; > span { color: #f7cc82; } }
 .orbit { position: absolute; width: 83%; aspect-ratio: 1; left: 8%; bottom: 39px; border: 1px solid #efdaac2b; border-radius: 50%; box-shadow: 0 0 0 30px #f3d7a008, 0 0 0 60px #f3d7a006; }
@@ -59,18 +59,13 @@
 @media (max-width: 720px) {
   .dialog { width: min(490px, calc(100vw - 28px)); max-height: calc(100dvh - 28px); border-radius: 18px; }
   .panel { grid-template-columns: 1fr; min-height: 0; }
-  .stage { height: 126px; border-right: 0; border-bottom: 1px solid #e3cfa626; background: radial-gradient(ellipse at 75% 65%, #bdab7366, #626c3d22 65%); > img { width: 182px; height: 225px; bottom: -88px; left: auto; right: 21px; object-position: center; } &::after { inset: 70% 0 0; } }
-  .stageTitle { top: 30px; left: 24px; font-size: 23px; line-height: .95; }
-  .orbit, .spark { display: none; }
-  .content { padding: 28px 27px; h2 { font-size: 29px; } }
-  .close { width: 30px; height: 30px; right: 13px; top: 13px; background: #343f28b3; }
+  .stage { display: none; }
+  .content { padding: 36px 27px 28px; h2 { padding-right: 32px; font-size: 29px; } }
+  .close { right: 13px; top: 13px; background: #343f28b3; }
   .description { margin-top: 9px !important; }
   .form, .state { margin-top: 22px; }
   .field { margin-top: 16px; > input { font-size: 16px; height: 47px; } }
   .form > .primary { margin-top: 23px; }
+  .secondary { min-height: 44px; }
   .waiting { min-height: 155px; }
-}
-@media (max-height: 620px) and (max-width: 720px) {
-  .stage { display: none; }
-  .content { padding-top: 36px; }
 }

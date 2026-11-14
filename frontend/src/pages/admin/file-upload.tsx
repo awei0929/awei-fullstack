@@ -8,7 +8,7 @@ import { Group } from './fields'
 import styles from './file-upload.module.less'
 
 // oxlint-disable-next-line react/only-export-components -- MobX 包装的复用上传结果组件。
-export const FileUploadResult = observer(function FileUploadResult({ targetKey }: { targetKey?: string }) {
+export const FileUploadResult = observer(function FileUploadResult({ targetKey, showSaveHint = true }: { targetKey?: string; showSaveHint?: boolean }) {
   const id = useId()
   const result = store.lastFileUpload
   if (!result || (targetKey && result.targetKey !== targetKey)) return null
@@ -18,12 +18,12 @@ export const FileUploadResult = observer(function FileUploadResult({ targetKey }
     <textarea id={`${id}-url`} readOnly value={result.asset.url} rows={2} spellCheck={false} onFocus={event => event.target.select()} />
     <label htmlFor={`${id}-markdown`}>Markdown</label>
     <textarea id={`${id}-markdown`} readOnly value={result.markdown} rows={3} spellCheck={false} onFocus={event => event.target.select()} />
-    <small>文件已公开，页面引用需保存后生效</small>
+    {showSaveHint && <small>页面引用需保存后生效</small>}
   </div>
 })
 
 // oxlint-disable-next-line react/only-export-components -- MobX 包装的复用上传控件。
-export const FileUploadControl = observer(function FileUploadControl({ target, mode = 'markdown', showResult = true }: { target: SiteFileUploadTarget; mode?: 'all' | 'image' | 'markdown'; showResult?: boolean }) {
+export const FileUploadControl = observer(function FileUploadControl({ target, mode = 'markdown', showResult = true, showPublicNotice = true }: { target: SiteFileUploadTarget; mode?: 'all' | 'image' | 'markdown'; showResult?: boolean; showPublicNotice?: boolean }) {
   const key = siteFileUploadKey(target)
   const uploading = store.uploadingFile && store.fileUploadTarget === key
   const error = store.fileUploadTarget === key ? store.fileUploadError : ''
@@ -40,7 +40,7 @@ export const FileUploadControl = observer(function FileUploadControl({ target, m
         if (file) void store.uploadFile(file, target, button.kind)
       }} />
     </label>)}</div>
-    <small>{mode === 'image' ? '图片最大 5 MiB' : '图片最大 5 MiB，附件最大 20 MiB'}；上传后可公开访问。{mode === 'markdown' && '成功后追加到这段正文末尾。'}</small>
+    <small>{mode === 'image' ? '图片最大 5 MiB' : '图片最大 5 MiB，附件最大 20 MiB'}。{showPublicNotice && '上传后可公开访问。'}{mode === 'markdown' && '成功后追加到这段正文末尾。'}</small>
     {uploading && <progress aria-label="文件上传中" />}
     {error && <p className={styles.error} role="alert">{error}</p>}
     {showResult && <FileUploadResult targetKey={key} />}
@@ -50,8 +50,8 @@ export const FileUploadControl = observer(function FileUploadControl({ target, m
 export function FileUploadsEditor() {
   return <Group title="上传图片与附件" description="文件上传后即可凭链接公开访问；隐藏项目或移除引用不会让文件变私密。">
     <p className={styles.formats}>图片：JPG、PNG、WebP<br />附件：PDF、ZIP、TXT、DOCX、XLSX、PPTX</p>
-    <FileUploadControl target={{ type: 'library' }} mode="all" showResult={false} />
-    <FileUploadResult />
+    <FileUploadControl target={{ type: 'library' }} mode="all" showResult={false} showPublicNotice={false} />
+    <FileUploadResult showSaveHint={false} />
     <p className={styles.formats}>复制上传后的地址到所需字段，保存后生效。</p>
   </Group>
 }

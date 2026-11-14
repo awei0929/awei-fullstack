@@ -39,7 +39,6 @@ export const Editors = observer(function Editors({ section, capabilityTab, onCap
       </Group>
     </>
     case 'appearance': return <>
-      <Group title="空间风格"><div className={styles.palette}><span /><span /><span /><span /></div><h3>橄榄舞台 / 奶油文字 / 暖橙点缀</h3></Group>
       <Group title="交互效果"><Toggle label="轻量动效" checked={content.appearance.motion} onChange={(value) => store.edit((draft) => { draft.appearance.motion = value })} hint="控制场景过渡与背景回应。" /><p className={styles.hint}>遵循访客设备的「减少动态效果」设置</p></Group>
       <Group title="背景音乐" description="访客点击后播放，后台预览静音">
         <TextField label="音乐名称" value={content.music.title} onChange={(value) => store.edit((draft) => { draft.music.title = value })} maxLength={80} placeholder="可留空" />

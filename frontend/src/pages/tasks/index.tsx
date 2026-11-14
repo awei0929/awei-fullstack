@@ -176,7 +176,31 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
       </section>
 
       <div className={styles.workspace}>
-        <section className={styles.panel} aria-labelledby="tasks-heading">
+        <section className={`${styles.panel} ${styles.createPanel}`} aria-labelledby="create-heading">
+          <div className={styles.panelHeader}><h2 id="create-heading">创建任务</h2></div>
+          <div className={styles.formBody}>
+            <Form name="create-task" form={form} layout="vertical" onFinish={(values) => void handleCreate(values)} requiredMark={false} disabled={busy}>
+              <Form.Item name="title" label="任务标题" rules={[
+                { required: true, whitespace: true, message: '请输入任务标题' },
+                { max: 120, message: '任务标题最多 120 个字符' },
+              ]}>
+                <Input placeholder="例如：读完一直想看的那本书" maxLength={120} showCount autoComplete="off" size="large" />
+              </Form.Item>
+              {tasksStore.createError && <Alert type="error" showIcon title={tasksStore.createError} className={styles.alert} />}
+              <Button
+                type="primary"
+                htmlType={guest ? 'button' : 'submit'}
+                onClick={guest ? requestLogin : undefined}
+                block
+                size="large"
+                loading={tasksStore.creating}
+                disabled={refreshing || busy}
+              >{guest ? '登录后创建' : '创建任务'}</Button>
+            </Form>
+          </div>
+        </section>
+
+        <section className={`${styles.panel} ${styles.listPanel}`} aria-labelledby="tasks-heading">
           <div className={styles.panelHeader}>
             <div className={styles.headingRow}>
               <h2 id="tasks-heading">{guest ? '示例任务' : '任务列表'}</h2>
@@ -214,33 +238,10 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
             </div>
           </Spin>
         </section>
-
-        <section className={`${styles.panel} ${styles.createPanel}`} aria-labelledby="create-heading">
-          <div className={styles.panelHeader}><h2 id="create-heading">创建任务</h2></div>
-          <div className={styles.formBody}>
-            <Form name="create-task" form={form} layout="vertical" onFinish={(values) => void handleCreate(values)} requiredMark={false} disabled={busy}>
-              <Form.Item name="title" label="任务标题" rules={[
-                { required: true, whitespace: true, message: '请输入任务标题' },
-                { max: 120, message: '任务标题最多 120 个字符' },
-              ]}>
-                <Input placeholder="例如：读完一直想看的那本书" maxLength={120} showCount autoComplete="off" size="large" />
-              </Form.Item>
-              {tasksStore.createError && <Alert type="error" showIcon title={tasksStore.createError} className={styles.alert} />}
-              <Button
-                type="primary"
-                htmlType={guest ? 'button' : 'submit'}
-                onClick={guest ? requestLogin : undefined}
-                block
-                size="large"
-                loading={tasksStore.creating}
-                disabled={refreshing || busy}
-              >{guest ? '登录后创建' : '创建任务'}</Button>
-            </Form>
-          </div>
-        </section>
       </div>
 
       <Modal
+        className={styles.taskModal}
         title="编辑任务"
         open={editingTask !== null}
         onCancel={closeEdit}
@@ -267,6 +268,7 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
       </Modal>
 
       <Modal
+        className={styles.taskModal}
         title="删除任务"
         open={deletingTask !== null}
         onCancel={closeDelete}

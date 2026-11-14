@@ -96,7 +96,6 @@ export const SiteExperience = observer(function SiteExperience({ content, previe
   const [capabilityFailed, setCapabilityFailed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
-  const [previewPanelTop, setPreviewPanelTop] = useState(20)
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const contactLinks = content.contact.links.filter((link) => link.url && isSafeSiteUrl(link.url))
   const contactEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(content.contact.email) ? content.contact.email : ''
@@ -184,7 +183,6 @@ export const SiteExperience = observer(function SiteExperience({ content, previe
     const origin = returnFocusRef.current?.getBoundingClientRect()
     detailOriginRef.current = origin ? { x: origin.left + origin.width / 2, y: origin.top + origin.height / 2 } : null
     setMenuOpen(false)
-    if (preview) setPreviewPanelTop((rootRef.current?.scrollTop ?? 0) + 20)
     if (!preview) window.history.pushState({ ...window.history.state, sitePanelOwner: historyOwner }, '', panelUrl(next))
     setPanel(next)
   }
@@ -282,7 +280,7 @@ export const SiteExperience = observer(function SiteExperience({ content, previe
           <div className={styles.heroPortrait}><div className={styles.wavingPortrait} data-capability-motion="wave"><Character /></div></div>
           <div className={styles.capabilityScene} ref={node => { node?.toggleAttribute('inert', !capabilities || switching) }} aria-hidden={!capabilities || switching}>
             <div className={styles.capabilityLight} data-capability-motion="light" aria-hidden="true" />
-            <div className={styles.capabilityCopy} data-capability-motion="copy"><p className={styles.eyebrow}>MY CAPABILITIES.</p><h2 ref={capabilityHeadingRef} tabIndex={-1} id={`${instanceId}-capabilities`}>我的能力</h2><h3>AI 驱动的全栈开发者</h3><p>融合 AI 与工程能力，关注从需求分析、前后端开发到部署落地的完整实现过程。</p></div>
+            <div className={styles.capabilityCopy} data-capability-motion="copy"><h2 ref={capabilityHeadingRef} tabIndex={-1} id={`${instanceId}-capabilities`}>我的能力</h2><h3>AI 驱动的全栈开发者</h3></div>
             <svg className={styles.capabilityOrbit} data-orbit-overlay aria-hidden="true" focusable="false">
               <defs>
                 <filter id={`${instanceId}-orbit-silhouette`} colorInterpolationFilters="sRGB">
@@ -327,7 +325,7 @@ export const SiteExperience = observer(function SiteExperience({ content, previe
 
     </main>
 
-    {panel && <dialog ref={dialogRef} data-kind={panel.kind} className={panel.kind === 'about' || panel.kind === 'contact' ? styles.readingDialog : detailStyles.dialog} style={preview && (panel.kind === 'about' || panel.kind === 'contact') ? { top: previewPanelTop } : undefined} aria-labelledby={`${instanceId}-panel-title`} onCancel={(event) => { event.preventDefault(); closePanel() }} onKeyDown={(event) => { if (preview && event.key === 'Escape') { event.preventDefault(); closePanel() } }} onClick={(event) => {
+    {panel && <dialog ref={dialogRef} data-kind={panel.kind} className={panel.kind === 'about' || panel.kind === 'contact' ? styles.readingDialog : detailStyles.dialog} aria-labelledby={`${instanceId}-panel-title`} onCancel={(event) => { event.preventDefault(); closePanel() }} onKeyDown={(event) => { if (preview && event.key === 'Escape') { event.preventDefault(); closePanel() } }} onClick={(event) => {
       if (event.target !== event.currentTarget) return
       const bounds = event.currentTarget.getBoundingClientRect()
       // 实底详情的padding也是阅读区，只有真正位于外部的背景点击才关闭。
@@ -336,7 +334,7 @@ export const SiteExperience = observer(function SiteExperience({ content, previe
       {panel.kind !== 'about' && panel.kind !== 'contact' ? <><button ref={closeRef} type="button" className={detailStyles.close} aria-label="关闭能力详情" onClick={closePanel}>×</button>{content === welcomeContent && (loading || error) ? <div className={detailStyles.empty} role={error ? 'alert' : 'status'}><h2 id={`${instanceId}-panel-title`}>{error ? '内容暂时无法读取' : '正在打开这份内容'}</h2><p>{error || '请稍等，内容正在加载。'}</p>{error && onRetry && <button type="button" className={detailStyles.retry} disabled={loading} onClick={onRetry}>{loading ? '重试中…' : '重新加载'} ↗</button>}</div> : <CapabilityDetails key={panel.kind} kind={panel.kind} content={content} titleId={`${instanceId}-panel-title`} />}</> : <article className={styles.readingPaper}>
         <header className={styles.readingHeader}><button ref={closeRef} type="button" onClick={closePanel}><Arrow direction="left" />返回浏览</button><button type="button" className={styles.closeButton} aria-label="关闭阅读面板" onClick={closePanel}>×</button></header>
         <div className={styles.readingBody}>
-          {content === welcomeContent && (loading || error) ? <div className={styles.readingEmpty} role={error ? 'alert' : 'status'}><h2 id={`${instanceId}-panel-title`}>{error ? '内容暂时无法读取' : '正在打开这份内容'}</h2><p>{error || '请稍等，内容正在加载。'}</p>{error && onRetry && <button type="button" className={styles.paperLink} disabled={loading} onClick={onRetry}>{loading ? '重试中…' : '重新加载'} <Arrow /></button>}</div> : panel.kind === 'about' ? <div className={styles.personalPanel}><p className={styles.paperEyebrow}>A LITTLE ABOUT ME</p><h2 id={`${instanceId}-panel-title`}>{content.profile.name ? `你好，我是${content.profile.name}` : '很高兴认识你'}</h2>{content.profile.tagline && <p className={styles.personalTagline}>{content.profile.tagline}</p>}<div className={styles.personalBio}>{content.profile.bio ? <p>{content.profile.bio}</p> : <p className={styles.quietText}>个人介绍还未公开。欢迎了解我的能力。</p>}</div><button type="button" className={styles.paperLink} onClick={closePanel}>继续探索 <Arrow /></button></div> : <div className={styles.personalPanel}><p className={styles.paperEyebrow}>LET’S KEEP IN TOUCH</p><h2 id={`${instanceId}-panel-title`}>让对话，从这里开始。</h2>{contactEmail || contactLinks.length ? <div className={styles.contactLinks}>{contactEmail && <a className={styles.emailLink} href={`mailto:${contactEmail}`}>{contactEmail}<Arrow /></a>}{contactLinks.map((link, index) => <ExternalLink key={`${link.url}-${index}`} href={link.url}>{link.label}</ExternalLink>)}</div> : <p className={styles.quietText}>暂未公开联系方式，感谢你的来访。</p>}</div>}
+          {content === welcomeContent && (loading || error) ? <div className={styles.readingEmpty} role={error ? 'alert' : 'status'}><h2 id={`${instanceId}-panel-title`}>{error ? '内容暂时无法读取' : '正在打开这份内容'}</h2><p>{error || '请稍等，内容正在加载。'}</p>{error && onRetry && <button type="button" className={styles.paperLink} disabled={loading} onClick={onRetry}>{loading ? '重试中…' : '重新加载'} <Arrow /></button>}</div> : panel.kind === 'about' ? <div className={styles.personalPanel}><h2 id={`${instanceId}-panel-title`}>{content.profile.name ? `你好，我是${content.profile.name}` : '很高兴认识你'}</h2>{content.profile.tagline && <p className={styles.personalTagline}>{content.profile.tagline}</p>}<div className={styles.personalBio}>{content.profile.bio ? <p>{content.profile.bio}</p> : <p className={styles.quietText}>个人介绍还未公开。欢迎了解我的能力。</p>}</div><button type="button" className={styles.paperLink} onClick={closePanel}>继续探索 <Arrow /></button></div> : <div className={styles.personalPanel}><h2 id={`${instanceId}-panel-title`}>让对话，从这里开始。</h2>{contactEmail || contactLinks.length ? <div className={styles.contactLinks}>{contactEmail && <a className={styles.emailLink} href={`mailto:${contactEmail}`}>{contactEmail}<Arrow /></a>}{contactLinks.map((link, index) => <ExternalLink key={`${link.url}-${index}`} href={link.url}>{link.label}</ExternalLink>)}</div> : <p className={styles.quietText}>暂未公开联系方式，感谢你的来访。</p>}</div>}
         </div>
         <footer className={styles.paperSignature}><span>HEY.</span><i aria-hidden="true">✳</i></footer>
       </article>}

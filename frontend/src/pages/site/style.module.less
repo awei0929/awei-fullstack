@@ -51,7 +51,8 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 5;
+  // Keep the entire navigation above the capability cards, including after scrolling.
+  z-index: 10;
   height: 108px;
   display: flex;
   align-items: center;
@@ -176,10 +177,9 @@
 .readingPaper { position: relative; background: linear-gradient(120deg, #fff5de, #f8e8cb 75%, #ebd2ac); border: 1px solid #fff7e4; border-radius: 20px; box-shadow: inset 0 0 0 5px #fff4d866, 0 15px 45px #0c160b4d; overflow: hidden; &::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .09; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='.5' filter='url(%23n)'/%3E%3C/svg%3E"); } }
 .readingHeader { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 20px 34px; border-bottom: 1px solid #d3b98b66; > button { border: 0; background: transparent; display: flex; align-items: center; gap: 12px; padding: 4px 0; font-size: 12px; } > span { margin-left: auto; font-size: 8px; letter-spacing: 2px; color: #98805b; } .closeButton { justify-content: center; width: 32px; height: 32px; margin-left: 15px; font-size: 28px; line-height: 1; font-weight: 300; } }
 .readingBody { padding: 35px 44px 38px; }
-.paperEyebrow { font-size: 12px; font-weight: 600; letter-spacing: 2px; color: #a36c27; line-height: 1.8; > span { color: #9a896c; margin-left: 12px; } }
 .paperLink { display: inline-flex; align-items: center; justify-content: space-between; gap: 25px; min-height: 44px; padding: 11px 24px; color: @ink; background: transparent; border: 1px solid #8f7854; border-radius: 9px; font-size: 13px; letter-spacing: .5px; transition: background .2s; &:hover { background: #dfbb7952; } }
 .paperSignature { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 44px; border-top: 1px solid #cfb58673; > span:first-child { font-weight: 900; letter-spacing: -1px; font-size: 20px; } i { font-size: 25px; color: #c27e24; font-style: normal; } }
-.readingEmpty { padding: 40px 0 60px; min-height: 330px; h2 { margin: 20px 0; font-size: 36px; letter-spacing: -.04em; } > p:not(.paperEyebrow) { margin: 20px 0 30px; font-size: 14px; color: #897550; line-height: 1.9; } }
+.readingEmpty { padding: 40px 0 60px; min-height: 330px; h2 { margin: 20px 0; font-size: 36px; letter-spacing: -.04em; } > p { margin: 20px 0 30px; font-size: 14px; color: #897550; line-height: 1.9; } }
 .personalPanel { min-height: 350px; padding: 20px 0 30px; h2 { margin-top: 20px; font-size: clamp(30px, 4vw, 52px); line-height: 1.3; letter-spacing: -.05em; overflow-wrap: anywhere; } .paperLink { margin-top: 35px; } }
 .personalTagline { font-size: 18px; line-height: 1.8; color: #8b6e43; margin-top: 22px !important; white-space: pre-line; }
 .personalBio { margin-top: 30px; max-width: 720px; p { white-space: pre-wrap; font-size: 15px; line-height: 2; color: #64563e; overflow-wrap: anywhere; } }
@@ -193,7 +193,7 @@
 
 .preview {
   // 独立预览视口与公开页使用同一套场景布局；只限制预览自身的外部滚动。
-  height: 100%; min-height: 0; overflow: clip;
+  height: 100%; min-height: 0; overflow-x: hidden; overflow-y: auto;
 }
 
 @media (max-width: 1050px) {
@@ -210,12 +210,12 @@
 
 @media (max-width: 767px) {
   .header { height: 84px; padding: 0 7%; }
-  .brand { font-size: 29px; }
+  .brand { font-size: 29px; min-width: 44px; min-height: 44px; }
   .contactNav { display: none; }
   .headerActions { display: none; }
   .navigation .mobileOwner { display: flex; align-items: center; gap: 12px; border-top: 1px solid #e7ce982e; margin-top: 5px; color: #f3c276; opacity: 1; small { margin-left: auto; font-size: 9px; opacity: .65; } &:disabled { opacity: .45; } }
-  .menuToggle { display: flex; position: relative; z-index: 8; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: 40px; height: 40px; padding: 5px; background: transparent; border: 0; font-size: 30px; > span { width: 24px; height: 1px; background: @cream; } }
-  .navigation { display: none; position: absolute; top: 72px; left: 6%; right: 6%; z-index: 7; margin: 0; padding: 14px 24px; border: 1px solid #e7ce9840; background: #333a29f5; border-radius: 12px; box-shadow: 0 10px 30px #111a1380; gap: 2px; align-items: stretch; button { text-align: left; padding: 15px 0; font-size: 13px; &[aria-current]::after { left: auto; right: 0; bottom: 50%; } } .mobileContact { display: flex; align-items: center; justify-content: space-between; } }
+  .menuToggle { display: flex; position: relative; z-index: 8; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: 44px; height: 44px; padding: 5px; background: transparent; border: 0; font-size: 30px; > span { width: 24px; height: 1px; background: @cream; } }
+  .navigation { display: none; position: absolute; top: 72px; left: 6%; right: 6%; z-index: 7; margin: 0; padding: 14px 24px; border: 1px solid #e7ce9840; background: #333a29f5; border-radius: 12px; box-shadow: 0 10px 30px #111a1380; gap: 2px; align-items: stretch; button { text-align: left; min-height: 44px; padding: 15px 0; font-size: 13px; &[aria-current]::after { left: auto; right: 0; bottom: 50%; } } .mobileContact { display: flex; align-items: center; justify-content: space-between; } }
   .navigationOpen { display: flex; flex-direction: column; }
   .hero { min-height: 790px; height: 100svh; max-height: 1050px; }
   .heroStage { background: #20291f; }
@@ -227,7 +227,7 @@
   .heroTitle.longTitle { font-size: 36px; max-width: 100%; }
   .heroTitle { font-size: clamp(76px, 19vw, 113px); line-height: .91; margin: 15px 0 18px !important; max-width: 75%; }
   .heroSubtitle { font-size: 14px; letter-spacing: .5px; max-width: 90%; }
-  .exploreButton { position: absolute; top: calc(100svh - 15svh - 210px); left: 0; min-width: 216px; min-height: 56px; margin: 0 !important; padding: 8px 8px 8px 24px; border-radius: 28px; font-size: 15px; gap: 32px; > span { width: 40px; height: 40px; } }
+  .exploreButton { position: relative; min-width: 216px; min-height: 56px; margin: 24px 0 0 !important; padding: 8px 8px 8px 24px; border-radius: 28px; font-size: 15px; gap: 32px; > span { width: 40px; height: 40px; } }
   .heroPortrait { top: auto; left: -15%; width: 130%; height: 59%; bottom: 0; }
   .stageSpark { top: 42%; left: 80%; font-size: 33px; }
   .discover { display: none; }
@@ -237,9 +237,8 @@
   .readingDialog { width: calc(100% - 20px); max-height: calc(100svh - 20px); padding: 0; border-radius: 15px; }
   .readingDialog[open] { animation-name: mobilePaperOpen; animation-duration: .28s; }
   .readingPaper { border-radius: 15px; }
-  .readingHeader { padding: 17px 20px; > span { display: none; } > button { font-size: 12px; gap: 8px; } .closeButton { font-size: 27px; width: 28px; height: 28px; } }
+  .readingHeader { padding: 17px 20px; > span { display: none; } > button { min-height: 44px; font-size: 12px; gap: 8px; } .closeButton { flex-shrink: 0; font-size: 27px; width: 44px; height: 44px; } }
   .readingBody { padding: 27px 23px 30px; }
-  .paperEyebrow { font-size: 12px; letter-spacing: .5px; }
   .paperLink { justify-content: center; gap: 12px; padding: 13px 22px; font-size: 13px; }
   .paperSignature { padding: 17px 23px; gap: 10px; > span:first-child { font-size: 18px; } i { font-size: 20px; } }
   .personalPanel { min-height: 380px; padding-top: 5px; h2 { font-size: 32px; } }
@@ -248,14 +247,9 @@
   .quietText { font-size: 14px; }
   .emailLink { font-size: 21px; gap: 12px; }
   .contactLinks { align-items: stretch; flex-direction: column; .paperLink { justify-content: space-between; } }
-  .readingEmpty { min-height: 360px; h2 { font-size: 30px; line-height: 1.4; } > p:not(.paperEyebrow) { font-size: 14px; } }
+  .readingEmpty { min-height: 360px; h2 { font-size: 30px; line-height: 1.4; } > p { font-size: 14px; } }
 }
 
-@media (max-width: 767px) and (max-height: 790px) {
-  .hero { height: 790px; }
-  .heroCopy { top: 118px; }
-  .exploreButton { top: 500px; }
-}
 
 
 
@@ -322,15 +316,17 @@
 }
 @media(max-width: 767px) {
   .header { position: fixed; background: linear-gradient(#20291fe6, #20291f00); }
-  .hero { min-height: 820px; height: 100svh; max-height: none; }
-  .heroStage { min-height: 820px; }
-  .heroCopy { top: 118px; }
-  .capabilityCopy { top: 118px; left: 8%; width: 84%; h2 { font-size: 42px; margin: 12px 0; } h3 { font-size: 19px; margin-bottom: 12px; } > p:last-child { max-width: 100%; font-size: 14px; line-height: 1.8; } }
+  .hero { min-height: max(640px, 100svh); height: auto; max-height: none; }
+  .heroStage { min-height: max(640px, 100svh); height: auto; }
+  // Content sets the stage height so long greetings cannot overlap the action or footer.
+  .heroCopy { position: relative; top: auto; left: 8%; width: 84%; padding: 104px 0 108px; }
+  .heroStage[data-capability-scene='1'][aria-busy='false'] .heroCopy { height: 0; padding-bottom: 0; overflow: hidden; }
+  .capabilityCopy { top: 104px; left: 8%; width: 84%; h2 { font-size: 42px; margin: 12px 0; } h3 { font-size: 19px; margin-bottom: 12px; } > p:last-child { max-width: 100%; font-size: 14px; line-height: 1.8; } }
   .capabilityPortrait { left: 3%; width: 94%; height: 46%; top: auto; bottom: 160px; }
   .capabilityOrbit { display: none; }
   .heroPortrait { left: 15%; width: 67%; height: auto; aspect-ratio: 1122 / 1402; top: auto; bottom: 160px; }
   .sceneFooter { bottom: 22px; }
-  .heroProgress { gap: 6px; > button { width: 25px; } }
+  .heroProgress { gap: 8px; > button { width: 44px; } }
   .sceneFooter .footerRule { display: none; }
 }
 

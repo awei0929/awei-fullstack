@@ -157,7 +157,7 @@ export const ChatPanel = observer(function ChatPanel() {
           </div>
           {fallbackModel && <p className={styles.fallbackHint}>繁忙时自动尝试 {fallbackModel.label}（免费）</p>}
         </div>
-        <div className={styles.composerFootnote}><p id="chat-input-hint"><span className={styles.srOnly}>Enter 换行，</span>Ctrl / ⌘ + Enter 发送</p><span className={count > 4000 ? styles.overLimit : count >= 3600 ? styles.nearLimit : ''} aria-label={`${count} / 4000 字`}>{count} / 4000</span></div>
+        <div className={styles.composerFootnote}><p id="chat-input-hint" className={styles.keyboardHint}><span className={styles.srOnly}>Enter 换行，</span>Ctrl / ⌘ + Enter 发送</p><span className={count > 4000 ? styles.overLimit : count >= 3600 ? styles.nearLimit : ''} aria-label={`${count} / 4000 字`}>{count} / 4000</span></div>
       </form>
     </div>
   </section></ConfigProvider>

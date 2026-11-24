@@ -2,6 +2,7 @@ import { makeAutoObservable, runInAction } from 'mobx'
 import {
   deleteSiteChatConversation,
   getSiteChatConversation,
+  getSiteChatStatus,
   listSiteChatConversations,
   streamSiteChat,
   type SiteChatConversationSummary,
@@ -16,6 +17,8 @@ export class SiteChatStore {
   conversations: SiteChatConversationSummary[] = []
   activeId: string | null = null
   turns: SiteChatTurn[] = []
+  status: 'loading' | 'ready' | 'closed' | 'error' = 'loading'
+  available = false
   loadingList = false
   loadingConversation = false
   sending = false
@@ -26,6 +29,18 @@ export class SiteChatStore {
 
   constructor() {
     makeAutoObservable<this, 'abort' | 'openVersion' | 'sendVersion'>(this, { abort: false, openVersion: false, sendVersion: false }, { autoBind: true })
+  }
+
+  async loadStatus(): Promise<void> {
+    try {
+      const result = await getSiteChatStatus()
+      runInAction(() => {
+        this.available = result.available
+        this.status = result.enabled ? 'ready' : 'closed'
+      })
+    } catch {
+      runInAction(() => { this.status = 'error' })
+    }
   }
 
   async loadList(): Promise<void> {
@@ -56,6 +71,8 @@ export class SiteChatStore {
     } catch (error) {
       if (version !== this.openVersion) return
       runInAction(() => {
+        this.activeId = null
+        this.turns = []
         this.notice = error instanceof Error && error.message ? error.message : '无法读取这段对话'
       })
     } finally {

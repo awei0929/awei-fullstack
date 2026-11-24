@@ -46,6 +46,9 @@ function iso(value: unknown): string {
 function headers(): Record<string, string> {
   return { 'X-Visitor-Id': getVisitorId() }
 }
+function optionalText(value: unknown): string {
+  return value === null || value === undefined ? '' : text(value)
+}
 function turn(value: unknown): SiteChatTurn {
   const item = record(value)
   if (!UUID_RE.test(text(item.requestId)) || !STATUSES.has(text(item.status) as SiteChatTurnStatus)) return invalid()
@@ -55,7 +58,7 @@ function turn(value: unknown): SiteChatTurn {
     answer: text(item.answer),
     status: text(item.status) as SiteChatTurnStatus,
     modelId: text(item.modelId),
-    error: text(item.error),
+    error: optionalText(item.error),
     createdAt: iso(item.createdAt),
     updatedAt: iso(item.updatedAt),
   }

@@ -10,8 +10,9 @@ export function useSiteChat() {
   const [messages, setMessages] = useState<SiteChatMessage[]>([])
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined)
   const nextId = useRef(1)
-  const conversationId = useRef<string | undefined>(undefined)
+  const conversationRef = useRef<string | undefined>(undefined)
   const busyRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -40,10 +41,13 @@ export function useSiteChat() {
     abortRef.current = controller
     let answer = ''
     try {
-      await streamSiteChat({ message, conversationId: conversationId.current }, controller.signal, text => {
+      await streamSiteChat({ message, conversationId: conversationRef.current }, controller.signal, text => {
         answer += text
         setMessages(current => current.map(item => item.id === assistant.id ? { ...item, content: answer } : item))
-      }, ids => { conversationId.current = ids.conversationId })
+      }, ids => {
+        conversationRef.current = ids.conversationId
+        setConversationId(ids.conversationId)
+      })
       return true
     } catch (error) {
       if (controller.signal.aborted) {
@@ -71,9 +75,10 @@ export function useSiteChat() {
     setBusy(false)
     setMessages([])
     setNotice('')
-    conversationId.current = undefined
+    conversationRef.current = undefined
+    setConversationId(undefined)
     nextId.current = 1
   }
 
-  return { status, available, messages, busy, notice, send, stop, reset }
+  return { status, available, conversationId, messages, busy, notice, send, stop, reset }
 }

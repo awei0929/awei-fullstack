@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { randomUUID } from 'node:crypto';
 import { Model } from 'mongoose';
@@ -43,11 +43,22 @@ function historyOf(turns: SiteChatConversationRecord['turns']): ModelMessage[] {
 }
 
 @Injectable()
-export class SiteChatRepository {
+export class SiteChatRepository implements OnModuleInit {
   constructor(
     @InjectModel(SiteChatConversationRecord.name)
     private readonly conversations: Model<SiteChatConversationRecord>,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    // 索引（尤其TTL）必须在服务开始接流量前就绪，否则测试和首次访问会看到半初始化状态。
+    await this.conversations.init();
+  }
+
+  async history(visitorHash: string, conversationId: string): Promise<ModelMessage[]> {
+    // 图只读取已完成轮次；当前 streaming 轮次不会进入下一轮上下文。
+    const record = await this.conversations.findOne({ id: conversationId, visitorHash }).lean();
+    return record ? historyOf(record.turns) : [];
+  }
 
   async list(visitorHash: string): Promise<SiteChatConversationSummary[]> {
     // turns 为空的半成品会话不展示；排序与上限都在数据库完成，避免把大文档读进内存。

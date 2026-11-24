@@ -7,6 +7,7 @@ import { SiteChatController } from './site-chat.controller.js';
 import { SiteService } from './site.service.js';
 import { SiteAssetsService } from './site-assets.service.js';
 import { SiteChatService } from './chat/site-chat.service.js';
+import { SiteChatGraph } from './chat/agent/site-chat.graph.js';
 import { SiteChatConfig } from './chat/site-chat.config.js';
 import { SiteChatLimiter } from './chat/site-chat.limiter.js';
 import { SiteRecord, SiteRecordSchema } from './schemas/site.schema.js';
@@ -20,6 +21,6 @@ import { SiteChatRepository } from './chat/site-chat.repository.js';
     { name: SiteChatConversationRecord.name, schema: SiteChatConversationSchema },
   ])],
   controllers: [SiteController, SiteChatController],
-  providers: [SiteService, SiteAssetsService, SiteChatService, SiteChatConfig, SiteChatLimiter, SiteChatRepository],
+  providers: [SiteService, SiteAssetsService, SiteChatService, SiteChatConfig, SiteChatLimiter, SiteChatRepository, SiteChatGraph],
 })
 export class SiteModule {}

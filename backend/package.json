@@ -17,6 +17,10 @@
     "site:owner:init": "node dist/scripts/initialize-site-owner.js"
   },
   "dependencies": {
+    "@langchain/core": "^1.5.1",
+    "@langchain/deepseek": "^1.1.26",
+    "@langchain/langgraph": "^1.7.5",
+    "@langchain/openai": "^1.8.5",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.0.1",

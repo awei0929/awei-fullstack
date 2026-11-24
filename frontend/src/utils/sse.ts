@@ -1,4 +1,4 @@
-interface SseEvent { event: string; data: string }
+export interface SseEvent { id?: string; event: string; data: string }
 
 // Bound both unfinished lines and accumulated multiline events.
 const MAX_EVENT_SIZE = 256 * 1024
@@ -7,6 +7,7 @@ export async function* readSseEvents(body: ReadableStream<Uint8Array>): AsyncGen
   const reader = body.getReader()
   const decoder = new TextDecoder('utf-8', { fatal: true })
   let buffer = ''
+  let id = ''
   let event = ''
   let data: string[] = []
   let size = 0
@@ -22,13 +23,14 @@ export async function* readSseEvents(body: ReadableStream<Uint8Array>): AsyncGen
         size += line.length + 1
         if (size > MAX_EVENT_SIZE) throw new Error('流事件过大，已停止读取')
         if (!line) {
-          if (data.length) yield { event: event || 'message', data: data.join('\n') }
-          event = ''; data = []; size = 0
+          if (data.length) yield { id: id || undefined, event: event || 'message', data: data.join('\n') }
+          id = ''; event = ''; data = []; size = 0
         } else if (!line.startsWith(':')) {
           const colon = line.indexOf(':')
           const field = colon < 0 ? line : line.slice(0, colon)
           const value = colon < 0 ? '' : line.slice(colon + 1).replace(/^ /, '')
-          if (field === 'event') event = value
+          if (field === 'id') id = value
+          else if (field === 'event') event = value
           else if (field === 'data') data.push(value)
         }
       }

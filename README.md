@@ -109,6 +109,10 @@ python3 -c 'import getpass,json; print(json.dumps({"account":"55555","password":
 
 官网内容存 MongoDB；上传的媒体默认在 `backend/.data/site-assets/`，可用 `SITE_ASSETS_DIR` 指向持久目录。迁移或部署时需同时备份媒体目录与数据库。当前版本不自动清理未被最终保存引用的媒体。
 
+### 编辑网页简历
+
+在 `/admin` 打开「简历」，填写姓名、岗位和 Markdown 正文，可上传一份 PDF。右侧预览使用当前草稿，点击「保存并更新官网」后，访客可从首页或 `/resume` 查看。联系方式使用「联系入口」中的公开邮箱。旧能力内容可在「能力资料」中编辑和预览。详见 [SPEC-008](docs/specs/008-public-resume.md)。
+
 ### 图片、PDF与附件上传接入
 
 实现与验收合同见 [SPEC-004](docs/specs/004-disk-file-uploads.md)。文件保存到服务器磁盘，不需要开通 COS。
@@ -128,7 +132,7 @@ python3 -c 'import getpass,json; print(json.dumps({"account":"55555","password":
 ```
 
 - 支持 JPG/JPEG、PNG、WebP 图片，最大 5 MiB；PDF、ZIP、TXT、DOCX、XLSX、PPTX 附件，最大 20 MiB。音频仍使用原音乐入口，最大15 MiB。
-- 进入后台「文件上传」可上传并复制地址/Markdown；「我的能力 → 公司项目」可直接上传封面，公司/项目正文的 Markdown 字段可直接上传并插入图片或附件。
+- 进入后台「文件上传」可上传并复制地址/Markdown；「能力资料 → 公司项目」可直接上传封面，公司/项目正文的 Markdown 字段可直接上传并插入图片或附件。
 - 文件上传只写磁盘，不会自动更新官网或站点版本；应用到封面/正文后仍要点击「保存全部并更新官网」。
 - 用户已选择全部公开：文件上传完成后，拿到链接的人即可访问，即使尚未保存、取消编辑或项目被隐藏。不要上传私密文件。
 - 服务器不自动解压或执行附件。ZIP仅支持普通单卷，不支持分卷与ZIP64；Office 仅校验 ZIP 容器与扩展名，不保证文件有效或无病毒。TXT须为UTF-8文本；不支持的类型需明确扩展白名单。
@@ -176,17 +180,17 @@ python3 -c 'import getpass,json; print(json.dumps({"account":"55555","password":
 
 ## 操作流程
 
-1. 打开官网浏览初次见面、我的能力及关于/联系；独立任务演示位于 `/tasks`。
+1. 打开官网浏览初次见面、简历及关于/联系；独立任务演示位于 `/tasks`。
 2. 从首页「站主入口」登录，或直接打开 `/admin`；非站主即使登录也不能读取或修改网站配置。
-3. 编辑首页、我的能力、个人资料、联系入口、动效及背景音乐；未保存预览只在编辑页可见。
-4. 点击“保存全部并更新官网”，成功后新访问和刷新看到更新；版本冲突保留输入，不能直接覆盖。
+3. 编辑首页、简历、能力资料、个人资料、联系入口、动效及背景音乐；未保存预览只在编辑页可见。
+4. 点击「保存并更新官网」，成功后新访问和刷新看到更新；版本冲突保留输入，不能直接覆盖。
 5. 任务演示保留游客示例与既有账号的私有任务；公开注册入口和API关闭。
 
 背景音乐在「外观与动效 → 背景音乐」设置：填写直接音频地址，或上传 MP3/WAV/OGG（最大15MiB），可设置名称、0–100%音量、循环和启用。上传只改草稿，点击保存后生效。访客主动点击「音乐」才开始播放；没有音源或未启用时隐藏播放器，音乐与环境动效独立。
 
-原独立作品档案及其配置、旧封面上传接口已移除；新的公司项目位于「我的能力」弹窗，通过新的文件上传接口设置封面，不恢复作品导航或旧项目接口。历史配置读取时剔除作品字段，保留其它配置与版本；读取不改数据库，下一次正常保存采用新合同。旧项目链接显示普通首页，历史上传媒体不自动删除。
+原独立作品档案及其配置、旧封面上传接口已移除；公司项目位于后台「能力资料」与其预览。历史配置读取时剔除作品字段，保留其它配置与版本；读取不改数据库，下一次正常保存采用新合同。旧项目链接显示普通首页，历史上传媒体不自动删除。
 
-「我的能力」分为技术栈、公司背景、公司项目三类入口卡片。技术栈详情集中展示前端、后端、AI、部署四区，后台仍按原四个 Tab 编辑图标、昵称和顺序，每类最多12项；新增技术介绍在技术栈弹窗上方展示。公司背景可配置名称、摘要与公司简介/核心业务/岗位职责；公司项目最多12份，可新增、排序、删除、隐藏并设置封面URL或上传封面。公司正文与项目正文支持 Markdown、表格、代码、图片及附件上传，编辑器可展开预览；不执行原始HTML。保存全部后统一更新，隐藏项目不出现在公开接口。38个图标仅作为可选目录，默认沿用原九项。图标来源与使用说明见[技术图标记录](frontend/public/site/tech/SOURCES.md)。
+后台「能力资料」预览分为技术栈、公司背景、公司项目三类入口卡片。技术栈详情集中展示前端、后端、AI、部署四区，后台按四个 Tab 编辑图标、昵称和顺序，每类最多12项；技术介绍在技术栈弹窗上方展示。公司背景可配置名称、摘要与公司简介/核心业务/岗位职责；公司项目最多12份，可新增、排序、删除、隐藏并设置封面URL或上传封面。公司正文与项目正文支持 Markdown、表格、代码、图片及附件上传，编辑器可展开预览；不执行原始HTML。保存全部后统一更新，隐藏项目不出现在公开接口。38个图标仅作为可选目录，默认沿用原九项。图标来源与使用说明见[技术图标记录](frontend/public/site/tech/SOURCES.md)。
 
 数字账号为3–5位ASCII数字字符串，保留前导零。未设置可验证的联系方式，第一版没有自助找回密码入口。密码规则、会话期限和错误行为统一见 SPEC-001。
 
@@ -259,11 +263,31 @@ CHAT_TIMEOUT_MS=120000
 
 真实 Key 不写进前端、`VITE_` 环境变量、README、聊天消息或 Git。生产环境需要单独配置服务器持久环境文件，自动发布不会把本机 `.env` 上传。配置完成后的真实模型可用性仍需实际发送验证。
 
+### 可选：公开对话接入 DeepSeek
+
+首页和 `/chat` 的公开 AI 对话优先使用 DeepSeek：在 `backend/.env` 增加 `DEEPSEEK_API_KEY`，重启后端即可。默认模型为 `deepseek-flash`、官方地址 `https://api.deepseek.com`，非思考模式；Key 留空时继续使用上面的 GLM 配置。`DEEPSEEK_BASE_URL` 只在使用兼容网关时需要覆盖。Key 同样只放服务器，不进入前端或 Git。
+
+### 公开对话历史（匿名）
+
+- `/chat` 与 `/chat/:conversationId` 会把会话保存到 MongoDB 的 `site_chat_conversations`；访客不需要登录，浏览器只在 `localStorage['nest.chat.visitor.v1']` 保存一个 UUID，请求通过 `X-Visitor-Id` 携带，服务端只存 SHA-256。
+- 同一浏览器刷新、重新打开页面仍能看到历史；换浏览器、清站点数据或换设备不会同步。每个访客最多 20 个会话、每个会话最多 100 轮，30 天无活动由 TTL 清理。
+- 历史接口：`GET /api/site-chat/conversations`、`GET /api/site-chat/conversations/:id`、`DELETE /api/site-chat/conversations/:id`；流式接口仍是 `POST /api/site-chat/stream`，事件为 `start/delta/done/error/ping`，空闲 30 秒 ping，前端 45 秒 watchdog。
+- 生成由 LangGraph 线性图编排：`loadConversation → buildContext → agent`；DeepSeek 走 `ChatDeepSeek`，GLM 回退走 `ChatOpenAI`，Mongo 轮次是唯一事实来源，不使用 LangGraph checkpointer。
+- 公开对话不写 `site_documents`，不影响首页内容；删除会话直接移除文档。Nginx 部署必须关闭 `proxy_buffering` 并把 `proxy_read_timeout` 设到 60 秒以上。
+
+### 密钥安全
+
+- `backend/.env` 已被 `backend/.gitignore` 忽略，仓库只跟踪 `backend/.env.example`；不要把真实 Key 写进示例、源码、文档、测试或前端 `VITE_` 变量。
+- 本地与服务器上的 `.env` 应保持 `600` 权限；部署时使用仓库外的持久环境文件（当前 `scripts/deploy.py` 会把它链接进发布目录，不会复制进 Git 或前端包）。
+- 推送 GitHub 前可检查：`git check-ignore -v backend/.env`、`git ls-files | grep -E '\.env'`、`git log --all --oneline -- backend/.env`。GitHub 仓库建议开启 Secret scanning 和 Push protection。
+- 如果 Key 曾进入任何提交、截图、聊天记录或日志，先在 DeepSeek 控制台撤销并换新 Key，再清理 Git 历史；只在后续提交里删除文件并不能消除历史泄露。
+- DeepSeek 控制台为本项目单独建 Key，设置额度/用量提醒并定期轮换；公开对话已按 IP 限流，但 Key 泄露后的费用仍需在供应商侧兜底。
+
 ### 配置多个模型
 
 后端使用 Node 原生 `fetch` 调用 Chat Completions 兼容接口，再转换为本项目 SSE 事件；前端使用 `fetch` 流式读取，MobX 管理状态。模型目录由服务端控制，页面不能提交任意模型地址或 Key。
 
-两个GLM免费模型为内置项，4.7仍是默认选择；也可手动选择4-Flash直接对话。可以在 `backend/.env` 增加最多10个其他兼容模型；下面是配置格式示例，需替换为供应商真实信息：
+两个 GLM 免费模型仍为内置项；未配置 DeepSeek 时默认 GLM-4.7-Flash，配置后默认 DeepSeek-Flash。也可手动选择 GLM-4-Flash 直接对话。可以在 `backend/.env` 增加最多10个其他兼容模型；下面是配置格式示例，需替换为供应商真实信息：
 
 ```dotenv
 OTHER_LLM_API_KEY=替换为其他供应商密钥

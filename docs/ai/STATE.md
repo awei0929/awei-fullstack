@@ -1,5 +1,51 @@
 # 工作区交接状态
 
+## 2026-11-24：公开对话历史、多会话与 LangGraph Agent（本地已验证）
+
+- 用户要求（m01564）：「会话历史呢。咱们的架构是。 前端点击发送。调用后端接口。此时后端保存当前会话和当前消息。要支持多历史记录啊。 请你先设计一下agent架构。我想使用 LangGraph / langchain。」；m01640 明确接受浏览器 `localStorage` 匿名标识，不做登录/跨设备；m01797「开始执行」。依据 [SPEC-011](../specs/011-site-chat-history.md) 与 `docs/superpowers/plans/2026-11-24-site-chat-history-agent.md`。此条取代本文件同日两条里的“公开对话不持久化/无历史”边界。
+- 后端：新集合 `site_chat_conversations`（单文档内嵌 `turns`，`visitorHash` 索引、`expiresAt` 30 天 TTL、20 会话/100 轮上限、`activeUntil` 锁）；`X-Visitor-Id` 只接受 UUID v4 并 SHA-256 入库；`GET/DELETE /api/site-chat/conversations`、`GET /conversations/:id`；`POST /api/site-chat/stream` 先写用户轮次，SSE `start/delta/done/error/ping`，30 秒空闲 ping（`SITE_CHAT_PING_MS`），每 500ms 持久化部分正文，断连写 `canceled`，上游失败写 `failed`，重复 `requestId` 幂等重放。公开对话从自定义 provider 切到 LangChain `ChatDeepSeek`（GLM 回退 `ChatOpenAI`）+ LangGraph `START → loadConversation → buildContext → agent → END`；Mongo turns 为唯一事实来源，不用 checkpointer。owner chat 不迁移。
+- 前端：`frontend/src/utils/visitor.ts` 提供 localStorage → sessionStorage → 内存的 visitor UUID；`frontend/src/api/site-chat.ts` 带 `X-Visitor-Id`、解析 `start/delta/ping`、45 秒 watchdog；新增 `frontend/src/store/site-chat.ts` 管理列表/活动会话/轮次/发送/停止/删除/新对话；`/chat` 与 `/chat/:conversationId` 共用页面，历史侧栏、当前项、删除确认、移动端抽屉；首页对话卡开始落库，「打开完整对话」带当前 ID。
+- 验证：后端全量 `MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test` 177/177、13 套件；`site-chat-history` 13/13、`site-chat` 8/8；前端 `npm run check`、`npm run lint`（0 warnings/0 errors，84 files）、`npm run build` 通过。Chrome 实测历史列表/详情/刷新恢复/删除当前回到 `/chat`/停止生成；390、320 宽度 `scrollWidth` 等于视口；真实 DeepSeek 经 LangGraph 返回并落库（截图 `/tmp/nest-chat-history-desktop.png`、`/tmp/nest-chat-history-mobile.png`、`/tmp/nest-chat-history-active.png`、`/tmp/nest-chat-mobile-topbar.png`）。
+- 分支与提交：`feat/site-chat-history-agent`；Task 1 `b7e2ec0`、Task 2 `f98bd75`、Task 3 `d54511a`/`d3f76be`、Task 4 `ac41a38`、Task 5 `69cd440`。未推送、未部署；文档随 Task 6 一并提交。工作区原有 resume/queue/tasks 等改动保留。
+- 安全：本机 `backend/.env` 的 DeepSeek Key 权限 600、已被 Git 忽略；该 Key 曾在对话中明文出现，仍建议在 DeepSeek 控制台撤销并轮换，新 Key 只写 `.env`。真实发布前需核对 Nginx `proxy_buffering off` 与 `proxy_read_timeout`。
+
+## 2026-11-24：首页对话卡优化与 DeepSeek 接入（本地真实请求已验证）
+
+- 用户要求（m01232）：「不弄主题了把这个优化一下 并接入DeepSeek api」。停止配色/主题探索，保留现有黑白主题，只改首页对话卡与公开对话模型。
+- UI：`frontend/src/pages/site/conversation.tsx` 改为两栏编辑布局，左侧标题/说明/完整对话入口，右侧浅表面板；去掉外框与重阴影、胶囊建议按钮与装饰火花，空态左对齐，建议问题改为两列文字行，新增 `chatState`（连接中/在线/回答中/离线）。`frontend/src/pages/site/home.module.less` 同步重写 `.conversation`/`.chatCard`/`.chatEmpty`/`.composer`/`.suggestions` 及 900/600 断点。截图 `/tmp/nest-chatcard-new.png`（1440）、`/tmp/nest-chatcard-mobile.png`（390）、`/tmp/nest-chatcard-live.png`（真实回答）、`/tmp/nest-chat-live.png`（`/chat` 真实回答）。
+- DeepSeek：`backend/src/chat/config/chat.config.ts` 在存在 `DEEPSEEK_API_KEY` 时加入内置模型 `deepseek-flash`（`https://api.deepseek.com`，非思考模式），未配置时不出现、保持旧 GLM 白名单数量；`backend/src/site/chat/site-chat.service.ts` 优先选 DeepSeek，未配置回退 GLM；`backend/src/chat/providers/chat-completions.provider.ts` 增加 402 额度错误。`backend/.env.example` 增加 `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` 说明。
+- 测试：`backend/test/site-chat.e2e.test.mjs` 新增「配置 DeepSeek 时优先 deepseek-flash、未配置保持 GLM」，并还原 `ConfigService.set` 写入的 `process.env`，避免后续用例串上游；全量 `MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test` 164/164、12 套件；前端 check/lint/build 通过。
+- 用户已在本机 `backend/.env` 配置 `DEEPSEEK_API_KEY`（文件权限 600，已被 Git 忽略，未入库）；重启后 `ChatConfig.catalog().defaultModelId` 为 `deepseek-flash`，公开对话真实 SSE 返回 delta 与 done，前端 `/chat` 与首页对话卡均拿到完整回答。该 Key 曾在对话中明文出现，按安全流程应尽快在 DeepSeek 控制台撤销并换新 Key，再只写入 `.env`。未提交、未推送、未部署；站点数据仍 version 10。
+
+## 2026-11-24：黑白主题与黑夜/白天切换（本地已验证）
+
+- 用户要求（m00930）：「我希望你在黑白配色。可以切换黑夜/白天模式。」公开页面改为纯黑白灰，不再保留奶油/橄榄/橙色；新增主题开关，覆盖首页/分区页、`/chat`、`/resume`。
+- 主题实现：`frontend/src/styles/global.less` 提供 `--theme-*` 变量（light `#ffffff/#0b0b0b`，dark `#0a0a0a/#f2f2f2`）；`frontend/src/components/theme-toggle/index.tsx` 切换 `<html data-theme>` 并写 `localStorage['nest-theme']`，无保存值时跟随 `prefers-color-scheme`；`frontend/index.html` 内联脚本在 CSS 前设置主题，避免闪烁。首页 header、`/chat` 顶栏、`/resume` masthead 均挂开关。
+- 样式范围：`frontend/src/pages/site/home.module.less`、`frontend/src/pages/chat/style.module.less`、`frontend/src/pages/resume/style.module.less`、`frontend/src/components/site-markdown/style.module.less`（`.paper`）、`frontend/src/components/chat-markdown/style.module.less` 全部改为中性主题变量；想法弹层、对话成功/错误/空态、简历与 Markdown 深色可读；打印样式固定白底黑字。
+- 验证：前端 `npm run check`、`npm run lint`（0 warnings/0 errors）、`npm run build` 通过；Chrome light/dark 计算色分别为 `rgb(255,255,255)/rgb(11,11,11)`、`rgb(10,10,10)/rgb(242,242,242)`；截图 `/tmp/nest-home-light.png`、`/tmp/nest-home-dark.png`、`/tmp/nest-chat-light.png`、`/tmp/nest-chat-dark.png`、`/tmp/nest-chat-success-dark.png`、`/tmp/nest-thought-dialog-dark.png`、`/tmp/nest-resume-light.png`、`/tmp/nest-resume-dark.png`；390×844 移动端首页/对话无横向溢出。后端未改，沿用 163/163。
+- 数据与交付：站点内容仍为 version 10，未改数据库；未提交、推送或部署；工作区原有 resume/queue/tasks 改动保留。
+
+## 2026-11-24：编辑式首页、真实路径与独立对话页（本地已验证）
+
+- 用户要求把官网改成 zhiqiang.chat 式页面（核心思想、项目链接、对话式回答）；依据 [SPEC-010](../specs/010-editorial-home.md)，基准 `65f01df` 加当前工作区改动。旧 `SiteEntryProvider/SiteIntro` 不再挂在 `/`，首页直接显示浅色编辑排版；新增 `/thoughts`、`/works`、`/about` 真实路径（复用首页内容并滚动到分区）与独立 `/chat` 对话页，`/conversation` 重定向 `/chat`；`/resume`、后台简历与附件合同不变。
+- 新数据分区 `thoughts/works/chat`：想法 12 条（Markdown 正文、显隐）、作品 12 条（站内/外链、封面、显隐、首条大卡）、对话设置（开关、标题/介绍/占位、最多 3 条建议、补充提示词）。公开读只保留 `visible`，`chat.systemPrompt` 公开响应清空；旧 Mongo 缺失分区只读补默认，PUT 仍要求完整分区。后台新增「想法笔记/作品链接/对话设置」，预览按 `focus` 滚动，`work-cover` 上传复用现有媒体。
+- 公开对话：`GET /api/site-chat` 与匿名 `POST /api/site-chat/stream`（手动 SSE `delta/done/error`），不挂 Session/Owner/CSRF，不持久化；按 SHA-256(IP) 内存限流默认 8 次/10 分钟、UTC 日 200，模型固定短答 `max_tokens=700`、45 秒超时，提示词只含公开资料并过滤隐藏想法/作品。单实例内存限流、无审核/多轮持久化是当前边界。
+- 对话页：`frontend/src/pages/chat/index.tsx` 与 `frontend/src/pages/site/use-site-chat.ts` 共享会话逻辑；桌面侧栏 + 空态建议卡 + 消息线程 + 固定 composer，移动端单列；消息只在当前标签页内存，新对话即清空。「新对话」不再因空会话禁用，发送受理后立即清空输入；失败保留错误提示。
+- 验证：后端 `MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test --prefix backend` 163/163、12 套件（含 build）通过，新增 `backend/test/site-chat.e2e.test.mjs` 7 项；前端 `npm run check`、`npm run lint`（0 warnings/0 errors）、`npm run build` 通过。Chrome 1440×1100 整页与 CDP 390×844 实际渲染，`scrollWidth` 分别等于视口，无横向溢出；想法弹层、作品卡、对话卡与后台预览聚焦可用。真实模型浏览器实测本轮返回 429，前端正确显示「模型有点忙，请稍后再试。」，不宣称真实回答成功；fixture SSE 已覆盖成功路径。
+- 路由与 UI：首页导航与页脚改用 `NavLink/Link`；`/works` 等路径在内容加载后滚到对应分区，吸顶导航在 `overflow-x: clip` 下正常，当前分区有 `aria-current` 下划线；hero「往下看看」按钮重置了浏览器默认样式。
+- 数据：本地隧道所连站点内容 version 7→10：`profile.tagline`、`home` 已更新，默认作品 `site-chat` 从 `/#conversation` 改为 `/chat`；备份 `/tmp/site-content-backup.json`、`/tmp/site-content-backup-before-chat-route.json`。期间一次直接改 `updatedAt` 为字符串导致 Mongoose CastError，已恢复为 Date 并清掉被误写成空数组的 `content.works`，读时补回 3 个默认作品。未提交、推送或部署；工作区原有 resume/queue/tasks 等改动保留。真机软键盘、Safari/Firefox、多实例限流未验证。
+
+## 2026-11-16：首页入口与公开简历页（本地已验证）
+
+- 基准 `65f01df`，[SPEC-008](../specs/008-public-resume.md)。首页导航和首屏主按钮直达 `/resume`，旧能力场景和直达面板在公开首页隐藏。后台「简历」编辑姓名、岗位、Markdown 和 PDF，复用版本化保存、隔离预览与附件下载；旧能力资料保留站主编辑和预览。旧 API 调用方保持现有响应格式。
+- 后端 152/152，前端 lint/build/diff 检查通过。Chrome 1440×960、320×568、390×844 验证入口、空态、错误重试、正文、权限编辑、草稿隔离、预览及附件下载/替换/移除。独立审查的问题已修正。
+- 已将提供的 `mdContent` 整理至本地预览，保留邮箱及职业信息，原稿中的手机、出生年份、性别与薪资未进入网页。隔离预览保留 `127.0.0.1:5173/resume`、后端 3000 和 `nest-resume-mongo` 27019，验收 PDF 已清理。真实 PDF 待提供，未触及正式数据，无提交、推送或部署。
+
+## 2026-11-16：首页网页简历调研
+
+- 基准 `65f01df`。已核对首页双场景、公司与项目详情、公开配置类型及 [PDF 上传下载合同](../specs/004-disk-file-uploads.md)，并对照 [Brittany Chiang 首页](https://brittanychiang.com/) 和 [Bama Charan Chhandogi 简历页](https://www.bamacharan.com/resume) 的内容结构。
+- 当时建议首页首屏突出姓名、岗位与简历入口，下面用网页正文展示经历和代表项目，PDF 复用现有附件下载。该轮只核对资料与源码，随后按用户决定改为独立简历页。
+
 ## 2026-11-14：手机修复（已上线并复验通过）
 
 - 用户授权修复M-01至M-07并在验证后提交、推送、部署；基准`a6c7db9`，合同[SPEC-007](../specs/007-ui-clarity.md#手机复查修复2026-11-14)。导航层级/手机内容流和预览滚动、任务入口与点击范围、冗余装饰说明均已调整；不改API、模型或依赖。

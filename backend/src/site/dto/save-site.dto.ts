@@ -28,7 +28,8 @@ function SiteUrl(kind: 'external' | 'audio' | 'image' | 'pdf' | 'page'): Propert
       if (typeof value !== 'string' || value.length > 2048 || /[\s\\\u0000-\u001f\u007f]/u.test(value)) return false;
       if (value === '') return true;
       if (kind === 'page' && /^\/(?!\/)[A-Za-z0-9/_-]*(?:#[A-Za-z0-9_-]+)?$/.test(value)) return true;
-      if (kind === 'pdf') return /^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.pdf$/u.test(value);
+      if (kind === 'pdf') return /^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.pdf$/u.test(value)
+        || /^\/site\/resume\/[A-Za-z0-9_-]+\.pdf$/u.test(value);
       if (kind === 'audio' && /^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.(mp3|wav|ogg)$/.test(value)) return true;
       if (kind === 'image' && /^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.(png|jpg|webp)$/.test(value)) return true;
       if (!/^https?:\/\//i.test(value)) return false;

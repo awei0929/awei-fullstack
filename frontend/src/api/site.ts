@@ -56,7 +56,8 @@ const emptyResume: SiteResume = {
 }
 
 export function isSiteResumePdf(value: string): boolean {
-  return value.startsWith('/api/site/assets/') && value.endsWith('.pdf') && isSafeSiteUrl(value, 'markdown')
+  return (value.startsWith('/api/site/assets/') && value.endsWith('.pdf') && isSafeSiteUrl(value, 'markdown'))
+    || /^\/site\/resume\/[A-Za-z0-9_-]+\.pdf$/.test(value)
 }
 
 function list<T>(value: unknown, max: number, parse: (item: unknown) => T): T[] {

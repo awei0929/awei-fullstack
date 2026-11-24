@@ -122,7 +122,7 @@ describe('单站点配置、权限、持久化与媒体 HTTP', () => {
   it('结构化简历字段可保存、公开，并拒绝非法技能/经历条目', async () => {
     const value = content();
     value.resume = {
-      name: '李武伟', role: 'Web 全栈开发', body: '', pdfUrl: '',
+      name: '李武伟', role: 'Web 全栈开发', body: '', pdfUrl: '/site/resume/liwuwei-resume.pdf',
       summary: '5 年 Web 全栈经验。', meta: '5 年经验 · 随时到岗',
       skills: [{ label: 'AI 应用开发', items: ['Mastra Agent 编排', '多轮上下文'] }],
       experience: [{ company: '闪剪智能', role: 'Web 前端', period: '2022.12 – 2026.11', summary: '', highlights: ['负责 AI 创作平台'] }],

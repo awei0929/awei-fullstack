@@ -17,6 +17,8 @@ export type PreparedPublicChat = {
   answer?: string;
   message: string;
   model: ModelSettings;
+  /** GLM 主模型在首个 token 前失败时才使用的备用模型。 */
+  fallback?: ModelSettings;
   timeout: number;
   maxTokens: number;
 };
@@ -35,22 +37,24 @@ export class SiteChatService {
 
   async status(): Promise<{ enabled: boolean; available: boolean }> {
     const document = await this.site.readPublic();
-    return { enabled: document.content.chat.enabled, available: Boolean(this.availableModel()) };
+    return { enabled: document.content.chat.enabled, available: Boolean(this.availableModels()) };
   }
 
-  async begin(input: PublicChatDto, visitorId: string, ip: string): Promise<PreparedPublicChat> {
+  async begin(input: PublicChatDto & { conversationId?: string }, visitorId: string, ip: string): Promise<PreparedPublicChat> {
     const document = await this.site.read();
     if (!document.content.chat.enabled) {
       throw new ServiceUnavailableException({ message: '对话暂未开放。', code: 'SITE_CHAT_DISABLED' });
     }
-    const model = this.availableModel();
-    if (!model) {
+    const selection = this.availableModels();
+    if (!selection) {
       throw new ServiceUnavailableException({ message: '对话暂时不可用，请稍后再试或直接联系站主。', code: 'SITE_CHAT_UNAVAILABLE' });
     }
     const visitorHash = hashVisitor(visitorId);
     // IP 桶与 visitor 桶同时生效：同一网络换 visitor 仍受 IP 限制，同一 visitor 换 IP 也受自身限制。
-    const limited = this.limiter.consume(createHash('sha256').update(ip).digest('hex'))
-      ?? this.limiter.consume(`visitor:${visitorHash}`);
+    const limited = this.limiter.consume([
+      createHash('sha256').update(ip).digest('hex'),
+      `visitor:${visitorHash}`,
+    ]);
     if (limited) {
       throw new HttpException({
         statusCode: 429,
@@ -64,18 +68,20 @@ export class SiteChatService {
       conversationId: input.conversationId,
       requestId: input.requestId,
       content: input.message.trim(),
-      modelId: model.id,
+      modelId: selection.model.id,
       lockMs: this.config.timeout() + 15000,
     });
+    const maxTokens = this.config.maxTokens();
     return {
       conversationId: turn.conversationId,
       turnId: turn.turnId,
       visitorHash,
       answer: turn.answer,
       message: input.message.trim(),
-      model: { ...model, maxTokens: this.config.maxTokens() },
+      model: { ...selection.model, maxTokens },
+      ...(selection.fallback ? { fallback: { ...selection.fallback, maxTokens } } : {}),
       timeout: this.config.timeout(),
-      maxTokens: this.config.maxTokens(),
+      maxTokens,
     };
   }
 
@@ -86,13 +92,24 @@ export class SiteChatService {
     signal.addEventListener('abort', abort);
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, prepared.timeout);
     try {
-      yield* this.graph.stream({
-        message: prepared.message,
-        visitorHash: prepared.visitorHash,
-        conversationId: prepared.conversationId,
-        model: prepared.model,
-        maxTokens: prepared.maxTokens,
-      }, controller.signal);
+      let emitted = false;
+      try {
+        for await (const text of this.generate(prepared, prepared.model, controller.signal)) {
+          emitted = true;
+          yield text;
+        }
+      } catch (error) {
+        // 只有主模型一个 token 都没吐出来时才切换；已经输出半句再重试会造成重复内容。
+        if (!prepared.fallback || emitted || controller.signal.aborted) throw error;
+        await this.repository.switchModel(prepared.visitorHash, prepared.conversationId, prepared.turnId, prepared.fallback.id);
+        for await (const text of this.generate(prepared, prepared.fallback, controller.signal)) yield text;
+        return;
+      }
+      // 主模型正常结束但没有任何正文（例如只返回思考片段）也算失败，允许切换一次备用。
+      if (!emitted && prepared.fallback && !controller.signal.aborted) {
+        await this.repository.switchModel(prepared.visitorHash, prepared.conversationId, prepared.turnId, prepared.fallback.id);
+        for await (const text of this.generate(prepared, prepared.fallback, controller.signal)) yield text;
+      }
     } catch (error) {
       if (signal.aborted) throw error;
       if (timedOut) throw new Error('回答超时了，请稍后再试。');
@@ -108,14 +125,30 @@ export class SiteChatService {
     }
   }
 
-  private availableModel(): ModelSettings | null {
+  private async *generate(prepared: PreparedPublicChat, model: ModelSettings, signal: AbortSignal): AsyncGenerator<string> {
+    yield* this.graph.stream({
+      message: prepared.message,
+      visitorHash: prepared.visitorHash,
+      conversationId: prepared.conversationId,
+      model,
+      maxTokens: prepared.maxTokens,
+    }, signal);
+  }
+
+  private availableModels(): { model: ModelSettings; fallback?: ModelSettings } | null {
     try {
       const models = this.chatConfig.models();
-      // 配置了DeepSeek就用它；未配置时保持原来的GLM优先逻辑，部署不需要同时维护两套Key。
-      return models.find(model => model.id === 'deepseek-flash' && model.apiKey)
-        ?? models.find(model => model.id === 'glm-4.7-flash' && model.apiKey)
-        ?? models.find(model => model.apiKey)
-        ?? null;
+      // GLM 优先；只有它没配 Key 时才让 DeepSeek 直接做主模型，避免无谓的多一跳。
+      const deepseek = models.find(model => model.id === 'deepseek-flash' && model.apiKey);
+      const model = models.find(item => item.id === 'glm-4.7-flash' && item.apiKey)
+        ?? deepseek
+        ?? models.find(item => item.apiKey);
+      if (!model) return null;
+      // 配置了 DeepSeek 就把它作为 GLM 的备用；否则沿用 GLM 内置的免费备用。
+      const fallback = model.id === 'deepseek-flash'
+        ? undefined
+        : deepseek ?? models.find(item => item.id === model.fallbackModelId && item.apiKey);
+      return { model, ...(fallback && fallback.id !== model.id ? { fallback } : {}) };
     } catch {
       // 配置错误不向访客输出变量名或密钥状态，只表现为暂不可用。
       return null;

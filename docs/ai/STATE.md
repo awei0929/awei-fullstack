@@ -1,4 +1,116 @@
+## 2026-11-24：对话页侧边栏优化（本地已验证）
+
+- 历史对话：272px 侧栏；标题旁显示会话数量；列表改为圆角行，active 行浅色卡片 + 左侧 2px 标记；删除按钮默认隐藏，hover/focus/active 时显示，触屏设备常显；元信息保持“相对时间 · 轮数”。
+- 底部「首页 / 想法 / 作品」由纯文字行改为三等分胶囊按钮，hover 反色描边；说明改为「历史只保存在这台浏览器」。
+- 验证：1440/390/320 无横向溢出，当前会话 active 态与删除按钮正常；前端 check/lint 通过。
+- 未提交/推送/部署。
+
+## 2026-11-24：后台预览不同步修复（本地已验证）
+
+- 用户反馈（m03958）：在 admin 更新内容后看不到官网预览变化。
+- 根因一：`frontend/src/pages/admin/preview-protocol.ts` 的 `isSitePreviewContent` 仍要求简历只有 `name/role/body/pdfUrl` 四个字段；结构化简历加入 `summary/skills/experience/projects/education` 后，父页发来的每份草稿都被拒绝，iframe 停在旧内容/“等待官网预览”。
+- 根因二：直接打开 `/admin/preview` 时没有父页面，原逻辑只等待 postMessage；页面组件未订阅 `siteStore`，加载完成也不刷新。
+- 修复：预览协议改为校验可选结构化简历字段，并补 `thoughts/works/chat`；`SitePreviewPage` 在顶层打开时加载已保存公开内容并用 `observer` 订阅；官网 `SitePage` 在标签页重新聚焦/可见时重新 `siteStore.load()`，已打开的官网标签页会更新。
+- 预览页根容器原是 `position:fixed; inset:0; overflow:clip`，把超出设备高度的文档直接裁掉；改为 `min-height:100vh`，iframe 内部恢复滚动，右侧显示全局 6px 滚动条。
+- 验证：用 live `/api/site?include=resume` 内容调用 `isSitePreviewContent` 返回 true；CDP 中父页 iframe 收到 draft 后渲染出李武伟简历；直接打开 `/admin/preview?view=resume` 显示已保存简历。前端 check/lint 通过。
+- 未提交/推送/部署。
+
+## 2026-11-24：对话入口、问答导流与首页圆环动效（本地已验证）
+
+- 用户要求（m03756）：发送时先插入乐观消息并滚到底部；简历/项目/想法问答给出页面入口；首页去掉圆环说明文字与「写信给我」，并增强圆环；简历在后台更新。
+- `frontend/src/pages/chat/index.tsx`：输入框在提交时立即清空并插入乐观轮次，不再等流结束；滚动 effect 依赖 `turns.length`、最后一条 `answer.length`、`status`，用户主动上滚后不强行拉回。
+- 问答完成后按用户问题追加确定性入口：简历 → `/resume`、项目/作品 → `/works`、想法 → `/thoughts`（`turnAction()`）；`backend/src/site/chat/site-chat.prompt.ts` 增加规则，禁止模型输出 URL/Markdown 链接/站内路径，由界面给入口。
+- 首页 `frontend/src/pages/site/index.tsx` 与 `home.module.less`：移除 `READ · THINK · MAKE` 圆环说明和 hero「写信给我」；圆环只保留居中「想法」，增加 halo、核心环、旋转 sweep、虚线轨道、轨道点与脉冲，`prefers-reduced-motion` 下全部停止；删除 heroRule，区块之间只保留单条分隔线；想法列表底部不再额外留出一行空白。
+- 首页 composer 下方提示文案改为可点击按钮，点击时用当前 draft 直接创建会话并跳 `/chat`；`frontend/src/pages/site/conversation.tsx` 移除邮件 CTA。
+- 验证：前端 `check`、`lint`、`build` 通过；Chrome 实测首页提示点击进入 `/chat/:id` 且输入清空；真实 GLM/DeepSeek 回答「简历」时显示「查看简历」入口，回答中不再输出 `/resume`；390 宽无横向溢出。
+- 未提交/推送/部署；后端 prompt 改动随 dev watch 生效。
+
+## 2026-11-24：滚动条改为默认淡灰、hover 淡蓝（本地已验证）
+
+- 用户反馈滚动条太丑，要求默认淡灰色、hover 淡蓝色。
+- `frontend/src/styles/global.less`：浅色 `--theme-scrollbar:#d9d9d9`、`--theme-scrollbar-hover:#93c5fd`；深色 `--theme-scrollbar:#3f3f3f`、hover 同为 `#93c5fd`；仍为 6px、透明 track、圆角 thumb，Firefox 用 `scrollbar-color` 兜底。
+- 验证：Chrome 计算值确认 light thumb `rgb(217,217,217)`、dark `rgb(63,63,63)`；`::-webkit-scrollbar-thumb:hover` 规则为 `#93c5fd`。前端 check/lint/build 通过；未提交/推送/部署。
+
+## 2026-11-24：公开对话 API 资源化 + MobX 请求去重（本地已验证）
+
+- 用户反馈（m03562）：`/chat` 首次打开会重复请求 `GET /api/site-chat/conversations`，且 `/api/site-chat/stream` 不像资源接口。
+- 后端路由改为资源式：`POST /api/site-chat/conversations` 创建会话并发送首条消息；`POST /api/site-chat/conversations/:conversationId/messages` 追加消息；两者都返回 SSE。删除 `POST /api/site-chat/stream`；`PublicChatDto` 移除 body 里的 `conversationId`，路径是唯一来源；`SiteChatController` 抽 `streamTurn()`，非法/越权会话统一 404。
+- 前端 `frontend/src/api/site-chat.ts` 按 `conversationId` 选择上述路径，body 只发 `{message, requestId}`；`frontend/src/store/site-chat.ts` 新增 `initialize()`，`loadStatus/loadList/open` 做 in-flight + 1 秒缓存去重，移除 `send()` 内所有 `loadList()`，改由 `start`/`done` 事件在 MobX 本地插入或更新会话摘要；`ChatPage` 只调用一次 `initialize()`。
+- 验证：`site-chat` + `site-chat-history` 23/23；全量后端 180/180、13 套件；前端 check/lint 通过。Chrome 实测 `/chat` 首次仅 1 次列表请求；首条发送走 `POST /conversations`，追加走 `POST /conversations/:id/messages`；同一 visitor 下详情只请求 1 次，发送后不再额外拉列表。前端 `check`/`lint`/`build` 通过；全量后端 180/180、13 套件。
+- 未提交、推送或部署；工作区既有 resume/主题/队列改动保留。
+
+## 2026-11-24：公开对话改为 GLM 优先、DeepSeek 备用（本地已验证）
+
+- 用户要求（m03372）：「优先 GLM 失败或错误再切换deepSeek」；后台默认模型同步回到 GLM，不再因为配置了 DeepSeek Key 而默认 DeepSeek。
+- `backend/src/chat/config/chat.config.ts`：`glm-4.7-flash` 的 `fallbackModelId` 在有 `DEEPSEEK_API_KEY` 时指向 `deepseek-flash`，否则仍为 `glm-4-flash-250414`；`catalog().defaultModelId` 优先 GLM，其次 DeepSeek，最后 GLM。
+- `backend/src/site/chat/site-chat.service.ts`：`PreparedPublicChat` 增加 `fallback`；`availableModels()` 优先 GLM，DeepSeek 只作为备用；`stream()` 仅在首个 token 前失败、或正常结束但没有任何正文时切换，已输出正文后不重试。`backend/src/site/chat/site-chat.repository.ts` 新增 `switchModel()`，把同一轮次的 modelId 更新为实际模型。
+- `backend/src/site/chat/agent/site-chat.models.ts`：`ChatOpenAI` 与 `ChatDeepSeek` 均设 `maxRetries: 0`；否则 LangChain 默认重试会把 GLM 500 拖到超时，备用来不及启动。
+- 测试：`backend/test/site-chat.e2e.test.mjs` 改为「GLM/DeepSeek 同时配置时仍优先 GLM」，新增「GLM 首 token 前 500 时切 DeepSeek 完成同一轮」（GLM 1 次、DeepSeek 1 次、落库 modelId 为 deepseek-flash、max_tokens 700、thinking disabled）。`site-chat.e2e.test.mjs` 10/10；全量 `MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test` 180/180、13 套件；`npm run build` 通过。
+- 文档：README、`backend/.env.example`、SPEC-010、SPEC-000 与实现计划同步为 GLM 优先、DeepSeek 备用；公开页/后台默认模型文案一致。
+- 真实请求：GLM 直连返回 `429 / 1305`；公开流自动切到 `deepseek-flash`，SSE `start/delta/done` 正常，落库 `turn.modelId=deepseek-flash`，确认备用链路生效。
+- 仍在 dev watch 运行期间误执行 `npm run build`，再次触发 `dist/main` 缺失与 3000 端口断开；已停止旧 watch，最终验证后单独重启。未提交、未推送、未部署。
+
+## 2026-11-24：全站 API 错误改为统一 tips，502 后端恢复（本地已验证）
+
+- 用户反馈（m03171）：服务 502；页面错误提示必须使用统一拦截和 tips，不允许在页面内显示。
+- 后端 502 根因：`nest start --watch` 运行期间又执行了 `npm run build`，build 重写 `backend/dist`，watch 重启时找不到 `dist/main` 与 `dist/site/config/site.defaults.js`，同时残留进程抢占 `127.0.0.1:3000`。已停止旧 watch job，清理 3000 端口，确认 SSH 隧道 `nest-db` 可用，重启 dev watch（job `bash-1fcdec24710f4b9d`）；`GET /api/site` 与 `/api/site-chat` 均 200。教训：dev watch 运行期间不要并行 build。
+- 新增 `frontend/src/utils/error-tips.ts`：全站错误提示总线，同一文案 2 秒内去重，订阅者未挂载时暂存一条。
+- 新增 `frontend/src/components/api-tips/index.tsx`：用 Ant Design `message.useMessage()` 渲染统一 tips；`frontend/src/App.tsx` 在 `ConfigProvider` 内挂载。
+- `frontend/src/api/http.ts`：网络异常、429、5xx 与非 JSON 响应统一 `notifyError`；`frontend/src/store/site-chat.ts` 的 `loadStatus/loadList/open/send/remove` 也统一走 tips，移除 `notice` 状态。
+- 移除公开页内联错误：`frontend/src/pages/site/index.tsx` 的 `errorBanner`、`frontend/src/pages/chat/index.tsx` 的连接/内容/notice/turn error 文案、`frontend/src/pages/resume/index.tsx` 的加载失败块、`frontend/src/pages/site/conversation.tsx` 的 `status==='error'` 提示；后台表单字段校验与任务页面原有错误流程未改。
+- `frontend/src/styles/global.less` 增加 `.api-error-tip` 主题样式：浅色黑底白字、深色白底黑字，与全站黑白主题一致。
+- 验证：`npm run check`、`npm run lint`（0 warnings/0 errors，87 files）、`npm run build` 通过；Chrome 拦截 `/api/site*` 返回 502 时页面顶部出现统一 tips，公开页不再出现“内容加载失败/连接对话服务失败”内联文案；浅色、深色 tips 计算色分别为 `rgb(11,11,11)/rgb(255,255,255)` 与 `rgb(242,242,242)/rgb(10,10,10)`；截图 `/tmp/nest-api-tip-light.png`、`/tmp/nest-api-tip-dark.png`、`/tmp/nest-api-tip-chat.png`。后端未改，沿用限流修复后的 179/179。
+- 未提交、未推送、未部署。
+
+## 2026-11-24：公开对话限流日总量改为按请求计数（本地已验证）
+
+- 问题：`site-chat.service.ts` 用 `consume(ip) ?? consume(visitor)` 调用两次；`consume()` 每次成功都 `daily += 1`，导致一次正常请求日总量加 2，默认 200 实际约 100 次；被 visitor 桶拒绝的请求还会只扣 1。
+- 修复：`backend/src/site/chat/site-chat.limiter.ts` 的 `consume(keys: string[])` 改为一次检查 IP/visitor 全部桶，任一超限直接返回且不写入；全部通过后统一写入各桶，并只 `daily += 1`。`backend/src/site/chat/site-chat.service.ts` 改为传入 `[sha256(ip), visitor:${visitorHash}]` 数组，不再用 `??` 串两次调用。
+- 测试：`backend/test/site-chat.e2e.test.mjs` 新增「日总量按请求计数一次，达到上限后返回429」：`SITE_CHAT_RATE_LIMIT=100`、`SITE_CHAT_DAILY_LIMIT=2`，前两次 200，第三次 429 `SITE_CHAT_RATE_LIMITED` 且 `retryAfter>=1`、上游只调用 2 次。旧实现第一次请求即把日总量加到 2，该用例会失败。
+- 验证：后端全量 `MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test` 179/179、13 套件；前端未改。未提交、未推送、未部署。
+
+## 2026-11-24：首页对话改为固定高度文本域 + 新建会话跳转（本地已验证）
+
+- 用户要求（m02907）：首页点击发送或建议问题时，直接创建一条新会话并跳转到对话页生成，不在首页内联生成；随后（m03078）要求文本域固定高度、支持内部滚动，并把全局滚动条统一为 6px 天蓝色、hover 灰色。
+- 已实现：`frontend/src/pages/site/conversation.tsx` 使用固定高度 `<textarea rows={3}>`（`height:78px`、`resize:none`、`overflow-y:auto`），只负责收问题；发送/Enter/建议问题调用 `setPendingPrompt()` 后 `navigate('/chat')`。Shift+Enter 换行。新增 `frontend/src/pages/site/chat-pending.ts`（sessionStorage + 内存降级）传递一次待发送问题。
+- `frontend/src/pages/chat/index.tsx` 在 `/chat` 状态 ready 后读取 pending，延迟一拍避开 StrictMode 双挂载，再调用 `siteChatStore.send()`；start 后 URL 替换为 `/chat/:id`。删除已无引用的 `frontend/src/pages/site/use-site-chat.ts`。
+- `frontend/src/styles/global.less` 增加 `--theme-scrollbar:#38bdf8`、`--theme-scrollbar-hover:#9ca3af` 与全局 `*` 滚动条规则：6px 宽/高、透明 track、圆角天蓝 thumb、hover 灰；Firefox 用 `scrollbar-width:thin` + `scrollbar-color`。
+- 验证：Chrome 实测 `tagName=TEXTAREA`、`clientHeight=78`、`scrollHeight=235`、`overflowY=auto`、`::-webkit-scrollbar` 宽 `6px`、thumb `rgb(56,189,248)`；点击发送与建议问题都跳到 `/chat/:id`，真实 DeepSeek 返回并落库；390 宽无横向溢出；截图 `/tmp/nest-chatcard-scroll.png`、`/tmp/nest-chatcard-new.png`、`/tmp/nest-chatcard-mobile.png`。前端 check/lint/build 通过；后端未改，沿用 178/178。未提交、未推送、未部署。
+
+## 2026-11-24：移除关于页与 03 ABOUT 分区（本地已验证）
+
+- 用户要求（m02848）：「这个内容和页面要去掉」；截图为首页 `03 ABOUT / 把复杂的事做简单。` 区块。
+- 已删除：`frontend/src/router/index.tsx` 的 `/about` 路由；`frontend/src/pages/site/index.tsx` 的 `03 ABOUT` 分区、`about` 分区文案/引用/能力 chips/公司项目弹层/联系行；首页与简历页导航的「关于」；`SiteExperience` 的 `capabilityPreview` 预览参数及滚动逻辑；`frontend/src/pages/site/home.module.less` 中仅该区使用的 about/capability/project 样式。`/about` 由通配路由回退到 `/`。
+- 保留：后台「能力资料」编辑数据（作为 AI 上下文/未来内容），公开页不再展示；后台预览不再滚到关于区。
+- 验证：前端 `npm run check`、`npm run lint`（0 warnings/0 errors，85 files）通过；Chrome 首页 1440 宽 `scrollHeight≈3094`，导航为想法/作品/简历，`#about` 不存在，`/about` 最终路径 `/`；截图 `/tmp/nest-home-no-about.png`。后端未改，沿用 178/178。未提交、未推送、未部署。
+
+## 2026-11-24：简历文档式排版与主页风格统一（本地已验证）
+
+- 用户要求（m02698）：「有点丑啊 能不能设计成docx文档那种 支持转PDF」；随后（m02724）指出「而且你简历页面和主页风格不一致啊」。
+- 公开页：`frontend/src/pages/resume/index.tsx` + `frontend/src/pages/resume/style.module.less` 改为 A4 文档式纸张；顶部复用首页 HEY. 品牌、想法/作品/简历/关于导航、ThemeToggle，右侧「导出 PDF」；纸张随主题（浅色白纸、深色深纸），打印时强制白底黑字。`@page size:A4`、`window.print()` 导出；`PDF 附件` 保留原上传文件。
+- 首页：`frontend/src/pages/site/index.tsx` 顶部导航与页脚增加「简历」入口，指向 `/resume`。
+- 验证：`npm run check`、`npm run lint`（0 warnings/0 errors，85 files）、`npm run build` 通过；后端 `MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test` 178/178、13 套件。Chrome 1440/390/320 无横向溢出，浅色/深色、sticky 正常；`Page.printToPDF` 导出 `/tmp/nest-resume-export.pdf` 3 页、约 654K；截图 `/tmp/nest-resume-unified-light.png`、`/tmp/nest-resume-unified-dark.png`、`/tmp/nest-resume-unified-mobile.png`。
+- 未提交、未推送、未部署；真实站主登录后的后台保存/预览与正式域名未验证。
+
 # 工作区交接状态
+
+## 2026-11-24：可配置结构化简历（本地已验证）
+
+- 用户要求（m02518）：「这个后续可以做为一个小demo来实现项目作品。先不管。我们需要先完善简历页面。也是一样需要统一UI样式 这是我的简历。这个页面我希望可以做出可配置的。可以方便站主随时更换更新简历。@/Users/awei/Desktop/李武伟简历-5年.pdf」。
+- 数据：`frontend/src/types/site.ts`、`backend/src/site/types/site.type.ts` 的 `resume` 新增可选 `summary/meta/skills/experience/projects/education`；`backend/src/site/dto/save-site.dto.ts` 增加对应嵌套 DTO 与 `TextList` 上限。旧 `{name,role,body,pdfUrl}` 仍可读写；`backend/src/site/site.service.ts` 的 `cleanResume()` 会剔除可选字段的 null/undefined，避免旧编辑器写入 BSON null 导致读取失败。
+- 后台：`frontend/src/pages/admin/fields.tsx` 新增 `LinesField`；`frontend/src/pages/admin/editors.tsx` 的简历分区支持技能组、工作经历、项目经历、教育经历、补充 Markdown 与 PDF。
+- 公开页：`frontend/src/pages/resume/index.tsx` + `frontend/src/pages/resume/style.module.less` 重写为与首页一致的黑白编辑版式（sticky masthead、RESUME 眉题、大号姓名、CONTACT/PDF、01–04 分区、页脚），无结构化内容时回退 Markdown；深色/移动端/打印已验证。该版式后续已被顶部「简历文档式排版与主页风格统一」条目的 A4 文档式排版取代。
+- 数据：站点 version 11，写入真实简历（6 个技能组、2 段工作、4 个项目、1 条教育），`contact.email=IUya0929@163.com`，PDF 写入 `backend/.data/site-assets/cfc300e3-7e3f-4501-a133-34df46e98745.pdf`；备份 `/tmp/site-content-backup-before-resume.json`。
+- 验证：后端 `MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test` 178/178、13 套件；`site.e2e.test.mjs` 35/35（新增结构化字段保存/公开/非法条目拒绝）；前端 `npm run check`、`npm run lint`（0 warnings/0 errors，85 files）、`npm run build` 通过。Chrome 1440/390/320 无横向溢出，深色/浅色、sticky 与打印样式通过；截图 `/tmp/nest-resume-light.png`、`/tmp/nest-resume-dark.png`、`/tmp/nest-resume-mobile.png`、`/tmp/nest-resume-mobile-dark.png`。
+- 未提交、未推送、未部署；真实站主登录后的后台保存/预览与正式域名未验证。
+
+## 2026-11-24：公共确认弹窗（AntD，本地已验证）
+
+- 用户要求（m02420）：「这个弹窗前端接入 antd 自主封装实现一个公共的弹窗 要和主题保持一致」；截图显示 `/chat` 删除会话仍使用浏览器原生 `window.confirm`。
+- 新增 `frontend/src/components/confirm-dialog/index.tsx` + `style.module.less`：`ConfirmProvider` 在 `frontend/src/App.tsx` 的 `ConfigProvider` 内挂载，导出 `useConfirm(options) => Promise<boolean>`；用 AntD `Modal` 承接焦点/遮罩/键盘/Esc，标题、正文、按钮、关闭图标全部走 `--theme-*` 变量，主按钮黑白反色、次按钮透明描边，圆角胶囊；`ConfigProvider` 增加 `button={{ autoInsertSpace: false }}`，避免「取消/删除」被插入空格。
+- `frontend/src/pages/chat/index.tsx` 的删除处理改为 `await confirm({ title:'删除这段对话？', description:'删除后无法恢复。', confirmText:'删除' })`，确认后调用 `siteChatStore.remove`；取消不删，删除当前会话回 `/chat`。
+- 验证：前端 `npm run check`、`npm run lint`（0 warnings/0 errors，85 files）通过；Chrome 实测原生 dialog 不再出现，AntD 弹窗 light `rgb(255,255,255)/rgb(11,11,11)`、dark `rgb(17,17,17)/rgb(242,242,242)`，取消保留会话、确认删除并回 `/chat`，390 宽度无横向溢出；截图 `/tmp/nest-confirm-light.png`、`/tmp/nest-confirm-dark.png`、`/tmp/nest-confirm-mobile-dark.png`。
+- 未提交、未推送；前端 `npm run build` 通过（新增 modal chunk），后端未改。
 
 ## 2026-11-24：公开对话历史、多会话与 LangGraph Agent（本地已验证）
 
@@ -13,8 +125,8 @@
 
 - 用户要求（m01232）：「不弄主题了把这个优化一下 并接入DeepSeek api」。停止配色/主题探索，保留现有黑白主题，只改首页对话卡与公开对话模型。
 - UI：`frontend/src/pages/site/conversation.tsx` 改为两栏编辑布局，左侧标题/说明/完整对话入口，右侧浅表面板；去掉外框与重阴影、胶囊建议按钮与装饰火花，空态左对齐，建议问题改为两列文字行，新增 `chatState`（连接中/在线/回答中/离线）。`frontend/src/pages/site/home.module.less` 同步重写 `.conversation`/`.chatCard`/`.chatEmpty`/`.composer`/`.suggestions` 及 900/600 断点。截图 `/tmp/nest-chatcard-new.png`（1440）、`/tmp/nest-chatcard-mobile.png`（390）、`/tmp/nest-chatcard-live.png`（真实回答）、`/tmp/nest-chat-live.png`（`/chat` 真实回答）。
-- DeepSeek：`backend/src/chat/config/chat.config.ts` 在存在 `DEEPSEEK_API_KEY` 时加入内置模型 `deepseek-flash`（`https://api.deepseek.com`，非思考模式），未配置时不出现、保持旧 GLM 白名单数量；`backend/src/site/chat/site-chat.service.ts` 优先选 DeepSeek，未配置回退 GLM；`backend/src/chat/providers/chat-completions.provider.ts` 增加 402 额度错误。`backend/.env.example` 增加 `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` 说明。
-- 测试：`backend/test/site-chat.e2e.test.mjs` 新增「配置 DeepSeek 时优先 deepseek-flash、未配置保持 GLM」，并还原 `ConfigService.set` 写入的 `process.env`，避免后续用例串上游；全量 `MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test` 164/164、12 套件；前端 check/lint/build 通过。
+- 旧规则（已被本页顶部「公开对话改为 GLM 优先」取代）：`backend/src/chat/config/chat.config.ts` 在存在 `DEEPSEEK_API_KEY` 时加入内置模型 `deepseek-flash`（`https://api.deepseek.com`，非思考模式），未配置时不出现、保持旧 GLM 白名单数量；`backend/src/site/chat/site-chat.service.ts` 优先选 DeepSeek，未配置回退 GLM；`backend/src/chat/providers/chat-completions.provider.ts` 增加 402 额度错误。`backend/.env.example` 增加 `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` 说明。
+- 旧测试（已改名）：`backend/test/site-chat.e2e.test.mjs` 新增「配置 DeepSeek 时优先 deepseek-flash、未配置保持 GLM」，并还原 `ConfigService.set` 写入的 `process.env`，避免后续用例串上游；全量 `MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test` 164/164、12 套件；前端 check/lint/build 通过。
 - 用户已在本机 `backend/.env` 配置 `DEEPSEEK_API_KEY`（文件权限 600，已被 Git 忽略，未入库）；重启后 `ChatConfig.catalog().defaultModelId` 为 `deepseek-flash`，公开对话真实 SSE 返回 delta 与 done，前端 `/chat` 与首页对话卡均拿到完整回答。该 Key 曾在对话中明文出现，按安全流程应尽快在 DeepSeek 控制台撤销并换新 Key，再只写入 `.env`。未提交、未推送、未部署；站点数据仍 version 10。
 
 ## 2026-11-24：黑白主题与黑夜/白天切换（本地已验证）

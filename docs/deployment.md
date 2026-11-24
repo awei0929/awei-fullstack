@@ -73,7 +73,7 @@
 
 聊天功能合同见 [SPEC-006](specs/006-owner-sse-chat.md)，Key申请及多模型配置见 [README](../README.md#站主后台-ai-对话)。以下步骤用于部署与复核；2026-11-12实际发布和验收结果见[上线记录](ai/tasks/006-chat-deployment.md)。
 
-1. 在服务器持久环境文件 `/home/ubuntu/apps/nest/backend/.env` 增加 `GLM_API_KEY`，保留原数据库、Session、站主和媒体配置。默认模型为 `glm-4.7-flash`，单轮时限 `CHAT_TIMEOUT_MS=120000`；如需多模型再增加白名单配置。真实环境文件保持600权限，不进入发布包。
+1. 在服务器持久环境文件 `/home/ubuntu/apps/nest/backend/.env` 增加 `GLM_API_KEY`，保留原数据库、Session、站主和媒体配置。公开对话默认优先 `glm-4.7-flash`；可选增加 `DEEPSEEK_API_KEY`，仅当 GLM 在首个 token 前失败或空输出时切到 `deepseek-flash`，不会改变默认模型。默认单轮时限 `CHAT_TIMEOUT_MS=120000`，公开对话另有 `SITE_CHAT_*` 限流/超时/短答配置。真实环境文件保持600权限，不进入发布包；不要把 Key 写进 Nginx、前端或 `VITE_` 变量。
 2. 核对 Nginx `/api/chat/` 路由可立即转发流数据。可为该前缀单独设置下面的location，或将相关设置合并到已有代理；保留已有TLS、站点及可信转发头配置。部署应用代码不会自动修改Nginx。
 
 ```nginx

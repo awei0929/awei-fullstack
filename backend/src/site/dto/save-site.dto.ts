@@ -1,5 +1,5 @@
 import { plainToInstance, Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsDefined, IsIn, IsInt, IsObject, Matches, Max, Min, ValidateBy, ValidateNested, isEmail } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsDefined, IsIn, IsInt, IsObject, IsOptional, Matches, Max, Min, ValidateBy, ValidateIf, ValidateNested, isEmail } from 'class-validator';
 import type { ValidationOptions } from 'class-validator';
 import { defaultSiteCapabilities, defaultSiteMusic } from '../config/site.defaults.js';
 import { SITE_CAPABILITY_ICONS } from '../config/site.capabilities.js';
@@ -12,13 +12,23 @@ function Text(max: number, min = 0, options?: ValidationOptions): PropertyDecora
   } }, options);
 }
 
+// 列表项仍需逐项限长并拒绝空白，避免把任意长文本塞进简历条目。
+function TextList(maxItems: number, maxChars: number): PropertyDecorator {
+  return ValidateBy({ name: 'siteTextList', constraints: [maxItems, maxChars], validator: {
+    validate: (value: unknown) => Array.isArray(value) && value.length <= maxItems && value.every((item) => typeof item === 'string' && Array.from(item).length > 0 && Array.from(item).length <= maxChars),
+    defaultMessage: () => `列表最多${maxItems}项，每项须为1–${maxChars}个字符`,
+  } });
+}
+
 // URL只接受明确的http(s)，局部资源只放行约定路径；禁止控制字符、反斜杠与路径穿越。
 // 不依赖浏览器自动纠正URL，否则同一个字符串在服务端和浏览器可能指向不同位置。
-function SiteUrl(kind: 'external' | 'audio' | 'image'): PropertyDecorator {
+function SiteUrl(kind: 'external' | 'audio' | 'image' | 'pdf' | 'page'): PropertyDecorator {
   return ValidateBy({ name: 'siteUrl', validator: {
     validate(value: unknown): boolean {
       if (typeof value !== 'string' || value.length > 2048 || /[\s\\\u0000-\u001f\u007f]/u.test(value)) return false;
       if (value === '') return true;
+      if (kind === 'page' && /^\/(?!\/)[A-Za-z0-9/_-]*(?:#[A-Za-z0-9_-]+)?$/.test(value)) return true;
+      if (kind === 'pdf') return /^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.pdf$/u.test(value);
       if (kind === 'audio' && /^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.(mp3|wav|ogg)$/.test(value)) return true;
       if (kind === 'image' && /^\/api\/site\/assets\/[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.(png|jpg|webp)$/.test(value)) return true;
       if (!/^https?:\/\//i.test(value)) return false;
@@ -40,6 +50,44 @@ class HomeDto {
   @Text(80, 1) title!: string;
   @Text(240) subtitle!: string;
   @Text(30, 1) buttonLabel!: string;
+}
+class ResumeSkillDto {
+  @Text(40, 1) label!: string;
+  @TextList(20, 60) items!: string[];
+}
+class ResumeExperienceDto {
+  @Text(80, 1) company!: string;
+  @Text(80, 1) role!: string;
+  @Text(40) period!: string;
+  @Text(600) summary!: string;
+  @TextList(12, 240) highlights!: string[];
+}
+class ResumeProjectDto {
+  @Text(100, 1) name!: string;
+  @Text(80) role!: string;
+  @Text(40) period!: string;
+  @Text(600) summary!: string;
+  @TextList(16, 40) tech!: string[];
+  @TextList(12, 300) highlights!: string[];
+}
+class ResumeEducationDto {
+  @Text(100, 1) school!: string;
+  @Text(80) major!: string;
+  @Text(40) period!: string;
+}
+class ResumeDto {
+  @Text(60) name!: string;
+  @Text(80) role!: string;
+  @Text(20000) body!: string;
+  // 下载按钮只引用本站上传生成的 PDF 路径；空字符串表示清除引用。
+  @SiteUrl('pdf') pdfUrl!: string;
+  // 结构化履历为后加字段：旧内容缺失时读取端按空处理；显式提交时仍逐项校验。
+  @IsOptional() @Text(600) summary?: string;
+  @IsOptional() @Text(60) meta?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(12) @IsObject({ each: true }) @ValidateNested({ each: true }) @Type(() => ResumeSkillDto) skills?: ResumeSkillDto[];
+  @IsOptional() @IsArray() @ArrayMaxSize(12) @IsObject({ each: true }) @ValidateNested({ each: true }) @Type(() => ResumeExperienceDto) experience?: ResumeExperienceDto[];
+  @IsOptional() @IsArray() @ArrayMaxSize(12) @IsObject({ each: true }) @ValidateNested({ each: true }) @Type(() => ResumeProjectDto) projects?: ResumeProjectDto[];
+  @IsOptional() @IsArray() @ArrayMaxSize(8) @IsObject({ each: true }) @ValidateNested({ each: true }) @Type(() => ResumeEducationDto) education?: ResumeEducationDto[];
 }
 class LinkDto {
   @Text(50, 1) label!: string;
@@ -100,6 +148,38 @@ class CapabilityProjectDto {
   @SiteUrl('image') coverUrl!: string;
   @IsBoolean() visible!: boolean;
 }
+class ThoughtDto {
+  @Text(64, 1) @Matches(/^[A-Za-z0-9_-]+$/) id!: string;
+  @Text(80, 1) title!: string;
+  @Text(200) summary!: string;
+  // 想法正文按 Markdown 原文保存；公开读取只按 visible 过滤，不在这里转成 HTML。
+  @Text(20000) content!: string;
+  @Text(40) meta!: string;
+  @IsBoolean() visible!: boolean;
+}
+class WorkDto {
+  @Text(64, 1) @Matches(/^[A-Za-z0-9_-]+$/) id!: string;
+  @Text(80, 1) title!: string;
+  @Text(240) summary!: string;
+  // 项目可暂不提供链接，也允许站内页面（如 /resume）；外部链接仍只接受 http(s)。
+  @SiteUrl('page') url!: string;
+  @Text(20) label!: string;
+  @SiteUrl('image') coverUrl!: string;
+  @Text(40) meta!: string;
+  @IsBoolean() visible!: boolean;
+}
+class SiteChatDto {
+  @IsBoolean() enabled!: boolean;
+  @Text(40, 1) heading!: string;
+  @Text(240) intro!: string;
+  @Text(60, 1) placeholder!: string;
+  // 只用于服务端提示词；公开响应会清空此字段。
+  @Text(4000) systemPrompt!: string;
+  @IsArray() @ArrayMaxSize(3) @ArrayUnique() @ValidateBy({ name: 'siteChatSuggestions', validator: {
+    validate: (value: unknown) => Array.isArray(value) && value.every(item => typeof item === 'string' && Array.from(item).length >= 1 && Array.from(item).length <= 60),
+    defaultMessage: () => '建议问题须为 1–60 个字符，最多 3 个',
+  } }) suggestions!: string[];
+}
 class CapabilityDetailsDto {
   @IsDefined() @IsObject() @ValidateNested() @Type(() => TechnologyDetailsDto) technology!: TechnologyDetailsDto;
   @IsDefined() @IsObject() @ValidateNested() @Type(() => CompanyDetailsDto) company!: CompanyDetailsDto;
@@ -109,6 +189,8 @@ class CapabilityDetailsDto {
 export class SiteContentDto {
   @IsDefined() @IsObject() @ValidateNested() @Type(() => ProfileDto) profile!: ProfileDto;
   @IsDefined() @IsObject() @ValidateNested() @Type(() => HomeDto) home!: HomeDto;
+  // 旧客户端可以省略整个分区；显式提交时仍拒绝 null、数组和不完整对象。
+  @ValidateIf((_, value) => value !== undefined) @IsObject() @ValidateNested() @Type(() => ResumeDto) resume?: ResumeDto;
   @IsDefined() @IsObject() @ValidateNested() @Type(() => ContactDto) contact!: ContactDto;
   @IsDefined() @IsObject() @ValidateNested() @Type(() => AppearanceDto) appearance!: AppearanceDto;
   // 默认值只用于旧客户端省略music；显式null/数组仍经过IsObject和嵌套规则拒绝。
@@ -117,6 +199,10 @@ export class SiteContentDto {
   @IsDefined() @IsObject() @ValidateNested() @Type(() => CapabilitiesDto) capabilities: CapabilitiesDto = plainToInstance(CapabilitiesDto, defaultSiteCapabilities());
   // 新分区仅GET兼容缺失；PUT必须完整提交，避免旧客户端整站保存把已有履历清成默认。
   @IsDefined() @IsObject() @ValidateNested() @Type(() => CapabilityDetailsDto) capabilityDetails!: CapabilityDetailsDto;
+  // 新首页主内容同样要求完整提交，避免旧客户端保存时把想法/作品清空。
+  @IsDefined() @IsArray() @ArrayMaxSize(12) @IsObject({ each: true }) @ArrayUnique((item: ThoughtDto) => item?.id) @ValidateNested({ each: true }) @Type(() => ThoughtDto) thoughts!: ThoughtDto[];
+  @IsDefined() @IsArray() @ArrayMaxSize(12) @IsObject({ each: true }) @ArrayUnique((item: WorkDto) => item?.id) @ValidateNested({ each: true }) @Type(() => WorkDto) works!: WorkDto[];
+  @IsDefined() @IsObject() @ValidateNested() @Type(() => SiteChatDto) chat!: SiteChatDto;
 }
 export class SaveSiteDto {
   @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER - 1) version!: number;

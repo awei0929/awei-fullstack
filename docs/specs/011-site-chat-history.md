@@ -4,7 +4,7 @@
 - 状态：已实现（本地验证通过，未部署）
 - 更新日期：2026-11-24
 - 关联任务 / 前置 SPEC / 替代关系：依赖 [SPEC-010](010-editorial-home.md)；替代其中“不包含对话历史持久化、多会话”的边界。
-- 当前实现与需求差异：已按本 SPEC 实现；`/chat` 使用服务端会话与 `site_chat_conversations`，`POST /api/site-chat/stream` 先落用户轮次再流式回答，旧 `history` 字段仅保留兼容、不再参与上下文。
+- 当前实现与需求差异：已按本 SPEC 实现；`/chat` 使用服务端会话与 `site_chat_conversations`，`POST /api/site-chat/conversations`（首条）或 `POST /api/site-chat/conversations/:conversationId/messages`（后续）先落用户轮次再流式回答，旧 `history` 字段仅保留兼容、不再参与上下文。
 
 ## 目标与范围
 
@@ -25,7 +25,7 @@
 ## 用户行为
 
 - 首次进入 `/chat`：显示空态与建议问题；侧栏“历史对话”为空。
-- 第一次发送：前端生成 `requestId`，调用 `POST /api/site-chat/stream`；后端创建会话、保存用户消息，SSE `start` 返回 `conversationId`；前端把地址替换为 `/chat/:conversationId`。
+- 第一次发送：前端生成 `requestId`，调用 `POST /api/site-chat/conversations`；后端创建会话、保存用户消息，SSE `start` 返回 `conversationId`；前端把地址替换为 `/chat/:conversationId`。后续消息调用 `POST /api/site-chat/conversations/:conversationId/messages`。
 - 回复中：逐段显示助手文本；停止按钮中断；断开后已收到内容保留，状态为中断。
 - 回复完成：侧栏出现该会话，标题取首条用户消息前 24 个码点；列表按最近更新排序。
 - 刷新 `/chat/:id`：从后端拉会话详情，恢复用户/助手消息；刷新 `/chat`：只显示空态和新对话，不自动打开最近会话。
@@ -40,7 +40,8 @@
 | --- | --- | --- | --- |
 | `GET /api/site-chat/conversations` | 公开；`X-Visitor-Id` 必填 | `200 { conversations: [{ id, title, updatedAt, messageCount, preview }] }`，最多 20 条 | 缺失/非法 visitor：`200 { conversations: [] }`；数据库错误 `503` |
 | `GET /api/site-chat/conversations/:id` | 公开；visitor 必须匹配 | `200 { conversation, turns }` | 不存在或不属于该 visitor：`404 SITE_CHAT_CONVERSATION_NOT_FOUND` |
-| `POST /api/site-chat/stream` | 公开；`X-Visitor-Id`；body `{ requestId, conversationId?, message }` | `200 text/event-stream`：`start { conversationId, turnId, requestId }`、`delta { text }`、`done { conversationId, turnId }`、`error { code, message }`、空闲 `ping { ts }`；事件格式见下节 | `400` 参数错误；`404` 会话不存在；`409 SITE_CHAT_BUSY`；`429 SITE_CHAT_RATE_LIMITED`；`503 SITE_CHAT_DISABLED/UNAVAILABLE` |
+| `POST /api/site-chat/conversations` | 公开；`X-Visitor-Id`；body `{ requestId, message }`；创建会话 | `200 text/event-stream`：`start { conversationId, turnId, requestId }`、`delta { text }`、`done { conversationId, turnId }`、`error { code, message }`、空闲 `ping { ts }` | `400` 参数错误；`409 SITE_CHAT_BUSY`；`429 SITE_CHAT_RATE_LIMITED`；`503 SITE_CHAT_DISABLED/UNAVAILABLE` |
+| `POST /api/site-chat/conversations/:conversationId/messages` | 公开；`X-Visitor-Id`；body `{ requestId, message }`；会话必须归属该 visitor | 同上；`start` 回同一 `conversationId` | `404 SITE_CHAT_CONVERSATION_NOT_FOUND`；其余同上 |
 | `DELETE /api/site-chat/conversations/:id` | 公开；visitor 必须匹配 | `204`，直接删除文档 | `404`；不删除其他 visitor 的数据 |
 
 - `X-Visitor-Id`：客户端生成的 UUID v4，服务端校验格式后做 `sha256`，只保存 hash；缺失或非法时不创建数据。它不是认证，不能用于授权；不能读取其他 UUID 的会话。
@@ -52,7 +53,7 @@
 
 ### SSE 协议与长连接
 
-公开对话只有一条 SSE 路由：`POST /api/site-chat/stream`。历史列表、详情、删除都是普通 JSON，不需要第二套 SSE。后端用一个共享 writer，前端用一个共享 parser；两端不允许各自手写事件格式。
+公开对话的 SSE 是两条资源路由的响应体：创建会话 `POST /api/site-chat/conversations`，追加消息 `POST /api/site-chat/conversations/:conversationId/messages`。历史列表、详情、删除都是普通 JSON，不需要第二套 SSE。后端用一个共享 writer，前端用一个共享 parser；两端不允许各自手写事件格式。SSE 是 POST 的响应内容类型，不是额外的第二条请求。
 
 响应头：
 
@@ -96,7 +97,7 @@ data: <单行 JSON>
 - 前端 `frontend/src/utils/visitor.ts` 负责读取/创建 `localStorage['nest.chat.visitor.v1']`；值优先用 `crypto.randomUUID()`，不可用时用 `crypto.getRandomValues` 生成并设置 UUID v4 的 version/variant 位（服务端只接受 UUID v4）。
 - 每次请求带 `X-Visitor-Id`；不写 Cookie。
 - 安全边界：`localStorage` 可被同源脚本读取，因此 visitor ID 不是认证凭据，只用于“同一浏览器找回自己的历史”。不存任何密钥或个人资料；会话内容按匿名数据处理。
-- 限流仍按 IP 的现有 `SiteChatLimiter`；新增按 `visitorHash` 的轻量桶，避免同一 IP 下多个 visitor 绕过。
+- 限流使用同一个 `SiteChatLimiter` 同时检查 IP 桶与 `visitorHash` 桶：先检查全部桶，任一超限则不写入；两者都通过才写入并只把日总量加一。
 
 ### MongoDB 文档
 
@@ -179,8 +180,8 @@ START
 
 - 新增 `frontend/src/utils/visitor.ts`。
 - `frontend/src/api/site-chat.ts`：请求统一带 `X-Visitor-Id`；新增 `listConversations`、`getConversation`、`deleteConversation`；`streamSiteChat` 支持 `conversationId`，解析 `start`。
-- 新增 `frontend/src/store/site-chat.ts`（MobX）：`conversations`、`activeId`、`turns`、`loadingList`、`sending`、`notice`；动作 `loadList`、`open`、`send`、`stop`、`remove`、`newChat`。
-- `frontend/src/pages/chat/index.tsx`：改用 store；`/chat` 空态、`/chat/:conversationId` 历史；侧栏列表、当前项高亮、删除；移动端抽屉。
+- 新增 `frontend/src/store/site-chat.ts`（MobX）：`conversations`、`activeId`、`turns`、`loadingList`、`sending`；动作 `loadList`、`open`、`send`、`stop`、`remove`、`newChat`。
+- `frontend/src/pages/chat/index.tsx`：改用 store；`/chat` 空态、`/chat/:conversationId` 历史；侧栏列表、当前项高亮、删除；移动端抽屉。删除确认用公共 `frontend/src/components/confirm-dialog`（AntD `Modal` + `ConfirmProvider/useConfirm`），不再使用 `window.confirm`，颜色跟随 `--theme-*`。
 - 路由 `frontend/src/router/index.tsx` 增加 `/chat/:conversationId`。
 - 页面刷新时通过 URL 恢复会话；刷新 `/chat` 不自动打开最近会话。
 - 不再把全量消息写 `localStorage`；`localStorage` 只存 visitor ID。
@@ -199,9 +200,9 @@ START
 | AC-08 | `localStorage` 被禁用 | 退回 sessionStorage 或内存，页面仍可对话；有提示 | Chrome |
 | AC-09 | 旧前端仍发送 `history` | 请求不 400；后端忽略该字段 | e2e |
 | AC-10 | 30 天 TTL / 20 会话 / 100 轮上限 | 超限返回明确错误；TTL 索引存在 | 单元/索引检查 |
-| AC-11 | LangGraph + DeepSeek 真实请求 | `/chat` 与首页对话卡都能流式返回并落库 | 人工 + e2e fixture |
+| AC-11 | LangGraph + DeepSeek 真实请求 | 首页发送/建议跳转 `/chat` 后流式返回并落库 | 人工 + e2e fixture |
 | AC-12 | 上游 30 秒无输出 | 客户端收到 `event: ping`；连接不断；`ping` 不写入轮次 | e2e（缩短 ping 间隔） |
-| AC-13 | 客户端 45 秒无任何 SSE 帧 | 前端 abort、显示断线提示；重新打开会话可读到已落库的部分/失败轮次 | Chrome |
+| AC-13 | 客户端 45 秒无任何 SSE 帧 | 前端 abort、通过统一 tips 提示断线；重新打开会话可读到已落库的部分/失败轮次 | Chrome |
 
 ## 实施清单
 

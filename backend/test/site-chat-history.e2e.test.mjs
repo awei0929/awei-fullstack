@@ -24,11 +24,17 @@ describe('公开对话历史读取', () => {
     createdAt: new Date(), updatedAt: new Date(), ...overrides,
   });
 
-  const post = (body, visitor = visitorA, signal) => fetch(`${state.baseUrl}/api/site-chat/stream`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitor },
-    body: JSON.stringify(body), signal,
-  })
+  const post = (body, visitor = visitorA, signal) => {
+    const { conversationId, ...rest } = body;
+    const path = conversationId
+      ? `/api/site-chat/conversations/${conversationId}/messages`
+      : '/api/site-chat/conversations';
+    return fetch(`${state.baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitor },
+      body: JSON.stringify(rest), signal,
+    });
+  }
 
   it('缺少visitor返回空列表且不建数据', async () => {
     const response = await fetch(`${state.baseUrl}/api/site-chat/conversations`);
@@ -212,7 +218,7 @@ describe('公开对话历史读取', () => {
     })
     const controller = new AbortController()
     try {
-      const response = await fetch(`${pingApp.baseUrl}/api/site-chat/stream`, {
+      const response = await fetch(`${pingApp.baseUrl}/api/site-chat/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitorA },
         body: JSON.stringify({ requestId: randomUUID(), message: 'ping测试' }),

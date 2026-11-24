@@ -16,12 +16,18 @@ describe('公开AI对话真实HTTP', () => {
   afterEach(async () => { await stopApp(state); await upstream.close(); });
 
   const visitor = '33333333-3333-4333-8333-333333333333';
-  const post = (body, extra = {}) => fetch(`${state.baseUrl}/api/site-chat/stream`, {
-    ...extra,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitor, ...(extra.headers ?? {}) },
-    body: JSON.stringify({ requestId: randomUUID(), ...body }),
-  });
+  const post = (body, extra = {}) => {
+    const { conversationId, ...rest } = body;
+    const path = conversationId
+      ? `/api/site-chat/conversations/${conversationId}/messages`
+      : '/api/site-chat/conversations';
+    return fetch(`${state.baseUrl}${path}`, {
+      ...extra,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitor, ...(extra.headers ?? {}) },
+      body: JSON.stringify({ requestId: randomUUID(), ...rest }),
+    });
+  };
 
   it('状态无需登录、禁止缓存且不暴露模型配置', async () => {
     const response = await fetch(`${state.baseUrl}/api/site-chat`);
@@ -56,34 +62,77 @@ describe('公开AI对话真实HTTP', () => {
     assert.equal(JSON.stringify(result).includes('fixture-key'), false);
   });
 
-  it('配置DeepSeek时公开对话优先使用deepseek-flash，未配置时保持GLM', async () => {
+  it('同时配置GLM与DeepSeek时公开对话仍优先使用GLM', async () => {
     const saved = { key: process.env.DEEPSEEK_API_KEY, url: process.env.DEEPSEEK_BASE_URL };
     const deepseekUpstream = await modelFixture();
     const deepseek = await startApp({
       config: {
         DEEPSEEK_API_KEY: 'deepseek-fixture', DEEPSEEK_BASE_URL: deepseekUpstream.url,
-        GLM_API_KEY: 'glm-fixture', GLM_BASE_URL: upstream.url, CHAT_MODELS_JSON: '', CHAT_TIMEOUT_MS: '1000',
+        GLM_API_KEY: 'glm-fixture', GLM_BASE_URL: upstream.url, CHAT_MODELS_JSON: '', CHAT_TIMEOUT_MS: '1000', SITE_CHAT_TIMEOUT_MS: '3000',
       },
     });
     try {
       const status = await fetch(`${deepseek.baseUrl}/api/site-chat`).then(response => response.json());
       assert.deepEqual(status, { enabled: true, available: true });
-      const response = await fetch(`${deepseek.baseUrl}/api/site-chat/stream`, {
+      const response = await fetch(`${deepseek.baseUrl}/api/site-chat/conversations`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitor },
         body: JSON.stringify({ requestId: randomUUID(), message: '你好' }),
       });
       assert.equal(response.status, 200);
       await collect(response);
-      assert.equal(deepseekUpstream.calls.length, 1);
-      assert.equal(upstream.calls.length, 0);
-      assert.equal(deepseekUpstream.calls[0].body.model, 'deepseek-flash');
-      assert.equal(deepseekUpstream.calls[0].body.max_tokens, 700);
-      assert.deepEqual(deepseekUpstream.calls[0].body.thinking, { type: 'disabled' });
-      assert.match(deepseekUpstream.calls[0].authorization, /^Bearer deepseek-fixture$/);
+      assert.equal(upstream.calls.length, 1);
+      assert.equal(deepseekUpstream.calls.length, 0);
+      assert.equal(upstream.calls[0].body.model, 'glm-4.7-flash');
+      assert.equal(upstream.calls[0].body.max_tokens, 700);
+      assert.deepEqual(upstream.calls[0].body.thinking, { type: 'disabled' });
+      assert.match(upstream.calls[0].authorization, /^Bearer glm-fixture$/);
     } finally {
       await stopApp(deepseek);
       await deepseekUpstream.close();
       // ConfigService.set会写process.env；不还原会让后续共享用例继续指向已关闭的DeepSeek上游。
+      if (saved.key === undefined) delete process.env.DEEPSEEK_API_KEY;
+      else process.env.DEEPSEEK_API_KEY = saved.key;
+      if (saved.url === undefined) delete process.env.DEEPSEEK_BASE_URL;
+      else process.env.DEEPSEEK_BASE_URL = saved.url;
+    }
+  });
+
+  it('GLM首个token前失败时自动切换DeepSeek并完成同一轮', async () => {
+    const saved = { key: process.env.DEEPSEEK_API_KEY, url: process.env.DEEPSEEK_BASE_URL };
+    const deepseekUpstream = await modelFixture();
+    const deepseek = await startApp({
+      config: {
+        DEEPSEEK_API_KEY: 'deepseek-fixture', DEEPSEEK_BASE_URL: deepseekUpstream.url,
+        GLM_API_KEY: 'glm-fixture', GLM_BASE_URL: upstream.url, CHAT_MODELS_JSON: '', CHAT_TIMEOUT_MS: '1000', SITE_CHAT_TIMEOUT_MS: '3000',
+      },
+    });
+    upstream.handle(({ response }) => {
+      response.writeHead(500);
+      response.end('glm upstream failed');
+      return true;
+    });
+    try {
+      const response = await fetch(`${deepseek.baseUrl}/api/site-chat/conversations`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitor },
+        body: JSON.stringify({ requestId: randomUUID(), message: '你好' }),
+      });
+      assert.equal(response.status, 200);
+      const result = await collect(response);
+      assert.equal(result.at(-1).type, 'done');
+      assert.equal(result.filter(event => event.type === 'delta').map(event => event.text).join(''), '你好，世界');
+      assert.equal(upstream.calls.length, 1);
+      assert.equal(deepseekUpstream.calls.length, 1);
+      assert.equal(deepseekUpstream.calls[0].body.model, 'deepseek-flash');
+      assert.equal(deepseekUpstream.calls[0].body.max_tokens, 700);
+      assert.deepEqual(deepseekUpstream.calls[0].body.thinking, { type: 'disabled' });
+      assert.match(deepseekUpstream.calls[0].authorization, /^Bearer deepseek-fixture$/);
+
+      const conversationId = result[0].conversationId;
+      const record = await deepseek.connection.collection('site_chat_conversations').findOne({ id: conversationId });
+      assert.equal(record.turns[0].modelId, 'deepseek-flash');
+    } finally {
+      await stopApp(deepseek);
+      await deepseekUpstream.close();
       if (saved.key === undefined) delete process.env.DEEPSEEK_API_KEY;
       else process.env.DEEPSEEK_API_KEY = saved.key;
       if (saved.url === undefined) delete process.env.DEEPSEEK_BASE_URL;
@@ -142,14 +191,14 @@ describe('公开AI对话真实HTTP', () => {
     });
     try {
       for (let index = 0; index < 2; index += 1) {
-        const response = await fetch(`${limited.baseUrl}/api/site-chat/stream`, {
+        const response = await fetch(`${limited.baseUrl}/api/site-chat/conversations`, {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitor },
           body: JSON.stringify({ requestId: randomUUID(), message: '你好' }),
         });
         assert.equal(response.status, 200);
         await collect(response);
       }
-      const blocked = await fetch(`${limited.baseUrl}/api/site-chat/stream`, {
+      const blocked = await fetch(`${limited.baseUrl}/api/site-chat/conversations`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitor },
         body: JSON.stringify({ requestId: randomUUID(), message: '你好' }),
       });
@@ -162,6 +211,39 @@ describe('公开AI对话真实HTTP', () => {
     } finally {
       await stopApp(limited);
       await limitedUpstream.close();
+    }
+  });
+
+  it('日总量按请求计数一次，达到上限后返回429', async () => {
+    const dailyUpstream = await modelFixture();
+    const daily = await startApp({
+      config: {
+        GLM_API_KEY: 'fixture-key', GLM_BASE_URL: dailyUpstream.url, CHAT_MODELS_JSON: '',
+        SITE_CHAT_RATE_LIMIT: '100', SITE_CHAT_RATE_WINDOW_MS: '60000', SITE_CHAT_DAILY_LIMIT: '2',
+      },
+    });
+    try {
+      for (let index = 0; index < 2; index += 1) {
+        const response = await fetch(`${daily.baseUrl}/api/site-chat/conversations`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitor },
+          body: JSON.stringify({ requestId: randomUUID(), message: '你好' }),
+        });
+        assert.equal(response.status, 200);
+        await collect(response);
+      }
+      const blocked = await fetch(`${daily.baseUrl}/api/site-chat/conversations`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Visitor-Id': visitor },
+        body: JSON.stringify({ requestId: randomUUID(), message: '你好' }),
+      });
+      assert.equal(blocked.status, 429);
+      assert.match(blocked.headers.get('content-type'), /json/);
+      const body = await blocked.json();
+      assert.equal(body.code, 'SITE_CHAT_RATE_LIMITED');
+      assert.ok(body.retryAfter >= 1);
+      assert.equal(dailyUpstream.calls.length, 2);
+    } finally {
+      await stopApp(daily);
+      await dailyUpstream.close();
     }
   });
 

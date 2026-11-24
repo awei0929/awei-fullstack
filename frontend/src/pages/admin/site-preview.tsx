@@ -7,7 +7,7 @@ import { isPreviewReadyEvent, SITE_PREVIEW_DRAFT } from './preview-protocol'
 import styles from './site-preview.module.less'
 
 // oxlint-disable-next-line react/only-export-components -- 深读MobX草稿，保持iframe内的未保存内容同步。
-export const SitePreview = observer(function SitePreview({ content, device }: { content: SiteContent; device: SitePreviewDevice }) {
+export const SitePreview = observer(function SitePreview({ content, device, section }: { content: SiteContent; device: SitePreviewDevice; section?: 'resume' | 'capabilities' | 'thoughts' | 'works' | 'conversation' }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [width, setWidth] = useState<number | null>(null)
@@ -47,7 +47,7 @@ export const SitePreview = observer(function SitePreview({ content, device }: { 
         ref={frameRef}
         className={styles.canvas}
         title={device === 'mobile' ? '官网手机预览' : '官网桌面预览'}
-        src="/admin/preview"
+        src={section ? `/admin/preview?view=${section}` : '/admin/preview'}
         style={{ width: geometry.canvasWidth, height: geometry.canvasHeight, transform: `scale(${geometry.scale})` }}
         onLoad={sendDraft}
       />

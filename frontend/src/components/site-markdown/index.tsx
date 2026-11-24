@@ -13,8 +13,8 @@ export function SiteImage({ src, alt = '', ...props }: ComponentProps<'img'>) {
 }
 
 // 不启用raw HTML插件；链接支持严格本站文件路径，图片仍使用独立图片白名单。
-export function SiteMarkdown({ content }: { content: string }) {
-  return <div className={styles.markdown}><Markdown remarkPlugins={[remarkGfm]} skipHtml urlTransform={(url, key) => {
+export function SiteMarkdown({ content, theme = 'dark' }: { content: string; theme?: 'dark' | 'paper' }) {
+  return <div className={`${styles.markdown}${theme === 'paper' ? ` ${styles.paper}` : ''}`}><Markdown remarkPlugins={[remarkGfm]} skipHtml urlTransform={(url, key) => {
     if (key === 'src') return isSafeSiteUrl(url, 'image') ? url : undefined
     return /^#[\w\u4e00-\u9fff-]+$/u.test(url) || isSafeSiteUrl(url, 'markdown') ? url : undefined
   }} components={{

@@ -13,6 +13,7 @@ export function createChatModel(settings: ModelSettings, maxTokens: number): Bas
       model: settings.model,
       maxTokens,
       streaming: true,
+      maxRetries: 0,
       modelKwargs,
       configuration: { baseURL: settings.baseUrl },
     });
@@ -22,6 +23,7 @@ export function createChatModel(settings: ModelSettings, maxTokens: number): Bas
     model: settings.model,
     maxTokens,
     streaming: true,
+    maxRetries: 0,
     modelKwargs,
     configuration: { baseURL: settings.baseUrl },
   });

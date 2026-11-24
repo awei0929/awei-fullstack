@@ -51,6 +51,22 @@
 .formBody { padding: 24px; }
 .alert { margin: 16px; }
 .formBody .alert { margin: 0 0 16px; }
+.jobPanel { margin-top: 24px; }
+.jobGuest { padding: 28px 24px; }
+.jobBody { padding: 20px 24px 24px; }
+.jobBody :global(.ant-form-inline) { flex-wrap: wrap; gap: 12px; }
+.jobInput { flex: 1 1 260px; margin-bottom: 0; }
+.jobInput :global(.ant-input) { width: 100%; }
+.jobAlert { margin: 16px 0 0; }
+.jobEmpty { padding: 28px 0 12px; }
+.jobList { list-style: none; margin: 16px 0 0; padding: 0; }
+.jobRow { padding: 14px 0; border-bottom: 1px solid #eef1eb; }
+.jobRow:last-child { border-bottom: 0; }
+.jobRowHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.jobLabel { font-weight: 500; overflow-wrap: anywhere; }
+.jobResult, .jobError { margin: 8px 0 0; font-size: 13px; line-height: 1.6; }
+.jobResult { color: #21634d; }
+.jobError { color: #a32d2d; }
 @media (max-width: 760px) {
   .header { height: 68px; padding: 0 20px; }
   .main { padding: 36px 16px 24px; }
@@ -62,6 +78,10 @@
   .taskDot { align-self: start; margin-top: 8px; }
   .taskActions { grid-column: 2; max-width: none; }
   .statsPanel { margin-bottom: 20px; }
+  .jobPanel { margin-top: 20px; }
+  .jobBody { padding: 18px 20px 20px; }
+  .jobBody :global(.ant-form-inline) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .jobInput { flex: auto; }
   .brand { gap: 9px; font-size: 14px; }
   .brandDivider { padding: 0 4px; }
   .accountControls { gap: 8px; }

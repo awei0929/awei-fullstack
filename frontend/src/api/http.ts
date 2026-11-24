@@ -1,3 +1,5 @@
+import { notifyError } from '../utils/error-tips'
+
 export class HttpError extends Error {
   readonly status: number
   readonly code?: string
@@ -29,7 +31,9 @@ export async function requestResponse(path: string, options: RequestOptions = {}
     })
   } catch (error) {
     if (init.signal?.aborted) throw error
-    throw new Error('无法连接服务，请检查网络后重试')
+    const message = '无法连接服务，请检查网络后重试'
+    notifyError(message)
+    throw new Error(message)
   }
 
   if (!response.ok) {
@@ -37,12 +41,14 @@ export async function requestResponse(path: string, options: RequestOptions = {}
     const message = body && typeof body === 'object' && 'message' in body
       ? body.message
       : null
+    const text = Array.isArray(message)
+      ? message.join('；')
+      : typeof message === 'string'
+        ? message
+        : `请求失败（${response.status}），请稍后重试`
+    if (response.status === 429 || response.status >= 500) notifyError(text)
     throw new HttpError(
-      Array.isArray(message)
-        ? message.join('；')
-        : typeof message === 'string'
-          ? message
-          : `请求失败（${response.status}），请稍后重试`,
+      text,
       response.status,
       body && typeof body === 'object' && 'code' in body && typeof body.code === 'string' ? body.code : undefined,
     )
@@ -54,6 +60,10 @@ export async function requestResponse(path: string, options: RequestOptions = {}
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const response = await requestResponse(path, options)
   const body: unknown = await response.json().catch(() => null)
-  if (body === null) throw new Error('接口没有返回有效的 JSON 数据')
+  if (body === null) {
+    const message = '接口没有返回有效的数据，请稍后重试'
+    notifyError(message)
+    throw new Error(message)
+  }
   return body as T
 }

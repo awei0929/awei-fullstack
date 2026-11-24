@@ -17,7 +17,8 @@ export class ChatConfig {
       ];
       // DeepSeek 只在提供Key时出现，避免未配置的部署多出一个不可用模型，也保持旧白名单数量不变。
       // 公开对话使用非思考模式，降低首字延迟与费用；DeepSeek 的思考参数与GLM同名，可直接复用适配器。
-      const deepseek = this.config.get<string>('DEEPSEEK_API_KEY')?.trim() ? [{
+      const deepseekKey = this.config.get<string>('DEEPSEEK_API_KEY')?.trim();
+      const deepseek = deepseekKey ? [{
         id: 'deepseek-flash', label: 'DeepSeek-Flash', model: 'deepseek-flash',
         baseUrl: this.config.get<string>('DEEPSEEK_BASE_URL') || 'https://api.deepseek.com',
         apiKeyEnv: 'DEEPSEEK_API_KEY', disableThinking: true,
@@ -32,7 +33,9 @@ export class ChatConfig {
         const url = new URL(baseUrl);
         if (url.username || url.password || url.search || url.hash || !(url.protocol === 'https:' || (url.protocol === 'http:' && this.config.get('NODE_ENV') !== 'production' && ['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname)))) throw new Error();
         // 备用关系由代码固定，额外白名单不能注入关系或覆盖内置id，避免自动调用收费模型。
-        return { id, label: label.trim(), model: model.trim(), baseUrl: url.href.replace(/\/$/, ''), apiKey: this.config.get<string>(apiKeyEnv)?.trim() || '', disableThinking, ...(id === 'glm-4.7-flash' ? { fallbackModelId: 'glm-4-flash-250414' } : {}) };
+        // 默认 GLM 优先；只有配置 DeepSeek 时才把备用从免费 GLM 换成 DeepSeek。
+        const fallbackModelId = id === 'glm-4.7-flash' ? (deepseekKey ? 'deepseek-flash' : 'glm-4-flash-250414') : undefined;
+        return { id, label: label.trim(), model: model.trim(), baseUrl: url.href.replace(/\/$/, ''), apiKey: this.config.get<string>(apiKeyEnv)?.trim() || '', disableThinking, ...(fallbackModelId ? { fallbackModelId } : {}) };
       });
     } catch {
       // 不把JSON解析异常或原始配置抛出，避免错误页/日志包含密钥。
@@ -41,8 +44,10 @@ export class ChatConfig {
   }
   catalog(): { models: ChatModel[]; defaultModelId: string } {
     const models = this.models();
-    // 配置了DeepSeek后后台也默认选它；未配置时保持原GLM默认，避免改变已有部署行为。
-    const defaultModelId = models.find(model => model.id === 'deepseek-flash' && model.apiKey)?.id ?? 'glm-4.7-flash';
+    // 默认仍优先 GLM；只有 GLM 没配 Key 时，才让已配置的 DeepSeek 成为默认。
+    const defaultModelId = models.find(model => model.id === 'glm-4.7-flash' && model.apiKey)?.id
+      ?? models.find(model => model.id === 'deepseek-flash' && model.apiKey)?.id
+      ?? 'glm-4.7-flash';
     return { models: models.map(model => ({ id: model.id, label: model.label, available: Boolean(model.apiKey), ...(model.fallbackModelId ? { fallbackModelId: model.fallbackModelId } : {}) })), defaultModelId };
   }
   timeout(): number {

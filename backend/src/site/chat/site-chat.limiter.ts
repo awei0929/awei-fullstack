@@ -13,7 +13,8 @@ export class SiteChatLimiter {
 
   constructor(private readonly config: SiteChatConfig) {}
 
-  consume(key: string): Limited | null {
+  // 一次请求可能同时受 IP 和 visitor 两个桶约束；先检查全部桶，再统一写入并只记一次日总量。
+  consume(keys: string[]): Limited | null {
     const now = Date.now();
     this.rollDay(now);
     const window = this.config.rateWindow();
@@ -21,13 +22,20 @@ export class SiteChatLimiter {
     if (this.daily >= this.config.dailyLimit()) {
       return { retryAfter: Math.max(1, Math.ceil((this.nextUtcMidnight(now) - now) / 1000)) };
     }
-    const hits = (this.buckets.get(key) ?? []).filter(time => now - time < window);
-    if (hits.length >= limit) {
-      this.buckets.set(key, hits);
-      return { retryAfter: Math.max(1, Math.ceil((hits[0] + window - now) / 1000)) };
+    const entries = [...new Set(keys)].map(key => ({
+      key,
+      hits: (this.buckets.get(key) ?? []).filter(time => now - time < window),
+    }));
+    for (const entry of entries) {
+      if (entry.hits.length >= limit) {
+        this.buckets.set(entry.key, entry.hits);
+        return { retryAfter: Math.max(1, Math.ceil((entry.hits[0] + window - now) / 1000)) };
+      }
     }
-    hits.push(now);
-    this.buckets.set(key, hits);
+    for (const entry of entries) {
+      entry.hits.push(now);
+      this.buckets.set(entry.key, entry.hits);
+    }
     this.daily += 1;
     // 防御大量不同来源把表撑大：只清理已经过窗的桶，不影响仍在限流中的记录。
     if (this.buckets.size > 4000) {

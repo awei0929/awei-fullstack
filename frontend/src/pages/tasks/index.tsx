@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Empty, Form, Input, Modal, Spin, message } from 'antd'
+import { Alert, Button, Empty, Form, Input, Modal, Progress, Spin, Tag, message } from 'antd'
 import { observer } from 'mobx-react-lite'
 import { AuthModal } from '../../components/auth-modal'
 import { authStore } from '../../store/auth'
+import { jobsStore } from '../../store/jobs'
 import { tasksStore } from '../../store/tasks'
+import type { JobStatus } from '../../types/job'
 import type { Task } from '../../types/task'
 import styles from './style.module.less'
 
 const formatTime = (value: string) => new Intl.DateTimeFormat('zh-CN', {
   month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
 }).format(new Date(value))
+
+const jobStatusText: Record<JobStatus, string> = {
+  pending: '排队中', running: '处理中', done: '已完成', failed: '失败',
+}
+
+const jobTagColor: Record<JobStatus, string> = {
+  pending: 'default', running: 'processing', done: 'success', failed: 'error',
+}
 
 export const TasksPage = observer(function TasksPage() {
   const [authOpen, setAuthOpen] = useState(false)
@@ -87,6 +97,7 @@ export const TasksPage = observer(function TasksPage() {
 
 export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }: { requestLogin: () => void }) {
   const [form] = Form.useForm<{ title: string }>()
+  const [jobForm] = Form.useForm<{ label: string }>()
   const [editForm] = Form.useForm<{ title: string }>()
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [deletingTask, setDeletingTask] = useState<Task | null>(null)
@@ -94,7 +105,7 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
   const guest = authStore.user === null
   const savingEdit = tasksStore.editingTaskId !== null
   const savingDelete = tasksStore.deletingTaskId !== null
-  const busy = tasksStore.isMutating || authStore.loggingOut
+  const busy = tasksStore.isMutating || authStore.loggingOut || jobsStore.creating
   const refreshing = tasksStore.loading || tasksStore.statsLoading
 
   async function handleCreate({ title }: { title: string }) {
@@ -103,6 +114,16 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
     if (await tasksStore.createTask(title.trim()) && identity === authStore.identityVersion) {
       form.resetFields()
       void messageApi.success('任务已创建')
+    }
+  }
+
+  async function handleCreateJob({ label }: { label: string }) {
+    if (!authStore.user) { requestLogin(); return }
+    const identity = authStore.identityVersion
+    jobsStore.clearCreateError()
+    if (await jobsStore.createJob(label.trim()) && identity === authStore.identityVersion) {
+      jobForm.resetFields()
+      void messageApi.success('作业已提交')
     }
   }
 
@@ -239,6 +260,65 @@ export const TasksWorkspace = observer(function TasksWorkspace({ requestLogin }:
           </Spin>
         </section>
       </div>
+
+      <section className={`${styles.panel} ${styles.jobPanel}`} aria-labelledby="job-heading">
+        <div className={styles.panelHeader}>
+          <h2 id="job-heading">异步作业演示</h2>
+        </div>
+        {guest ? (
+          <div className={styles.jobGuest}><Button onClick={requestLogin}>登录后提交</Button></div>
+        ) : (
+          <div className={styles.jobBody}>
+            <Form form={jobForm} layout="inline" onFinish={(values) => void handleCreateJob(values)} requiredMark={false} disabled={busy}>
+              <Form.Item
+                name="label"
+                className={styles.jobInput}
+                rules={[
+                  { required: true, whitespace: true, message: '请输入作业标签' },
+                  { max: 80, message: '作业标签最多 80 个字符' },
+                ]}
+              >
+                <Input placeholder="给作业起个名字" maxLength={80} autoComplete="off" />
+              </Form.Item>
+              <Button type="primary" htmlType="submit" loading={jobsStore.creating} disabled={refreshing || busy}>提交作业</Button>
+            </Form>
+            {jobsStore.createError && (
+              <Alert type="error" showIcon title="作业提交失败" description={jobsStore.createError} className={styles.jobAlert} />
+            )}
+            {jobsStore.loadError && (
+              <Alert
+                type="error"
+                showIcon
+                title="作业查询失败"
+                description={jobsStore.loadError}
+                className={styles.jobAlert}
+                action={<Button size="small" onClick={() => void jobsStore.refresh()}>重试</Button>}
+              />
+            )}
+            <div aria-live="polite">
+              {jobsStore.jobs.length === 0 ? (
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有作业" className={styles.jobEmpty} />
+              ) : (
+                <ul className={styles.jobList}>
+                  {jobsStore.jobs.map((job) => (
+                    <li key={job.id} className={styles.jobRow}>
+                      <div className={styles.jobRowHead}>
+                        <span className={styles.jobLabel}>{job.label}</span>
+                        <Tag color={jobTagColor[job.status]}>{jobStatusText[job.status]}</Tag>
+                      </div>
+                      {(job.status === 'pending' || job.status === 'running') && (
+                        <Progress percent={job.progress} size="small" showInfo={false} />
+                      )}
+                      {job.status === 'done' && <p className={styles.jobResult}>{job.result}</p>}
+                      {job.status === 'failed' && <p className={styles.jobError}>{job.error ?? '作业失败'}</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
 
       <Modal
         className={styles.taskModal}

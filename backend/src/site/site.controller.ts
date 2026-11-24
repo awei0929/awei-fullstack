@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import type { Response } from 'express';
 import { SiteAudioUploadInterceptor } from './interceptors/site-audio-upload.interceptor.js';
 import { SiteFileUploadInterceptor } from './interceptors/site-file-upload.interceptor.js';
@@ -8,20 +8,35 @@ import { SiteOwnerGuard } from './guards/site-owner.guard.js';
 import { SaveSiteDto } from './dto/save-site.dto.js';
 import { SiteService } from './site.service.js';
 import { SiteAssetsService } from './site-assets.service.js';
-import type { SiteDocument, SiteFileAsset, SiteUpload } from './types/site.type.js';
+import type { SiteContent, SiteDocument, SiteFileAsset, SiteUpload } from './types/site.type.js';
+
+type SiteResponse = Omit<SiteDocument, 'content'> & { content: Omit<SiteContent, 'resume'> & Partial<Pick<SiteContent, 'resume'>> };
+
+// 已打开的旧前端校验固定响应字段。由新版读取显式选择简历，提交简历时一同返回保存结果。
+function siteResponse(document: SiteDocument, includeResume: boolean): SiteResponse {
+  if (includeResume) return document;
+  const { resume: _resume, ...content } = document.content;
+  return { ...document, content };
+}
 
 // 公开读取经过隐藏项目投影，受控管理保留完整文档；管理入口显式列出Session→Owner→CSRF顺序。
 @Controller('site')
 export class SiteController {
   constructor(private readonly site: SiteService, private readonly assets: SiteAssetsService) {}
   @Get()
-  publicSite(): Promise<SiteDocument> { return this.site.readPublic(); }
+  async publicSite(@Query('include') include?: string): Promise<SiteResponse> {
+    return siteResponse(await this.site.readPublic(), include === 'resume');
+  }
   @Get('config')
   @UseGuards(SessionGuard, SiteOwnerGuard)
-  config(): Promise<SiteDocument> { return this.site.read(); }
+  async config(@Query('include') include?: string): Promise<SiteResponse> {
+    return siteResponse(await this.site.read(), include === 'resume');
+  }
   @Put('config')
   @UseGuards(SessionGuard, SiteOwnerGuard, CsrfGuard)
-  save(@Body() input: SaveSiteDto): Promise<SiteDocument> { return this.site.save(input.version, input.content); }
+  async save(@Body() input: SaveSiteDto): Promise<SiteResponse> {
+    return siteResponse(await this.site.save(input.version, input.content), input.content.resume !== undefined);
+  }
   @Post('audio-assets')
   @UseGuards(SessionGuard, SiteOwnerGuard, CsrfGuard)
   // Guard先于文件解析执行；未授权请求不会触及媒体存储。

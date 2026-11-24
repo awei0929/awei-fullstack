@@ -5,6 +5,11 @@ coverage/
 .env
 .env.*
 !.env.example
+# 本地记忆/会话文件可能含私密内容
+.memsearch/
+# 私钥与证书
+*.pem
+*.key
 *.log
 *.tsbuildinfo
 

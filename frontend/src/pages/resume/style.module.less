@@ -1,0 +1,554 @@
+.page {
+  min-height: 100dvh;
+  background: var(--theme-bg);
+  color: var(--theme-text);
+  font-family: 'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.preview {
+  background: transparent;
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--theme-line);
+  background: var(--theme-header);
+  backdrop-filter: blur(14px);
+}
+
+.toolbarInner {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  width: 100%;
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 18px 40px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--theme-text);
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brandMark {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--theme-text);
+  color: var(--theme-bg);
+  font-family: Georgia, 'Songti SC', serif;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.nav {
+  display: flex;
+  gap: 30px;
+  margin-left: 18px;
+  color: var(--theme-muted);
+  font-size: 13px;
+}
+
+.nav a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.nav a[aria-current='page'] {
+  color: var(--theme-text);
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  text-decoration-thickness: 1px;
+}
+
+.nav a:hover {
+  color: var(--theme-muted);
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.printAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--theme-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--theme-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.printAction:hover {
+  border-color: var(--theme-text);
+  background: var(--theme-text);
+  color: var(--theme-bg);
+}
+
+.paperShell {
+  padding: 48px 24px 96px;
+}
+
+.paper {
+  display: flex;
+  flex-direction: column;
+  width: 210mm;
+  max-width: 100%;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 20mm 18mm;
+  background: var(--theme-bg);
+  box-shadow: none;
+  color: var(--theme-text);
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 10pt;
+  line-height: 1.65;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  --doc-ink: var(--theme-text);
+  --doc-body: var(--theme-text);
+  --doc-muted: var(--theme-muted);
+  --doc-line: var(--theme-line);
+  --doc-line-strong: var(--theme-line-strong);
+}
+
+.docHeader {
+  padding-bottom: 6mm;
+  border-bottom: 1px solid var(--doc-line-strong);
+  break-after: avoid;
+}
+
+.docHeader h1 {
+  margin: 0;
+  color: var(--doc-ink);
+  font-size: 30pt;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  outline: none;
+}
+
+.role {
+  margin: 2.4mm 0 0;
+  color: var(--doc-body);
+  font-size: 12pt;
+  font-weight: 500;
+}
+
+.contactLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 3mm;
+  color: var(--doc-muted);
+  font-size: 9.5pt;
+}
+
+.contactLine a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.contactLine a:hover {
+  text-decoration: underline;
+}
+
+.pdfLink {
+  color: var(--doc-muted);
+}
+
+.summary {
+  max-width: 168mm;
+  margin: 3.5mm 0 0;
+  color: var(--doc-body);
+  font-size: 10pt;
+  line-height: 1.75;
+}
+
+.section {
+  margin-top: 7mm;
+}
+
+.sectionTitle {
+  margin: 0 0 3.5mm;
+  padding-bottom: 1.6mm;
+  border-bottom: 1px solid var(--doc-line-strong);
+  color: var(--doc-ink);
+  font-size: 12pt;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  break-after: avoid;
+}
+
+.skillList {
+  display: flex;
+  flex-direction: column;
+}
+
+.skillRow {
+  display: grid;
+  grid-template-columns: 31mm minmax(0, 1fr);
+  gap: 5mm;
+  padding: 2.2mm 0;
+  border-bottom: 1px solid var(--doc-line);
+  break-inside: avoid;
+}
+
+.skillRow:first-child {
+  padding-top: 0;
+}
+
+.skillRow:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.skillRow h3 {
+  margin: 0;
+  color: var(--doc-ink);
+  font-size: 10pt;
+  font-weight: 600;
+}
+
+.skillRow p {
+  margin: 0;
+  color: var(--doc-body);
+  font-size: 10pt;
+}
+
+.entryList,
+.projectList,
+.educationList {
+  display: flex;
+  flex-direction: column;
+}
+
+.entry,
+.project {
+  padding: 0 0 5mm;
+  break-inside: avoid;
+}
+
+.entry + .entry,
+.project + .project {
+  padding-top: 5mm;
+  border-top: 1px solid var(--doc-line);
+}
+
+.entry:last-child,
+.project:last-child {
+  padding-bottom: 0;
+}
+
+.entryHead,
+.projectHead,
+.educationRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8mm;
+}
+
+.entryHead h3,
+.projectHead h3,
+.educationRow h3 {
+  margin: 0;
+  color: var(--doc-ink);
+  font-size: 11pt;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.entryRole,
+.projectRole,
+.educationRow p {
+  margin: 1mm 0 0;
+  color: var(--doc-muted);
+  font-size: 9.5pt;
+  line-height: 1.5;
+}
+
+.entryPeriod,
+.projectPeriod,
+.educationPeriod {
+  flex: 0 0 auto;
+  margin: 1mm 0 0;
+  color: var(--doc-muted);
+  font-size: 9pt;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.entrySummary,
+.projectSummary {
+  margin: 2mm 0 0;
+  color: var(--doc-body);
+  font-size: 10pt;
+  line-height: 1.7;
+}
+
+.tech {
+  margin: 1.6mm 0 0;
+  color: var(--doc-muted);
+  font-size: 9pt;
+  line-height: 1.6;
+}
+
+.bullets {
+  margin: 1.6mm 0 0;
+  padding-left: 4.4mm;
+  color: var(--doc-body);
+  font-size: 9.5pt;
+  line-height: 1.7;
+}
+
+.bullets li {
+  margin: 0.8mm 0;
+  padding-left: 0.6mm;
+  list-style: square;
+  break-inside: avoid;
+}
+
+.educationRow + .educationRow {
+  margin-top: 4mm;
+  padding-top: 4mm;
+  border-top: 1px solid var(--doc-line);
+}
+
+.educationRow {
+  padding-bottom: 0;
+}
+
+.body {
+  color: var(--doc-body);
+  font-size: 10pt;
+}
+
+.paperFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8mm;
+  margin-top: auto;
+  padding-top: 5mm;
+  border-top: 1px solid var(--doc-line);
+  color: var(--doc-muted);
+  font-size: 8.5pt;
+  break-inside: avoid;
+}
+
+.status {
+  margin: 8mm 0;
+  padding: 5mm;
+  border: 1px solid var(--doc-line);
+  color: var(--doc-muted);
+  font-size: 10pt;
+  text-align: center;
+}
+
+.status p {
+  margin: 0;
+}
+
+.status button {
+  margin-top: 3mm;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--doc-ink);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.preview {
+  .paperShell {
+    padding: 0;
+  }
+
+  .paper {
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .toolbarInner {
+    gap: 14px;
+    padding: 14px 20px;
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .paperShell {
+    padding: 0;
+  }
+
+  .paper {
+    width: 100%;
+    min-height: 100dvh;
+    padding: 32px 22px 48px;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .docHeader h1 {
+    font-size: 32px;
+  }
+
+  .role {
+    font-size: 14px;
+  }
+
+  .contactLine {
+    font-size: 12px;
+  }
+
+  .summary {
+    font-size: 13px;
+  }
+
+  .sectionTitle {
+    font-size: 15px;
+  }
+
+  .skillRow {
+    grid-template-columns: 1fr;
+    gap: 1.5mm;
+  }
+
+  .entryHead,
+  .projectHead,
+  .educationRow {
+    gap: 4mm;
+  }
+
+  .entryHead h3,
+  .projectHead h3,
+  .educationRow h3 {
+    font-size: 14px;
+  }
+
+  .entryRole,
+  .projectRole,
+  .educationRow p {
+    font-size: 12px;
+  }
+
+  .entryPeriod,
+  .projectPeriod,
+  .educationPeriod {
+    font-size: 11px;
+  }
+
+  .entrySummary,
+  .projectSummary,
+  .skillRow p,
+  .body {
+    font-size: 13px;
+  }
+
+  .bullets {
+    font-size: 12px;
+  }
+
+  .tech {
+    font-size: 11px;
+  }
+
+  .printAction {
+    height: 34px;
+    padding: 0 14px;
+    font-size: 12px;
+  }
+}
+
+@page {
+  size: A4;
+  margin: 16mm 18mm;
+  background: #fff;
+}
+
+@media print {
+  .page {
+    min-height: 0;
+    background: #fff;
+    color: #000;
+  }
+
+  .toolbar {
+    display: none !important;
+  }
+
+  .paperShell {
+    padding: 0;
+  }
+
+  .paper {
+    width: auto;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: #fff;
+    box-shadow: none;
+    color: #000;
+    font-size: 10pt;
+    --doc-ink: #000;
+    --doc-body: #000;
+    --doc-muted: #444;
+    --doc-line: #d8d8d8;
+    --doc-line-strong: #000;
+  }
+
+  .docHeader {
+    break-after: avoid;
+  }
+
+  .section {
+    break-inside: auto;
+  }
+
+  .entry,
+  .project,
+  .educationRow,
+  .skillRow,
+  .paperFooter {
+    break-inside: avoid;
+  }
+
+  .pdfLink {
+    display: none;
+  }
+
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+}

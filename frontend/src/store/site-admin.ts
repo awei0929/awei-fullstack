@@ -308,9 +308,11 @@ export class SiteAdminStore {
   async uploadFile(file: File, target: SiteFileUploadTarget, expectedKind?: SiteFileAsset['kind']): Promise<void> {
     if (!this.active || !this.canEdit || !this.draft) return
     const targetKey = siteFileUploadKey(target)
-    const requiredKind = target.type === 'cover' ? 'image' : expectedKind
+    const requiredKind = target.type === 'cover' || target.type === 'work-cover' ? 'image' : target.type === 'resume' ? 'attachment' : expectedKind
     this.fileUploadTarget = targetKey
-    this.fileUploadError = siteFileValidationError(file, requiredKind)
+    this.fileUploadError = target.type === 'resume' && !/\.pdf$/i.test(file.name)
+      ? '请选择 PDF 文件。'
+      : siteFileValidationError(file, requiredKind)
     if (this.fileUploadError) return
     const identity = authStore.identityVersion
     const version = ++this.requestVersion
@@ -332,10 +334,23 @@ export class SiteAdminStore {
           this.notice = '文件已上传，可复制地址或 Markdown。添加到草稿后仍需保存全部。'
           return
         }
+        if (target.type === 'resume') {
+          if (!siteApi.isSiteResumePdf(asset.url)) {
+            this.fileUploadError = '服务返回的文件不是 PDF。'
+            return
+          }
+          this.draft.resume.pdfUrl = asset.url
+          this.notice = '简历 PDF 已关联到草稿，保存后更新下载入口。'
+          return
+        }
         if (target.type === 'cover') {
           const project = this.draft.capabilityDetails.projects.find(item => item.id === target.projectId)
           if (!project) { this.fileUploadError = '原项目已不在草稿中，未替换封面。可复制下方地址。'; return }
           project.coverUrl = asset.url
+        } else if (target.type === 'work-cover') {
+          const work = this.draft.works.find(item => item.id === target.workId)
+          if (!work) { this.fileUploadError = '原作品已不在草稿中，未替换封面。可复制下方地址。'; return }
+          work.coverUrl = asset.url
         } else {
           const project = target.type === 'project' ? this.draft.capabilityDetails.projects.find(item => item.id === target.projectId) : null
           if (target.type === 'project' && !project) { this.fileUploadError = '原项目已不在草稿中，未插入正文。可复制下方内容。'; return }
@@ -354,7 +369,7 @@ export class SiteAdminStore {
       runInAction(() => {
         if (!this.current(identity, version) || this.authFailure(error, identity)) return
         if (error instanceof HttpError && error.code === 'CSRF_INVALID') authStore.csrfToken = ''
-        this.fileUploadError = `${error instanceof Error ? error.message : '上传失败'}；原封面和正文已保留。请重新选择文件重试。`
+        this.fileUploadError = `${error instanceof Error ? error.message : '上传失败'}；原内容已保留。请重新选择文件重试。`
       })
     } finally {
       runInAction(() => { if (this.current(identity, version)) this.uploadingFile = false })

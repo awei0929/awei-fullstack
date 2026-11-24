@@ -197,6 +197,23 @@ export class SiteChatRepository implements OnModuleInit {
     return { conversationId: record.id, turnId: input.requestId, history: historyOf(record.turns) };
   }
 
+  async switchModel(visitorHash: string, conversationId: string, requestId: string, modelId: string): Promise<void> {
+    // 只有当前轮仍在 streaming 时才允许改模型；终态或取消后不能让备用模型覆盖状态。
+    const now = new Date();
+    await this.conversations.updateOne(
+      { id: conversationId, visitorHash },
+      {
+        $set: {
+          'turns.$[turn].modelId': modelId,
+          'turns.$[turn].updatedAt': now,
+          updatedAt: now,
+          expiresAt: new Date(now.getTime() + TTL_MS),
+        },
+      },
+      { arrayFilters: [{ 'turn.requestId': requestId, 'turn.status': 'streaming' }] },
+    ).exec();
+  }
+
   async appendAnswer(visitorHash: string, conversationId: string, requestId: string, answer: string): Promise<void> {
     // 用 arrayFilters 定位轮次，避免并发更新覆盖其他轮次；只改增量正文，不改状态。
     const now = new Date();

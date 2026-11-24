@@ -20,10 +20,6 @@ export class PublicChatDto {
   @IsUUID('4')
   requestId!: string;
 
-  // 首条消息不传；第二条起必须指向当前 visitor 自己的会话，服务端会再次校验归属。
-  @IsOptional() @IsUUID('4')
-  conversationId?: string;
-
   // 500 个码点足够表达一个问题，也避免把整篇文章塞进提示词和模型预算。
   @PublicText(500)
   message!: string;

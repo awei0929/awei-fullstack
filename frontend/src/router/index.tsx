@@ -5,7 +5,6 @@ export const router = createBrowserRouter([
   { path: '/', errorElement: <PageLoadError />, lazy: async () => ({ Component: (await import('../pages/site')).SitePage }) },
   { path: '/thoughts', errorElement: <PageLoadError />, lazy: async () => { const { SitePage } = await import('../pages/site'); return { Component: () => <SitePage section="thoughts" /> } } },
   { path: '/works', errorElement: <PageLoadError />, lazy: async () => { const { SitePage } = await import('../pages/site'); return { Component: () => <SitePage section="works" /> } } },
-  { path: '/about', errorElement: <PageLoadError />, lazy: async () => { const { SitePage } = await import('../pages/site'); return { Component: () => <SitePage section="about" /> } } },
   { path: '/chat', errorElement: <PageLoadError />, lazy: async () => ({ Component: (await import('../pages/chat')).ChatPage }) },
   { path: '/chat/:conversationId', errorElement: <PageLoadError />, lazy: async () => ({ Component: (await import('../pages/chat')).ChatPage }) },
   { path: '/conversation', element: <Navigate to="/chat" replace /> },

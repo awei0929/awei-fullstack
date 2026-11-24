@@ -23,14 +23,16 @@ export const FileUploadResult = observer(function FileUploadResult({ targetKey, 
 })
 
 // oxlint-disable-next-line react/only-export-components -- MobX 包装的复用上传控件。
-export const FileUploadControl = observer(function FileUploadControl({ target, mode = 'markdown', showResult = true, showPublicNotice = true }: { target: SiteFileUploadTarget; mode?: 'all' | 'image' | 'markdown'; showResult?: boolean; showPublicNotice?: boolean }) {
+export const FileUploadControl = observer(function FileUploadControl({ target, mode = 'markdown', showResult = true, showPublicNotice = true }: { target: SiteFileUploadTarget; mode?: 'all' | 'image' | 'markdown' | 'pdf'; showResult?: boolean; showPublicNotice?: boolean }) {
   const key = siteFileUploadKey(target)
   const uploading = store.uploadingFile && store.fileUploadTarget === key
   const error = store.fileUploadTarget === key ? store.fileUploadError : ''
   const buttons = mode === 'markdown' ? [
     { label: '上传图片并插入', accept: SITE_IMAGE_ACCEPT, kind: 'image' as const },
     { label: '上传附件并插入', accept: SITE_ATTACHMENT_ACCEPT, kind: 'attachment' as const },
-  ] : [{ label: mode === 'image' ? '上传封面图片' : '选择图片或附件上传', accept: mode === 'image' ? SITE_IMAGE_ACCEPT : SITE_FILE_ACCEPT, kind: mode === 'image' ? 'image' as const : undefined }]
+  ] : mode === 'image' ? [{ label: '上传封面图片', accept: SITE_IMAGE_ACCEPT, kind: 'image' as const }]
+    : mode === 'pdf' ? [{ label: '上传简历 PDF', accept: '.pdf,application/pdf', kind: 'attachment' as const }]
+      : [{ label: '选择图片或附件上传', accept: SITE_FILE_ACCEPT, kind: undefined }]
   return <div className={styles.upload}>
     <div className={styles.actions}>{buttons.map(button => <label key={button.label} className={`${styles.button} ${!store.canEdit ? styles.disabled : ''}`}>
       {uploading ? '正在上传…' : button.label}
@@ -40,7 +42,7 @@ export const FileUploadControl = observer(function FileUploadControl({ target, m
         if (file) void store.uploadFile(file, target, button.kind)
       }} />
     </label>)}</div>
-    <small>{mode === 'image' ? '图片最大 5 MiB' : '图片最大 5 MiB，附件最大 20 MiB'}。{showPublicNotice && '上传后可公开访问。'}{mode === 'markdown' && '成功后追加到这段正文末尾。'}</small>
+    <small>{mode === 'pdf' ? 'PDF 最大 20 MiB' : mode === 'image' ? '图片最大 5 MiB' : '图片最大 5 MiB，附件最大 20 MiB'}。{showPublicNotice && '上传后可公开访问。'}{mode === 'markdown' && '成功后追加到这段正文末尾。'}</small>
     {uploading && <progress aria-label="文件上传中" />}
     {error && <p className={styles.error} role="alert">{error}</p>}
     {showResult && <FileUploadResult targetKey={key} />}

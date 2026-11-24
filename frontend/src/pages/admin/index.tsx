@@ -48,6 +48,7 @@ export const AdminPage = observer(function AdminPage() {
   const formRef = useRef<HTMLFormElement>(null)
   const blocker = useBlocker(({ currentLocation, nextLocation }) => (store.dirty || store.busy) && currentLocation.pathname !== nextLocation.pathname)
   const activeSection = sections.find((item) => item.id === section)!
+  const previewSection = section === 'resume' || section === 'capabilities' || section === 'thoughts' || section === 'works' || section === 'conversation' ? section : undefined
   const conflict = store.conflict
   const user = authStore.user
   const status = store.status
@@ -174,7 +175,7 @@ export const AdminPage = observer(function AdminPage() {
           <form ref={formRef} className={`${styles.editor} ${mobilePanel !== 'editor' ? styles.mobileHidden : ''}`} onSubmit={(event) => event.preventDefault()}><fieldset disabled={!store.canEdit}><Editors section={section} capabilityTab={capabilityTab} onCapabilityTabChange={setCapabilityTab} capabilityCategory={capabilityCategory} onCapabilityCategoryChange={setCapabilityCategory} companyProjectId={companyProjectId} onCompanyProjectChange={setCompanyProjectId} /></fieldset></form>
           <section className={`${styles.preview} ${mobilePanel !== 'preview' ? styles.mobileHidden : ''}`} aria-label={store.dirty ? '未保存预览' : '官网预览'}>
             <div className={styles.previewHeading}><div><h2>{store.dirty ? '未保存预览' : '官网预览'}</h2></div><div className={styles.segmented}><button type="button" aria-pressed={device === 'desktop'} onClick={() => setDevice('desktop')}>桌面</button><button type="button" aria-pressed={device === 'mobile'} onClick={() => setDevice('mobile')}>手机</button></div></div>
-            <Preview content={store.draft!} device={device} />
+            <Preview content={store.draft!} device={device} section={previewSection} />
           </section>
         </div>}
         {section !== 'chat' && <footer className={styles.mobileSave}><span className={`${styles.dirty} ${store.dirty ? styles.hasChanges : ''}`}><i />{store.dirty ? '未保存' : '已保存'}</span><button className={styles.primaryButton} type="button" disabled={!store.canEdit || !store.dirty || store.outcomeUnknown} onClick={saveAll}>{store.saving ? '保存中…' : '保存并更新官网'}</button><button type="button" className={styles.textButton} disabled={store.busy} onClick={() => void logout()}>退出</button><Link to="/" aria-label="返回官网">↗</Link></footer>}
@@ -184,7 +185,7 @@ export const AdminPage = observer(function AdminPage() {
     <Modal open={Boolean(confirm)} title={confirm?.kind === 'logout' ? '退出前，要放弃这份草稿吗？' : '载入官网最新内容？'} onCancel={() => { if (!store.busy) setConfirm(null) }} onOk={() => void confirmAction()} confirmLoading={authStore.loggingOut} okText={confirm?.kind === 'logout' ? '放弃并退出' : '放弃草稿并载入'} cancelText="继续编辑" closable={!store.busy} mask={{ closable: !store.busy }} keyboard={!store.busy} okButtonProps={{ danger: true, disabled: store.busy }} cancelButtonProps={{ disabled: store.busy }}><p>当前未保存的修改不会保留。</p>{authStore.logoutError && <Alert type="error" title={authStore.logoutError} />}</Modal>
     <Modal open={conflictOpen && Boolean(authorized)} title="最新内容已更新" onCancel={() => setConflictOpen(false)} footer={<><Button onClick={() => setConflictOpen(false)}>继续保留编辑</Button><Button type="primary" onClick={() => void showLatest()}>查看最新内容</Button></>}><p>另一个编辑页面已更新官网。你的输入仍保留，请先查看最新内容。继续编辑不会覆盖官网的新版本。</p></Modal>
     <Modal open={latestOpen && Boolean(authorized)} width={1000} title={`官网最新内容${store.latest ? ` · 版本 ${store.latest.version}` : ''}`} onCancel={() => { if (!store.busy) setLatestOpen(false) }} closable={!store.busy} footer={<><Button disabled={store.busy} onClick={() => setLatestOpen(false)}>继续保留编辑</Button><Button disabled={store.busy || !store.latest} type="primary" onClick={() => setConfirm({ kind: 'latest' })}>载入最新，替换草稿</Button></>}>
-      {store.checkingLatest ? <div className={styles.loading}><Spin /><p>正在核对最新版本…</p></div> : store.latestError ? <Alert type="error" title={store.latestError} action={<Button onClick={() => void store.checkLatest()}>重试</Button>} /> : store.latest && <><p>以下是已保存到官网的内容。可以载入最新内容后重新应用你的修改，也可以关闭并继续保留草稿。</p><Preview content={store.latest.content} device="desktop" /></>}
+      {store.checkingLatest ? <div className={styles.loading}><Spin /><p>正在核对最新版本…</p></div> : store.latestError ? <Alert type="error" title={store.latestError} action={<Button onClick={() => void store.checkLatest()}>重试</Button>} /> : store.latest && <><p>以下是已保存到官网的内容。可以载入最新内容后重新应用你的修改，也可以关闭并继续保留草稿。</p><Preview content={store.latest.content} device="desktop" section={previewSection} /></>}
     </Modal>
   </ConfigProvider>
 })

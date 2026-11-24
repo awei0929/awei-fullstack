@@ -2,6 +2,7 @@ import { ChatModule } from './chat/chat.module.js';
 import { ChatController } from './chat/chat.controller.js';
 import { SiteModule } from './site/site.module.js';
 import { SiteController } from './site/site.controller.js';
+import { SiteChatController } from './site/site-chat.controller.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AuthController } from './auth/auth.controller.js';
 import { PublicModule } from './public/public.module.js';
@@ -19,6 +20,8 @@ import { TasksController } from './tasks/tasks.controller.js';
 import { StatsModule } from './stats/stats.module.js';
 import { StatsController } from './stats/stats.controller.js';
 import { SystemModule } from './system/system.module.js';
+import { QueueModule } from './queue/queue.module.js';
+import { JobsController } from './queue/jobs.controller.js';
 
 // @Module 标记应用根模块，NestFactory.create(AppModule) 从这里开始组织依赖。
 @Module({
@@ -37,6 +40,7 @@ import { SystemModule } from './system/system.module.js';
     SiteModule,
     ChatModule,
     TasksModule,
+    QueueModule,
     SystemModule,
     StatsModule,
   ],
@@ -57,6 +61,6 @@ export class AppModule implements NestModule {
       .apply(RequestLoggerMiddleware)
       // forRoutes 指定需要记录的 Controller，包含它们全部HTTP方法；不打印密码、Cookie或请求体。
       // 全局 /api 前缀由 Nest 统一处理，不需要在这里重复拼写。
-      .forRoutes(TasksController, StatsController, AuthController, PublicController, SiteController, ChatController);
+      .forRoutes(TasksController, StatsController, AuthController, PublicController, SiteController, SiteChatController, ChatController, JobsController);
   }
 }

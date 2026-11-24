@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 
 type Scene = 0 | 1
-type Options = { rootRef: RefObject<HTMLDivElement>; enabled: boolean; paused: boolean }
+type Options = { rootRef: RefObject<HTMLDivElement> | null; enabled: boolean; paused: boolean }
 type Timeline = {
   goTo: (scene: Scene) => boolean
   reconcile: () => void
@@ -32,7 +32,7 @@ export function useCapabilityTransition({ rootRef, enabled, paused }: Options) {
   useLayoutEffect(() => { options.current = { enabled, paused } }, [enabled, paused])
 
   useLayoutEffect(() => {
-    const root = rootRef.current
+    const root = rootRef?.current
     if (!root) return
     const initialScene = settledScene.current
     const animations: Animation[] = []

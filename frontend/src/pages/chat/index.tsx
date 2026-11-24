@@ -3,9 +3,11 @@ import type { FormEvent, KeyboardEvent } from 'react'
 import { observer } from 'mobx-react-lite'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChatMarkdown } from '../../components/chat-markdown'
+import { useConfirm } from '../../components/confirm-dialog'
 import { ThemeToggle } from '../../components/theme-toggle'
 import { siteChatStore } from '../../store/site-chat'
 import { siteStore } from '../../store/site'
+import { takePendingPrompt } from '../site/chat-pending'
 import type { SiteChatContent } from '../../types/site'
 import styles from './style.module.less'
 
@@ -19,6 +21,15 @@ const fallbackChat: SiteChatContent = {
 }
 
 type SuggestionCard = { label: string; prompt: string }
+type TurnAction = { label: string; to: string }
+
+// 答案落库后再给明确入口，避免模型自由生成链接造成死链。
+function turnAction(content: string): TurnAction | null {
+  if (/(简历|工作经历|教育经历|resume)/i.test(content)) return { label: '查看简历', to: '/resume' }
+  if (/(项目|作品|作品集|project|portfolio)/i.test(content)) return { label: '查看作品', to: '/works' }
+  if (/(想法|文章|思考|thought)/i.test(content)) return { label: '查看想法', to: '/thoughts' }
+  return null
+}
 
 function buildCards(chat: SiteChatContent): SuggestionCard[] {
   return [
@@ -29,7 +40,7 @@ function buildCards(chat: SiteChatContent): SuggestionCard[] {
   ]
 }
 
-const statusText = { loading: '接通中', ready: '在线', closed: '未开放', error: '连接失败' } as const
+const statusText = { loading: '接通中', ready: '在线', closed: '未开放', error: '离线' } as const
 
 const relative = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' })
 
@@ -52,10 +63,10 @@ export const ChatPage = observer(function ChatPage() {
   const navigate = useNavigate()
   const [drawer, setDrawer] = useState(false)
   const activeId = siteChatStore.activeId
+  const { status, available } = siteChatStore
   useEffect(() => {
     void siteStore.load()
-    void siteChatStore.loadStatus()
-    void siteChatStore.loadList()
+    void siteChatStore.initialize()
   }, [])
 
   useEffect(() => {
@@ -65,6 +76,17 @@ export const ChatPage = observer(function ChatPage() {
       siteChatStore.newChat()
     }
   }, [conversationId])
+
+  // 首页点击发送/建议后只负责跳转；真正的建会话和生成在这里开始，URL 只保留 /chat/:id。
+  // 延迟一拍避开 StrictMode 的双次挂载，避免首个请求刚发出就被第二次 newChat 中止。
+  useEffect(() => {
+    if (conversationId || status !== 'ready' || !available) return
+    const timer = window.setTimeout(() => {
+      const prompt = takePendingPrompt()
+      if (prompt) void siteChatStore.send(prompt)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [conversationId, status, available])
 
   useEffect(() => {
     if (activeId && !conversationId) navigate(`/chat/${activeId}`, { replace: true })
@@ -82,7 +104,6 @@ export const ChatPage = observer(function ChatPage() {
     name={siteStore.document?.content.profile.name.trim() || 'HEY.'}
     email={siteStore.document?.content.contact.email.trim() || ''}
     loading={siteStore.loading || (!siteStore.document && !siteStore.error)}
-    error={siteStore.error}
     conversationId={conversationId}
     drawer={drawer}
     onDrawer={setDrawer}
@@ -95,7 +116,6 @@ type ChatExperienceProps = {
   name: string
   email: string
   loading?: boolean
-  error?: string
   conversationId?: string
   drawer: boolean
   onDrawer: (open: boolean) => void
@@ -103,31 +123,43 @@ type ChatExperienceProps = {
 }
 
 // oxlint-disable-next-line react/only-export-components -- 页面内部排版组件。
-const ChatExperience = observer(function ChatExperience({ chat, name, email, loading = false, error = '', conversationId, drawer, onDrawer, onNavigate }: ChatExperienceProps) {
-  const { status, available, conversations, activeId, turns, loadingList, loadingConversation, sending, notice } = siteChatStore
+const ChatExperience = observer(function ChatExperience({ chat, name, email, loading = false, conversationId, drawer, onDrawer, onNavigate }: ChatExperienceProps) {
+  const { status, available, conversations, activeId, turns, loadingList, loadingConversation, sending } = siteChatStore
   const [draft, setDraft] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const stickToBottom = useRef(true)
   const cards = buildCards(chat)
   const canSend = status === 'ready' && available && !sending && !loadingConversation
   const live = status === 'ready' && available
 
+  const lastTurn = turns[turns.length - 1]
   useEffect(() => {
     const thread = threadRef.current
-    if (!thread) return
-    thread.scrollTo({ top: thread.scrollHeight, behavior: turns.length > 1 ? 'smooth' : 'auto' })
-  }, [turns, notice])
+    if (!thread || !stickToBottom.current) return
+    thread.scrollTo({ top: thread.scrollHeight, behavior: 'auto' })
+  }, [turns.length, lastTurn?.answer.length, lastTurn?.status])
 
-  const submit = async (event?: FormEvent) => {
+  useEffect(() => {
+    stickToBottom.current = true
+  }, [conversationId])
+
+  const submit = (event?: FormEvent) => {
     event?.preventDefault()
-    if (!canSend || !draft.trim()) return
-    if (await siteChatStore.send(draft)) setDraft('')
+    const text = draft.trim()
+    if (!canSend || !text) return
+    // 先清空并立即插入乐观轮次，再把请求交给 store；不要等整段流结束才清输入框。
+    setDraft('')
+    stickToBottom.current = true
+    void siteChatStore.send(text).then(ok => {
+      if (!ok) setDraft(current => current || text)
+    })
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
-      void submit()
+      submit()
     }
   }
 
@@ -151,9 +183,16 @@ const ChatExperience = observer(function ChatExperience({ chat, name, email, loa
     onNavigate(`/chat/${id}`)
   }
 
+  const confirm = useConfirm()
+
   const remove = async (id: string) => {
     if (sending) return
-    if (!window.confirm('删除这段对话？删除后无法恢复。')) return
+    const ok = await confirm({
+      title: '删除这段对话？',
+      description: '删除后无法恢复。',
+      confirmText: '删除',
+    })
+    if (!ok) return
     await siteChatStore.remove(id)
     if (id === conversationId || id === activeId) onNavigate('/chat', { replace: true })
   }
@@ -168,7 +207,10 @@ const ChatExperience = observer(function ChatExperience({ chat, name, email, loa
         <span aria-hidden="true">＋</span> 新对话
       </button>
       <div className={styles.history}>
-        <p className={styles.historyLabel}>历史对话</p>
+        <div className={styles.historyHead}>
+          <p className={styles.historyLabel}>历史对话</p>
+          {conversations.length > 0 && <span className={styles.historyCount}>{String(conversations.length).padStart(2, '0')}</span>}
+        </div>
         {loadingList
           ? <p className={styles.historyHint}>正在读取…</p>
           : conversations.length > 0
@@ -186,10 +228,12 @@ const ChatExperience = observer(function ChatExperience({ chat, name, email, loa
             : <p className={styles.historyHint}>还没有对话。问一句，历史会留在这里。</p>}
       </div>
       <div className={styles.sidebarFoot}>
-        <Link to="/">首页<span aria-hidden="true">↗</span></Link>
-        <Link to="/thoughts">想法<span aria-hidden="true">↗</span></Link>
-        <Link to="/works">作品<span aria-hidden="true">↗</span></Link>
-        <p>对话保存在服务器，只有这台浏览器能查看</p>
+        <div className={styles.footNav}>
+          <Link to="/">首页<i aria-hidden="true">↗</i></Link>
+          <Link to="/thoughts">想法<i aria-hidden="true">↗</i></Link>
+          <Link to="/works">作品<i aria-hidden="true">↗</i></Link>
+        </div>
+        <p>历史只保存在这台浏览器</p>
       </div>
     </aside>
     {drawer && <button type="button" className={styles.backdrop} aria-label="关闭历史对话" onClick={() => onDrawer(false)} />}
@@ -210,7 +254,11 @@ const ChatExperience = observer(function ChatExperience({ chat, name, email, loa
         </div>
       </header>
 
-      <div className={styles.thread} ref={threadRef} aria-live="polite" aria-busy={sending}>
+      <div className={styles.thread} ref={threadRef} aria-live="polite" aria-busy={sending}
+        onScroll={event => {
+          const thread = event.currentTarget
+          stickToBottom.current = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 96
+        }}>
         {loadingConversation
           ? <p className={styles.threadStatus}>正在载入这段对话…</p>
           : turns.length === 0
@@ -220,11 +268,9 @@ const ChatExperience = observer(function ChatExperience({ chat, name, email, loa
               <p>{chat.intro || '关于我、这个网站，或者你正在想的事，都可以从一句话开始。'}</p>
               {status === 'loading' && <p className={styles.emptyStatus}>正在接通对话…</p>}
               {(status === 'closed' || (status === 'ready' && !available)) && <p className={styles.emptyStatus}>
-                {status === 'closed' ? '对话暂未开放' : 'AI 分身暂时离线'}{email ? <>，可以先 <a href={`mailto:${email}`}>写信给我</a></> : null}。
+                {status === 'closed' ? '对话暂未开放' : 'AI 分身暂时离线'}。
               </p>}
-              {status === 'error' && <p className={styles.emptyStatus} role="alert">连接对话服务失败，请刷新页面重试。</p>}
               {loading && <p className={styles.emptyStatus}>正在载入对话设置…</p>}
-              {error && <p className={styles.emptyStatus} role="alert">内容加载失败：{error}</p>}
               {live && <div className={styles.suggestionGrid} aria-label="可以这样开始">
                 {cards.map(card => <button key={card.label} type="button" className={styles.suggestionCard} onClick={() => suggest(card.prompt)}>
                   <span className={styles.cardLabel}>{card.label}</span>
@@ -244,18 +290,17 @@ const ChatExperience = observer(function ChatExperience({ chat, name, email, loa
                     {turn.answer
                       ? <ChatMarkdown content={turn.answer} />
                       : <span className={styles.typing} aria-label="正在回答"><i /><i /><i /></span>}
+                    {turn.status === 'completed' && turnAction(turn.content) && <Link className={styles.turnAction} to={turnAction(turn.content)!.to}>
+                      {turnAction(turn.content)!.label}<span aria-hidden="true">↗</span>
+                    </Link>}
                   </div>
                 </article>}
-                {!notice && (turn.status === 'failed' || turn.status === 'canceled') && <p className={styles.turnError} role="status">
-                  {turn.status === 'canceled' ? '已停止生成。' : turn.error || '回答失败，请重试。'}
-                </p>}
+                {turn.status === 'canceled' && <p className={styles.turnError} role="status">已停止生成。</p>}
               </div>)}
-              {notice && <p className={styles.notice} role="alert">{notice}</p>}
             </div>}
       </div>
 
       <div className={styles.composerWrap}>
-        {notice && turns.length === 0 && <p className={styles.notice} role="alert">{notice}</p>}
         <form className={styles.composer} onSubmit={event => void submit(event)}>
           <label htmlFor="chat-input" className={styles.srOnly}>想说的话</label>
           <textarea id="chat-input" ref={inputRef} rows={1} maxLength={500} value={draft}

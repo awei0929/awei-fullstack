@@ -1,14 +1,105 @@
 :root {
+  color-scheme: light;
+  --theme-bg: #ffffff;
+  --theme-surface: #ffffff;
+  --theme-surface-soft: #f3f3f3;
+  --theme-text: #0b0b0b;
+  --theme-muted: #6b6b6b;
+  --theme-line: rgba(11, 11, 11, 0.14);
+  --theme-line-strong: rgba(11, 11, 11, 0.36);
+  --theme-header: rgba(255, 255, 255, 0.86);
+  --theme-error-bg: #f4f4f4;
+  --theme-error-line: #b5b5b5;
+  --theme-error-text: #333333;
+  --theme-selection: #d7d7d7;
+  --theme-shadow: rgba(0, 0, 0, 0.08);
+  --theme-scrollbar: #d9d9d9;
+  --theme-scrollbar-hover: #93c5fd;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  color: #26352f;
-  background: #f6f7f4;
+  color: var(--theme-text);
+  background: var(--theme-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
 
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; }
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --theme-bg: #0a0a0a;
+  --theme-surface: #111111;
+  --theme-surface-soft: #181818;
+  --theme-text: #f2f2f2;
+  --theme-muted: #9b9b9b;
+  --theme-line: rgba(242, 242, 242, 0.16);
+  --theme-line-strong: rgba(242, 242, 242, 0.42);
+  --theme-header: rgba(10, 10, 10, 0.86);
+  --theme-error-bg: #181818;
+  --theme-error-line: #6c6c6c;
+  --theme-error-text: #ededed;
+  --theme-selection: #3d3d3d;
+  --theme-shadow: rgba(0, 0, 0, 0.55);
+  --theme-scrollbar: #3f3f3f;
+  --theme-scrollbar-hover: #93c5fd;
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-scrollbar) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--theme-scrollbar);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-scrollbar-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.api-error-tip .ant-message-notice-wrapper {
+  border: 1px solid var(--theme-line-strong);
+  border-radius: 10px;
+  background: var(--theme-text);
+  color: var(--theme-bg);
+  box-shadow: 0 14px 40px var(--theme-shadow);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.api-error-tip .ant-message-notice-title,
+.api-error-tip .anticon {
+  color: var(--theme-bg);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--theme-bg);
+  color: var(--theme-text);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
 button, input { font: inherit; }
 a { color: inherit; }
-::selection { background: #d7e8dc; }
+::selection { background: var(--theme-selection); color: var(--theme-text); }
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #000;
+  }
+}

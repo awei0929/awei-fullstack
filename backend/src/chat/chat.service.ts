@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { BeforeApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
@@ -6,18 +12,43 @@ import { randomUUID } from 'node:crypto';
 import { ConversationRecord } from './schemas/conversation.schema.js';
 import type { TurnRecord } from './schemas/conversation.schema.js';
 import { ChatConfig } from './config/chat.config.js';
-import { ChatCompletionsProvider, ModelRateLimitError } from './providers/chat-completions.provider.js';
+import {
+  ChatCompletionsProvider,
+  ModelRateLimitError,
+} from './providers/chat-completions.provider.js';
 import { ChatMemoryService } from './chat-memory.service.js';
 import type { StreamChatDto } from './dto/chat.dto.js';
-import type { ChatConversation, ChatEvent, ChatStatus, ChatTurn, ModelMessage, ModelSettings } from './types/chat.type.js';
+import type {
+  ChatConversation,
+  ChatEvent,
+  ChatStatus,
+  ChatTurn,
+  ModelMessage,
+  ModelSettings,
+} from './types/chat.type.js';
 
 interface Run {
-  ownerId: string; conversationId: string; turn: ChatTurn; model: ModelSettings; messages: ModelMessage[];
-  controller: AbortController; answer: string; savedAt: number; deadline: number; fallbackModel?: ModelSettings;
-  checkpoint?: Promise<void>; pendingCheckpoint?: string; checkpointFailed?: boolean;
-  ending?: Promise<ChatTurn>; timer?: ReturnType<typeof setTimeout>;
+  ownerId: string;
+  conversationId: string;
+  turn: ChatTurn;
+  model: ModelSettings;
+  messages: ModelMessage[];
+  controller: AbortController;
+  answer: string;
+  savedAt: number;
+  deadline: number;
+  fallbackModel?: ModelSettings;
+  checkpoint?: Promise<void>;
+  pendingCheckpoint?: string;
+  checkpointFailed?: boolean;
+  ending?: Promise<ChatTurn>;
+  timer?: ReturnType<typeof setTimeout>;
 }
-export interface PreparedChat { conversationId: string; turn: ChatTurn; run?: Run }
+export interface PreparedChat {
+  conversationId: string;
+  turn: ChatTurn;
+  run?: Run;
+}
 // Service组织受理、模型调用和持久化；内存只存取消句柄，Mongo负责历史、幂等与最终状态。
 @Injectable()
 export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
@@ -25,69 +56,170 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
   private readonly runs = new Map<string, Run>();
   private readonly admitting = new Set<string>();
   constructor(
-    @InjectModel(ConversationRecord.name) private readonly conversations: Model<ConversationRecord>,
+    @InjectModel(ConversationRecord.name)
+    private readonly conversations: Model<ConversationRecord>,
     private readonly config: ChatConfig,
     private readonly provider: ChatCompletionsProvider,
     private readonly memories: ChatMemoryService,
   ) {}
   async onModuleInit(): Promise<void> {
     // 等待唯一索引并检查配置；缺Key合法，坏白名单明确拒绝，不能静默换模型。
-    await this.conversations.init(); this.config.models(); this.config.timeout();
+    await this.conversations.init();
+    this.config.models();
+    this.config.timeout();
   }
   async beforeApplicationShutdown(): Promise<void> {
-    await Promise.allSettled([...this.runs.values()].map(run => this.finish(run, 'interrupted', '服务已停止，回复已中断')));
+    await Promise.allSettled(
+      [...this.runs.values()].map((run) =>
+        this.finish(run, 'interrupted', '服务已停止，回复已中断'),
+      ),
+    );
   }
-  catalog() { return this.config.catalog(); }
+  catalog() {
+    return this.config.catalog();
+  }
   async list(ownerId: string): Promise<{ conversations: ChatConversation[] }> {
     await this.recover(ownerId);
-    const records = await this.conversations.find({ ownerId }).select('-turns').sort({ updatedAt: -1, _id: -1 }).limit(50).lean().exec();
-    return { conversations: records.map(record => this.conversationView(record)) };
+    const records = await this.conversations
+      .find({ ownerId })
+      .select('-turns')
+      .sort({ updatedAt: -1, _id: -1 })
+      .limit(50)
+      .lean()
+      .exec();
+    return {
+      conversations: records.map((record) => this.conversationView(record)),
+    };
   }
-  async create(ownerId: string): Promise<ChatConversation> { return this.conversationView(await this.conversations.create({ ownerId })); }
-  async detail(ownerId: string, id: string): Promise<{ conversation: ChatConversation; turns: ChatTurn[] }> {
-    await this.recover(ownerId); const record = await this.find(ownerId, id);
-    return { conversation: this.conversationView(record), turns: record.turns.map(turn => this.turnView(turn)) };
+  async create(ownerId: string): Promise<ChatConversation> {
+    return this.conversationView(await this.conversations.create({ ownerId }));
   }
-  async prepare(ownerId: string, id: string, input: StreamChatDto): Promise<PreparedChat> {
-    await this.recover(ownerId); const record = await this.find(ownerId, id);
-    const existing = record.turns.find(turn => turn.requestId === input.requestId);
+  async detail(
+    ownerId: string,
+    id: string,
+  ): Promise<{ conversation: ChatConversation; turns: ChatTurn[] }> {
+    await this.recover(ownerId);
+    const record = await this.find(ownerId, id);
+    return {
+      conversation: this.conversationView(record),
+      turns: record.turns.map((turn) => this.turnView(turn)),
+    };
+  }
+  async prepare(
+    ownerId: string,
+    id: string,
+    input: StreamChatDto,
+  ): Promise<PreparedChat> {
+    await this.recover(ownerId);
+    const record = await this.find(ownerId, id);
+    const existing = record.turns.find(
+      (turn) => turn.requestId === input.requestId,
+    );
     if (existing) {
-      if (existing.content !== input.content || (existing.requestedModelId ?? existing.modelId) !== input.modelId) throw new ConflictException('同一请求编号不能用于不同内容或模型');
-      if (existing.status === 'streaming') throw new ConflictException('该请求仍在生成中');
+      if (
+        existing.content !== input.content ||
+        (existing.requestedModelId ?? existing.modelId) !== input.modelId
+      )
+        throw new ConflictException('同一请求编号不能用于不同内容或模型');
+      if (existing.status === 'streaming')
+        throw new ConflictException('该请求仍在生成中');
       return { conversationId: id, turn: this.turnView(existing) };
     }
     // 同步预占阻止await之间重复受理；数据库唯一索引再兜底跨会话竞争。
-    if (this.runs.has(ownerId) || this.admitting.has(ownerId)) throw new ConflictException('已有回复正在生成，请先停止或等待完成');
+    if (this.runs.has(ownerId) || this.admitting.has(ownerId))
+      throw new ConflictException('已有回复正在生成，请先停止或等待完成');
     this.admitting.add(ownerId);
     try {
-      if (record.turns.length >= 100) throw new BadRequestException('此会话已达100轮，请新建会话');
+      if (record.turns.length >= 100)
+        throw new BadRequestException('此会话已达100轮，请新建会话');
       const models = this.config.models();
-      const model = models.find(item => item.id === input.modelId);
+      const model = models.find((item) => item.id === input.modelId);
       if (!model) throw new BadRequestException('请选择有效模型');
-      if (!model.apiKey) throw new ServiceUnavailableException('此模型尚未配置，请在服务端配置API Key');
+      if (!model.apiKey)
+        throw new ServiceUnavailableException(
+          '此模型尚未配置，请在服务端配置API Key',
+        );
       // 在受理写库前获取启用记忆快照；失败时仍返回普通JSON，不产生无上下文的半受理轮次。
       const memoryContext = await this.memories.context(ownerId);
-      const timeoutMs = this.config.timeout(); const now = new Date();
-      const turn: TurnRecord = { requestId: input.requestId, content: input.content, answer: '', modelId: model.id, modelLabel: model.label, requestedModelId: model.id, requestedModelLabel: model.label, status: 'streaming', error: null, createdAt: now, updatedAt: now };
+      const timeoutMs = this.config.timeout();
+      const now = new Date();
+      const turn: TurnRecord = {
+        requestId: input.requestId,
+        content: input.content,
+        answer: '',
+        modelId: model.id,
+        modelLabel: model.label,
+        requestedModelId: model.id,
+        requestedModelLabel: model.label,
+        status: 'streaming',
+        error: null,
+        createdAt: now,
+        updatedAt: now,
+      };
       let updated;
       try {
-        updated = await this.conversations.findOneAndUpdate(
-          { ownerId, id, active: false, 'turns.requestId': { $ne: input.requestId }, 'turns.99': { $exists: false } },
-          { $push: { turns: turn }, $set: { active: true, runtimeId: this.runtimeId, expiresAt: new Date(now.getTime() + timeoutMs), ...(record.turns.length === 0 ? { title: Array.from(input.content).slice(0, 40).join('') } : {}) } },
-          { returnDocument: 'after' },
-        ).lean().exec();
+        updated = await this.conversations
+          .findOneAndUpdate(
+            {
+              ownerId,
+              id,
+              active: false,
+              'turns.requestId': { $ne: input.requestId },
+              'turns.99': { $exists: false },
+            },
+            {
+              $push: { turns: turn },
+              $set: {
+                active: true,
+                runtimeId: this.runtimeId,
+                expiresAt: new Date(now.getTime() + timeoutMs),
+                ...(record.turns.length === 0
+                  ? { title: Array.from(input.content).slice(0, 40).join('') }
+                  : {}),
+              },
+            },
+            { returnDocument: 'after' },
+          )
+          .lean()
+          .exec();
       } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 11000) throw new ConflictException('已有回复正在生成，请先停止或等待完成');
+        if (
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          error.code === 11000
+        )
+          throw new ConflictException('已有回复正在生成，请先停止或等待完成');
         throw error;
       }
       if (!updated) throw new ConflictException('会话状态已变化，请刷新后重试');
-      const run: Run = { ownerId, conversationId: id, turn: this.turnView(turn), model, fallbackModel: models.find(item => item.id === model.fallbackModelId && item.apiKey), messages: [...memoryContext, ...this.context(record.turns, input.content)], controller: new AbortController(), answer: '', savedAt: 0, deadline: now.getTime() + timeoutMs };
+      const run: Run = {
+        ownerId,
+        conversationId: id,
+        turn: this.turnView(turn),
+        model,
+        fallbackModel: models.find(
+          (item) => item.id === model.fallbackModelId && item.apiKey,
+        ),
+        messages: [
+          ...memoryContext,
+          ...this.context(record.turns, input.content),
+        ],
+        controller: new AbortController(),
+        answer: '',
+        savedAt: 0,
+        deadline: now.getTime() + timeoutMs,
+      };
       this.runs.set(ownerId, run);
       // 数据库可能已受理但响应迟到，另一请求已取消；登记句柄后再读一次，封住此窗口。
       try {
-        const current = (await this.find(ownerId, id)).turns.find(item => item.requestId === input.requestId)!;
+        const current = (await this.find(ownerId, id)).turns.find(
+          (item) => item.requestId === input.requestId,
+        )!;
         if (current.status !== 'streaming') {
-          run.controller.abort(); run.turn = this.turnView(current); run.ending = Promise.resolve(run.turn);
+          run.controller.abort();
+          run.turn = this.turnView(current);
+          run.ending = Promise.resolve(run.turn);
           return { conversationId: id, turn: run.turn, run };
         }
       } catch (error) {
@@ -96,42 +228,110 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
         throw error;
       }
       // 从受理时计时，客户端不读取流也不能无限占用模型资源。
-      run.timer = setTimeout(() => { void this.finish(run, 'interrupted', '生成超时，已保留部分回复'); }, Math.max(1, run.deadline - Date.now()));
+      run.timer = setTimeout(
+        () => {
+          void this.finish(run, 'interrupted', '生成超时，已保留部分回复');
+        },
+        Math.max(1, run.deadline - Date.now()),
+      );
       return { conversationId: id, turn: run.turn, run };
-    } finally { this.admitting.delete(ownerId); }
+    } finally {
+      this.admitting.delete(ownerId);
+    }
   }
-  async stream(prepared: PreparedChat, emit: (event: ChatEvent) => void): Promise<void> {
-    emit({ type: 'start', conversationId: prepared.conversationId, turn: prepared.turn });
+  async stream(
+    prepared: PreparedChat,
+    emit: (event: ChatEvent) => void,
+  ): Promise<void> {
+    emit({
+      type: 'start',
+      conversationId: prepared.conversationId,
+      turn: prepared.turn,
+    });
     const run = prepared.run;
-    if (!run) { emit({ type: 'done', conversationId: prepared.conversationId, turn: prepared.turn }); return; }
+    if (!run) {
+      emit({
+        type: 'done',
+        conversationId: prepared.conversationId,
+        turn: prepared.turn,
+      });
+      return;
+    }
     try {
-      try { await this.consume(run, emit); }
-      catch (error) {
+      try {
+        await this.consume(run, emit);
+      } catch (error) {
         // 只在首次可信HTTP429且无正文时尝试固定免费备用；第二次consume不再进入此catch。
-        if (!(error instanceof ModelRateLimitError) || !run.fallbackModel || run.answer || this.stopped(run)) throw error;
+        if (
+          !(error instanceof ModelRateLimitError) ||
+          !run.fallbackModel ||
+          run.answer ||
+          this.stopped(run)
+        )
+          throw error;
         const fallback = run.fallbackModel;
         run.fallbackModel = undefined;
-        const updated = await this.conversations.findOneAndUpdate(
-          { ownerId: run.ownerId, id: run.conversationId, active: true, runtimeId: this.runtimeId, expiresAt: { $gt: new Date() }, turns: { $elemMatch: { requestId: run.turn.requestId, status: 'streaming', modelId: run.model.id, answer: '' } } },
-          { $set: { 'turns.$.modelId': fallback.id, 'turns.$.modelLabel': fallback.label, 'turns.$.updatedAt': new Date() } },
-          { returnDocument: 'after' },
-        ).lean().exec();
+        const updated = await this.conversations
+          .findOneAndUpdate(
+            {
+              ownerId: run.ownerId,
+              id: run.conversationId,
+              active: true,
+              runtimeId: this.runtimeId,
+              expiresAt: { $gt: new Date() },
+              turns: {
+                $elemMatch: {
+                  requestId: run.turn.requestId,
+                  status: 'streaming',
+                  modelId: run.model.id,
+                  answer: '',
+                },
+              },
+            },
+            {
+              $set: {
+                'turns.$.modelId': fallback.id,
+                'turns.$.modelLabel': fallback.label,
+                'turns.$.updatedAt': new Date(),
+              },
+            },
+            { returnDocument: 'after' },
+          )
+          .lean()
+          .exec();
         // await期间可能取消或超时；终态CAS优先，写入失败/未命中都不能启动新上游。
-        if (updated) run.turn = this.turnView(updated.turns.find(turn => turn.requestId === run.turn.requestId)!);
+        if (updated)
+          run.turn = this.turnView(
+            updated.turns.find(
+              (turn) => turn.requestId === run.turn.requestId,
+            )!,
+          );
         if (!this.stopped(run)) {
           if (!updated) throw new Error('切换模型状态已变化');
           run.model = fallback;
-          emit({ type: 'fallback', conversationId: run.conversationId, turn: run.turn });
+          emit({
+            type: 'fallback',
+            conversationId: run.conversationId,
+            turn: run.turn,
+          });
           await this.consume(run, emit);
         }
       }
       this.stopped(run);
-      const turn = await (run.ending ?? this.finish(run, run.answer.trim() ? 'completed' : 'failed', run.answer.trim() ? null : '模型未返回有效文本，请重试'));
+      const turn = await (run.ending ??
+        this.finish(
+          run,
+          run.answer.trim() ? 'completed' : 'failed',
+          run.answer.trim() ? null : '模型未返回有效文本，请重试',
+        ));
       emit({ type: 'done', conversationId: run.conversationId, turn });
     } catch (error) {
       this.stopped(run);
       // 只公开本地适配层定义的错误；未知网络/数据库异常不能带出原始响应或连接信息。
-      const message = error instanceof Error && /^(模型|回复超过)/.test(error.message) ? error.message : '生成或保存回复失败，请刷新后重试';
+      const message =
+        error instanceof Error && /^(模型|回复超过)/.test(error.message)
+          ? error.message
+          : '生成或保存回复失败，请刷新后重试';
       const turn = await (run.ending ?? this.finish(run, 'failed', message));
       emit({ type: 'done', conversationId: run.conversationId, turn });
     } finally {
@@ -139,107 +339,280 @@ export class ChatService implements OnModuleInit, BeforeApplicationShutdown {
       if (this.runs.get(run.ownerId) === run) this.runs.delete(run.ownerId);
     }
   }
-  private async consume(run: Run, emit: (event: ChatEvent) => void): Promise<void> {
+  private async consume(
+    run: Run,
+    emit: (event: ChatEvent) => void,
+  ): Promise<void> {
     if (this.stopped(run)) return;
-    for await (const text of this.provider.generate(run.model, run.messages, run.controller.signal)) {
+    for await (const text of this.provider.generate(
+      run.model,
+      run.messages,
+      run.controller.signal,
+    )) {
       // 每次上游await后检查同一截止时间；阶段保存独立推进，不阻塞继续消费和转发增量。
       if (this.stopped(run)) break;
       const remaining = 16000 - Array.from(run.answer).length;
-      const points = Array.from(text); const accepted = points.slice(0, remaining).join('');
+      const points = Array.from(text);
+      const accepted = points.slice(0, remaining).join('');
       run.answer += accepted;
-      if (accepted) emit({ type: 'delta', requestId: run.turn.requestId, text: accepted });
-      if (points.length > remaining) throw new Error('回复超过16000字符限制，已保留部分内容');
+      if (accepted)
+        emit({ type: 'delta', requestId: run.turn.requestId, text: accepted });
+      if (points.length > remaining)
+        throw new Error('回复超过16000字符限制，已保留部分内容');
       this.checkpoint(run);
     }
   }
   private checkpoint(run: Run): void {
     // 每轮最多一个写库任务；在途期间只替换最新快照，不按token排队，避免慢Mongo拖慢SSE。
-    if (run.checkpoint) { run.pendingCheckpoint = run.answer; return; }
+    if (run.checkpoint) {
+      run.pendingCheckpoint = run.answer;
+      return;
+    }
     if (Date.now() - run.savedAt < 250) return;
     run.pendingCheckpoint = run.answer;
     // 先登记Promise再开始执行，保证取消/完成能等待它，写失败也不会留下未处理的拒绝。
-    run.checkpoint = Promise.resolve().then(async () => {
-      while (run.pendingCheckpoint !== undefined && !this.stopped(run)) {
-        const answer = run.pendingCheckpoint; run.pendingCheckpoint = undefined; run.savedAt = Date.now();
-        await this.conversations.updateOne({ ownerId: run.ownerId, id: run.conversationId, turns: { $elemMatch: { requestId: run.turn.requestId, status: 'streaming' } } },
-          { $set: { 'turns.$.answer': answer, 'turns.$.updatedAt': new Date() } }).exec();
-        // 快写仍保持250ms节流；慢写结束后可马上保存合并快照，但绝不并行或越过终态。
-        if (Date.now() - run.savedAt < 250) break;
-      }
-    }).catch(() => {
-      run.checkpointFailed = true;
-      // 上游可能还在等待下一个token，失败要主动abort；这里不能await finish，否则自等死锁。
-      void this.finish(run, 'failed', '保存回复失败，请刷新确认结果');
-    }).finally(() => { run.checkpoint = undefined; run.pendingCheckpoint = undefined; });
+    run.checkpoint = Promise.resolve()
+      .then(async () => {
+        while (run.pendingCheckpoint !== undefined && !this.stopped(run)) {
+          const answer = run.pendingCheckpoint;
+          run.pendingCheckpoint = undefined;
+          run.savedAt = Date.now();
+          await this.conversations
+            .updateOne(
+              {
+                ownerId: run.ownerId,
+                id: run.conversationId,
+                turns: {
+                  $elemMatch: {
+                    requestId: run.turn.requestId,
+                    status: 'streaming',
+                  },
+                },
+              },
+              {
+                $set: {
+                  'turns.$.answer': answer,
+                  'turns.$.updatedAt': new Date(),
+                },
+              },
+            )
+            .exec();
+          // 快写仍保持250ms节流；慢写结束后可马上保存合并快照，但绝不并行或越过终态。
+          if (Date.now() - run.savedAt < 250) break;
+        }
+      })
+      .catch(() => {
+        run.checkpointFailed = true;
+        // 上游可能还在等待下一个token，失败要主动abort；这里不能await finish，否则自等死锁。
+        void this.finish(run, 'failed', '保存回复失败，请刷新确认结果');
+      })
+      .finally(() => {
+        run.checkpoint = undefined;
+        run.pendingCheckpoint = undefined;
+      });
   }
   private stopped(run: Run): boolean {
-    if (!run.ending && Date.now() >= run.deadline) void this.finish(run, 'interrupted', '生成超时，已保留部分回复');
+    if (!run.ending && Date.now() >= run.deadline)
+      void this.finish(run, 'interrupted', '生成超时，已保留部分回复');
     return Boolean(run.ending) || run.controller.signal.aborted;
   }
   async disconnect(prepared: PreparedChat): Promise<void> {
     if (prepared.run) {
       await this.finish(prepared.run, 'interrupted', '连接已断开，回复已中断');
       // 写头前断开的请求不会进入stream.finally，因此在断开路径也必须释放运行句柄。
-      if (this.runs.get(prepared.run.ownerId) === prepared.run) this.runs.delete(prepared.run.ownerId);
+      if (this.runs.get(prepared.run.ownerId) === prepared.run)
+        this.runs.delete(prepared.run.ownerId);
     }
   }
-  async cancel(ownerId: string, id: string, requestId: string): Promise<ChatTurn> {
-    await this.recover(ownerId); const record = await this.find(ownerId, id);
-    const turn = record.turns.find(item => item.requestId === requestId);
+  async cancel(
+    ownerId: string,
+    id: string,
+    requestId: string,
+  ): Promise<ChatTurn> {
+    await this.recover(ownerId);
+    const record = await this.find(ownerId, id);
+    const turn = record.turns.find((item) => item.requestId === requestId);
     if (!turn) throw new NotFoundException('对话轮次不存在');
     if (turn.status !== 'streaming') return this.turnView(turn);
     const run = this.runs.get(ownerId);
-    if (run?.conversationId === id && run.turn.requestId === requestId) return this.finish(run, 'canceled', null);
-    return this.persistTerminal(ownerId, id, requestId, turn.answer, 'canceled', null);
+    if (run?.conversationId === id && run.turn.requestId === requestId)
+      return this.finish(run, 'canceled', null);
+    return this.persistTerminal(
+      ownerId,
+      id,
+      requestId,
+      turn.answer,
+      'canceled',
+      null,
+    );
   }
-  private finish(run: Run, status: Exclude<ChatStatus, 'streaming'>, error: string | null): Promise<ChatTurn> {
+  private finish(
+    run: Run,
+    status: Exclude<ChatStatus, 'streaming'>,
+    error: string | null,
+  ): Promise<ChatTurn> {
     if (run.ending) return run.ending;
     // await前固定终态并abort；等待已开始的保存，再用完整正文做终态CAS，旧快照不能覆盖取消。
-    run.controller.abort(); if (run.timer) clearTimeout(run.timer);
+    run.controller.abort();
+    if (run.timer) clearTimeout(run.timer);
     run.ending = (async () => {
       await run.checkpoint;
       // DONE可能早于在途写失败。不能先报completed；已有取消/超时决定仍保持优先。
-      if (run.checkpointFailed && status !== 'canceled' && status !== 'interrupted') { status = 'failed'; error = '保存回复失败，请刷新确认结果'; }
-      return this.persistTerminal(run.ownerId, run.conversationId, run.turn.requestId, run.answer, status, error);
+      if (
+        run.checkpointFailed &&
+        status !== 'canceled' &&
+        status !== 'interrupted'
+      ) {
+        status = 'failed';
+        error = '保存回复失败，请刷新确认结果';
+      }
+      return this.persistTerminal(
+        run.ownerId,
+        run.conversationId,
+        run.turn.requestId,
+        run.answer,
+        status,
+        error,
+      );
     })().catch(async () => {
       const message = '保存回复失败，请刷新确认结果';
-      try { return await this.persistTerminal(run.ownerId, run.conversationId, run.turn.requestId, run.answer, 'failed', message); }
-      catch { return { ...run.turn, answer: run.answer, status: 'failed', error: message, updatedAt: new Date().toISOString() }; }
+      try {
+        return await this.persistTerminal(
+          run.ownerId,
+          run.conversationId,
+          run.turn.requestId,
+          run.answer,
+          'failed',
+          message,
+        );
+      } catch {
+        return {
+          ...run.turn,
+          answer: run.answer,
+          status: 'failed',
+          error: message,
+          updatedAt: new Date().toISOString(),
+        };
+      }
     });
     return run.ending;
   }
-  private async persistTerminal(ownerId: string, id: string, requestId: string, answer: string, status: Exclude<ChatStatus, 'streaming'>, error: string | null): Promise<ChatTurn> {
-    const updated = await this.conversations.findOneAndUpdate(
-      { ownerId, id, turns: { $elemMatch: { requestId, status: 'streaming' } } },
-      { $set: { active: false, expiresAt: null, 'turns.$.answer': answer, 'turns.$.status': status, 'turns.$.error': error, 'turns.$.updatedAt': new Date() } },
-      { returnDocument: 'after' },
-    ).lean().exec();
-    const record = updated ?? await this.find(ownerId, id);
-    const turn = record.turns.find(item => item.requestId === requestId);
-    if (!turn) throw new NotFoundException('对话轮次不存在'); return this.turnView(turn);
+  private async persistTerminal(
+    ownerId: string,
+    id: string,
+    requestId: string,
+    answer: string,
+    status: Exclude<ChatStatus, 'streaming'>,
+    error: string | null,
+  ): Promise<ChatTurn> {
+    const updated = await this.conversations
+      .findOneAndUpdate(
+        {
+          ownerId,
+          id,
+          turns: { $elemMatch: { requestId, status: 'streaming' } },
+        },
+        {
+          $set: {
+            active: false,
+            expiresAt: null,
+            'turns.$.answer': answer,
+            'turns.$.status': status,
+            'turns.$.error': error,
+            'turns.$.updatedAt': new Date(),
+          },
+        },
+        { returnDocument: 'after' },
+      )
+      .lean()
+      .exec();
+    const record = updated ?? (await this.find(ownerId, id));
+    const turn = record.turns.find((item) => item.requestId === requestId);
+    if (!turn) throw new NotFoundException('对话轮次不存在');
+    return this.turnView(turn);
   }
   private async recover(ownerId: string): Promise<void> {
     // 每个查询仍带ownerId；新进程标识不同，旧streaming即使未超时也不会永久挂起。
     // 本进程持有的run可能正在等待阶段保存，其终态/完整正文由同一finish负责。
     // 只排除这一会话与runtime，避免到期读查询抢先用旧快照结束它；无句柄的孤立记录仍需恢复。
     const run = this.runs.get(ownerId);
-    await this.conversations.updateMany({ ownerId, active: true, $or: [{ expiresAt: { $lte: new Date() } }, { runtimeId: { $ne: this.runtimeId } }], ...(run ? { $nor: [{ id: run.conversationId, runtimeId: this.runtimeId }] } : {}) },
-      { $set: { active: false, expiresAt: null, 'turns.$[turn].status': 'interrupted', 'turns.$[turn].error': '生成已中断，请重新编辑后发送', 'turns.$[turn].updatedAt': new Date() } },
-      { arrayFilters: [{ 'turn.status': 'streaming' }] }).exec();
+    await this.conversations
+      .updateMany(
+        {
+          ownerId,
+          active: true,
+          $or: [
+            { expiresAt: { $lte: new Date() } },
+            { runtimeId: { $ne: this.runtimeId } },
+          ],
+          ...(run
+            ? { $nor: [{ id: run.conversationId, runtimeId: this.runtimeId }] }
+            : {}),
+        },
+        {
+          $set: {
+            active: false,
+            expiresAt: null,
+            'turns.$[turn].status': 'interrupted',
+            'turns.$[turn].error': '生成已中断，请重新编辑后发送',
+            'turns.$[turn].updatedAt': new Date(),
+          },
+        },
+        { arrayFilters: [{ 'turn.status': 'streaming' }] },
+      )
+      .exec();
   }
   private async find(ownerId: string, id: string): Promise<ConversationRecord> {
-    const record = await this.conversations.findOne({ ownerId, id }).lean().exec();
-    if (!record) throw new NotFoundException('对话不存在'); return record;
+    const record = await this.conversations
+      .findOne({ ownerId, id })
+      .lean()
+      .exec();
+    if (!record) throw new NotFoundException('对话不存在');
+    return record;
   }
   private context(turns: TurnRecord[], content: string): ModelMessage[] {
     // 保留完整问答对，从最近10轮completed倒序取预算，再恢复旧到新顺序；当前输入永不裁剪。
-    let budget = 32000 - Array.from(content).length; const selected: TurnRecord[] = [];
-    for (const turn of turns.filter(item => item.status === 'completed').slice(-10).reverse()) {
-      const cost = Array.from(turn.content).length + Array.from(turn.answer).length;
-      if (cost > budget) break; selected.unshift(turn); budget -= cost;
+    let budget = 32000 - Array.from(content).length;
+    const selected: TurnRecord[] = [];
+    for (const turn of turns
+      .filter((item) => item.status === 'completed')
+      .slice(-10)
+      .reverse()) {
+      const cost =
+        Array.from(turn.content).length + Array.from(turn.answer).length;
+      if (cost > budget) break;
+      selected.unshift(turn);
+      budget -= cost;
     }
-    return [...selected.flatMap(turn => [{ role: 'user' as const, content: turn.content }, { role: 'assistant' as const, content: turn.answer }]), { role: 'user', content }];
+    return [
+      ...selected.flatMap((turn) => [
+        { role: 'user' as const, content: turn.content },
+        { role: 'assistant' as const, content: turn.answer },
+      ]),
+      { role: 'user', content },
+    ];
   }
-  private conversationView(record: ConversationRecord): ChatConversation { return { id: record.id, title: record.title, createdAt: record.createdAt.toISOString(), updatedAt: record.updatedAt.toISOString() }; }
-  private turnView(turn: TurnRecord): ChatTurn { return { requestId: turn.requestId, content: turn.content, answer: turn.answer, modelId: turn.modelId, modelLabel: turn.modelLabel, requestedModelId: turn.requestedModelId ?? turn.modelId, requestedModelLabel: turn.requestedModelLabel ?? turn.modelLabel, status: turn.status, error: turn.error, createdAt: turn.createdAt.toISOString(), updatedAt: turn.updatedAt.toISOString() }; }
+  private conversationView(record: ConversationRecord): ChatConversation {
+    return {
+      id: record.id,
+      title: record.title,
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+    };
+  }
+  private turnView(turn: TurnRecord): ChatTurn {
+    return {
+      requestId: turn.requestId,
+      content: turn.content,
+      answer: turn.answer,
+      modelId: turn.modelId,
+      modelLabel: turn.modelLabel,
+      requestedModelId: turn.requestedModelId ?? turn.modelId,
+      requestedModelLabel: turn.requestedModelLabel ?? turn.modelLabel,
+      status: turn.status,
+      error: turn.error,
+      createdAt: turn.createdAt.toISOString(),
+      updatedAt: turn.updatedAt.toISOString(),
+    };
+  }
 }

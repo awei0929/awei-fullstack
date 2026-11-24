@@ -31,7 +31,21 @@ const content = () => ({
   music: { enabled: false, title: '', sourceUrl: '', volume: 25, loop: true },
   capabilities: capabilityDefaults(),
   capabilityDetails: capabilityDetailsDefaults(),
+  thoughts: [{
+    id: 'thought_fixture', title: '测试想法', summary: '想法的摘要', content: '## 正文\n\n- 第一点', meta: '2026 · 测试', visible: true,
+  }],
+  works: [{
+    id: 'work_fixture', title: '测试作品', summary: '作品的摘要', url: 'https://example.com/work', label: '项目', coverUrl: '', meta: '2026 · 测试', visible: true,
+  }],
+  chat: {
+    enabled: true, heading: '测试对话', intro: '测试介绍', placeholder: '测试占位', systemPrompt: '', suggestions: ['问题一', '问题二'],
+  },
 });
+const legacyContent = () => {
+  const value = content();
+  delete value.thoughts; delete value.works; delete value.chat;
+  return value;
+};
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS4cAAAAASUVORK5CYII=', 'base64');
 
 // 最小音频容器夹具只验证HTTP的格式边界，不把解码器播放成功作为上传承诺。
@@ -70,6 +84,77 @@ describe('单站点配置、权限、持久化与媒体 HTTP', () => {
     const form = new FormData(); form.append('file', new Blob([bytes], { type: mime }), '../../untrusted.mp3');
     return fetch(`${state.baseUrl}/api/site/audio-assets`, { method: 'POST', body: form, headers: { Cookie: user.cookie, 'X-CSRF-Token': user.csrfToken, ...extra } });
   };
+
+  it('简历旧记录只读补空，完整保存后公开，省略分区的旧客户端保留简历', async () => {
+    const empty = { name: '', role: '', body: '', pdfUrl: '' };
+    const collection = state.connection.collection('site_documents');
+    const readResume = path => owner.request(`${path}?include=resume`).then(r => r.json()).then(document => document.content.resume);
+    assert.deepEqual(await readResume('/site'), empty);
+    assert.equal((await owner.request('/site').then(r => r.json())).content.resume, undefined);
+    assert.equal(await collection.countDocuments(), 0);
+
+    const legacy = content();
+    await collection.insertOne({ key: 'main', version: 7, updatedAt: new Date(), content: legacy });
+    const original = await collection.findOne({ key: 'main' });
+    assert.deepEqual(await readResume('/site/config'), empty);
+    assert.deepEqual(await collection.findOne({ key: 'main' }), original);
+
+    const resume = { name: '测试站主', role: '前端开发工程师', body: '## 工作经历\n\n- 已公开的项目贡献', pdfUrl: '/api/site/assets/12345678-abcd-4abc-8abc-0123456789ab.pdf' };
+    const saved = await save(owner, { ...legacy, resume }, 7);
+    assert.equal(saved.status, 200);
+    assert.deepEqual((await saved.json()).content.resume, resume);
+    assert.deepEqual((await client(state).request('/site?include=resume').then(r => r.json())).content.resume, resume);
+    assert.equal((await save(owner, legacy, 7)).status, 409);
+
+    const oldClient = await save(owner, { ...legacy, profile: { ...legacy.profile, name: '编辑后的站主' } }, 8);
+    assert.equal(oldClient.status, 200);
+    const updated = await oldClient.json();
+    assert.equal(updated.content.profile.name, '编辑后的站主');
+    assert.equal(updated.content.resume, undefined);
+    assert.equal((await owner.request('/site/config').then(r => r.json())).content.resume, undefined);
+    assert.deepEqual(await readResume('/site/config'), resume);
+
+    const cleared = await save(owner, { ...legacy, resume: empty }, 9);
+    assert.equal(cleared.status, 200);
+    assert.deepEqual((await cleared.json()).content.resume, empty);
+  });
+
+  it('结构化简历字段可保存、公开，并拒绝非法技能/经历条目', async () => {
+    const value = content();
+    value.resume = {
+      name: '李武伟', role: 'Web 全栈开发', body: '', pdfUrl: '',
+      summary: '5 年 Web 全栈经验。', meta: '5 年经验 · 随时到岗',
+      skills: [{ label: 'AI 应用开发', items: ['Mastra Agent 编排', '多轮上下文'] }],
+      experience: [{ company: '闪剪智能', role: 'Web 前端', period: '2022.12 – 2026.11', summary: '', highlights: ['负责 AI 创作平台'] }],
+      projects: [{ name: '闪剪 AI 创作平台', role: '前端', period: '2022 – 2026', summary: 'AI 内容创作平台。', tech: ['React', 'NestJS'], highlights: ['独立负责首页与对话'] }],
+      education: [{ school: '江西理工大学', major: '计算机科学与技术', period: '' }],
+    };
+    const saved = await save(owner, value);
+    assert.equal(saved.status, 200);
+    const savedResume = (await saved.json()).content.resume;
+    assert.deepEqual(savedResume, value.resume);
+    assert.deepEqual((await client(state).request('/site?include=resume').then(r => r.json())).content.resume, value.resume);
+
+    const invalid = structuredClone(value);
+    invalid.resume.skills = [{ label: '', items: [] }];
+    assert.equal((await save(owner, invalid, 1)).status, 400);
+    invalid.resume.skills = [{ label: 'AI', items: ['字'.repeat(61)] }];
+    assert.equal((await save(owner, invalid, 1)).status, 400);
+    invalid.resume.skills = [{ label: 'AI', items: ['ok'] }];
+    invalid.resume.experience = [{ company: '', role: '前端', period: '', summary: '', highlights: [] }];
+    assert.equal((await save(owner, invalid, 1)).status, 400);
+  });
+
+  it('简历拒绝不完整分区、越界正文和非本站 PDF 链接，不产生写入', async () => {
+    const empty = { name: '', role: '', body: '', pdfUrl: '' };
+    for (const resume of [null, [], { body: '', pdfUrl: '' }, { ...empty, other: true },
+      { ...empty, name: '字'.repeat(61) }, { ...empty, role: '字'.repeat(81) }, { ...empty, body: '字'.repeat(20001) },
+      { ...empty, pdfUrl: 'https://example.com/resume.pdf' }, { ...empty, pdfUrl: '/api/site/assets/12345678-abcd-4abc-8abc-0123456789ab.zip' },
+      { ...empty, pdfUrl: '/api/site/assets/12345678-abcd-4abc-8abc-0123456789ab.pdf\n' }]) {
+      assert.equal((await save(owner, { ...content(), resume })).status, 400);
+    }
+    assert.equal(await state.connection.collection('site_documents').countDocuments(), 0);
+  });
 
   it('详情新库及旧分区缺失只读补默认，原能力和历史记录版本时间均不改变', async () => {
     for (const path of ['/site', '/site/config']) {
@@ -566,7 +651,7 @@ describe('单站点配置、权限、持久化与媒体 HTTP', () => {
 
   it('[P24] 旧Mongo文档只读剔除projects且不改版本；下一次正常保存整体替换内容', async () => {
     // 通过原生集合放入历史数据，绕开新DTO；这只影响每用例独立临时库。
-    const legacy = { ...content(), projects: [{ id: 'legacy-visible', visible: true }, { id: 'legacy-hidden', visible: false }] };
+    const legacy = { ...legacyContent(), projects: [{ id: 'legacy-visible', visible: true }, { id: 'legacy-hidden', visible: false }] };
     const updatedAt = new Date('2026-10-01T12:00:00.000Z');
     await state.connection.collection('site_documents').insertOne({ key: 'main', version: 7, updatedAt, content: legacy });
     const original = await state.connection.collection('site_documents').findOne({ key: 'main' });
@@ -574,7 +659,10 @@ describe('单站点配置、权限、持久化与媒体 HTTP', () => {
       const response = await owner.request(path); assert.equal(response.status, 200);
       const document = await response.json();
       assert.equal(document.version, 7); assert.equal(document.updatedAt, updatedAt.toISOString());
-      assert.equal(Object.hasOwn(document.content, 'projects'), false); assert.deepEqual(document.content, content());
+      assert.equal(Object.hasOwn(document.content, 'projects'), false);
+      const { thoughts, works, chat, ...legacySections } = document.content;
+      assert.deepEqual(legacySections, legacyContent());
+      assert.ok(thoughts.length > 0); assert.ok(works.length > 0); assert.equal(chat.enabled, true);
     }
     assert.deepEqual(await state.connection.collection('site_documents').findOne({ key: 'main' }), original);
     const value = content(); value.profile.name = '正常更新';

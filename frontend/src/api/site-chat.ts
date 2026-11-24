@@ -124,10 +124,15 @@ export async function streamSiteChat(
   signal.addEventListener('abort', abort)
   touch()
   try {
-    const response = await requestResponse('/site-chat/stream', {
+    // 首条消息 POST 集合创建会话；已有会话 POST 到自己的 messages 子资源。
+    // 两者都返回 SSE：POST 的响应体可以直接是流，SSE 是传输方式，不是第二个接口。
+    const path = input.conversationId
+      ? `/site-chat/conversations/${encodeURIComponent(input.conversationId)}/messages`
+      : '/site-chat/conversations';
+    const response = await requestResponse(path, {
       method: 'POST',
       headers: { ...headers(), 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-      body: JSON.stringify({ ...input, requestId }),
+      body: JSON.stringify({ message: input.message, requestId }),
       signal: controller.signal,
     })
     if (!response.body || !(response.headers.get('content-type') ?? '').includes('text/event-stream')) {

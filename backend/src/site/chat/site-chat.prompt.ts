@@ -48,6 +48,7 @@ export function buildSiteChatMessages(content: SiteContent, history: ModelMessag
     '3. 与站主或这个网站无关的问题，礼貌说明你更擅长聊这些内容，并邀请对方换个问题。',
     '4. 用简体中文，语气自然、克制，通常 2–4 句、不超过 120 个字；不要使用列表，除非对方要求。',
     '5. 不要声称自己是真人，也不要承诺站主本人会立即回复；需要联系时给出公开联系方式。',
+    '6. 如果问题与简历、项目或作品、想法有关，可以自然提示查看对应页面，但不要输出 URL、Markdown 链接或 /resume、/works 这类站内路径；界面会自动给出入口。',
     content.chat.systemPrompt.trim() ? `站主补充设定：${cut(content.chat.systemPrompt, 3000)}` : '',
     `\n公开资料：\n${brief || '（站主还没有公开更多资料。）'}`,
   ].filter(Boolean).join('\n');

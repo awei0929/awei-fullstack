@@ -259,20 +259,20 @@ CHAT_TIMEOUT_MS=120000
 
 4. 重启后端，登录站主后台 → AI 对话 → 选择 GLM-4.7-Flash → 新建对话并发送消息。Key 留空时官网照常运行，聊天显示模型未配置并禁用发送。
 
-截至2026-11-12，[官方定价](https://docs.bigmodel.cn/cn/guide/start/pricing)将 GLM-4.7-Flash 与 GLM-4-Flash-250414 输入、输出标为免费；两者复用同一标准API Key，无需另申请备用Key。账号的并发、速率和开通条件以控制台为准；当前免费不代表未来价格或持续可用性保证。应用仅在4.7收到429且没有正文时自动切换一次4-Flash，两次尝试共享原总时限，不切付费模型，不启用另收费的搜索或其他工具。
+截至2026-11-12，[官方定价](https://docs.bigmodel.cn/cn/guide/start/pricing)将 GLM-4.7-Flash 与 GLM-4-Flash-250414 输入、输出标为免费；两者复用同一标准API Key，无需另申请备用Key。账号的并发、速率和开通条件以控制台为准；当前免费不代表未来价格或持续可用性保证。后台聊天与未配置 DeepSeek 的公开对话，仅在 4.7 收到 429 且没有正文时自动切换一次 4-Flash，两次尝试共享原总时限，不启用另收费的搜索或其他工具；公开对话配置 DeepSeek 后，首 token 前失败会切到 DeepSeek（可能计费），见下文。
 
 真实 Key 不写进前端、`VITE_` 环境变量、README、聊天消息或 Git。生产环境需要单独配置服务器持久环境文件，自动发布不会把本机 `.env` 上传。配置完成后的真实模型可用性仍需实际发送验证。
 
 ### 可选：公开对话接入 DeepSeek
 
-首页和 `/chat` 的公开 AI 对话优先使用 DeepSeek：在 `backend/.env` 增加 `DEEPSEEK_API_KEY`，重启后端即可。默认模型为 `deepseek-flash`、官方地址 `https://api.deepseek.com`，非思考模式；Key 留空时继续使用上面的 GLM 配置。`DEEPSEEK_BASE_URL` 只在使用兼容网关时需要覆盖。Key 同样只放服务器，不进入前端或 Git。
+首页和 `/chat` 的公开 AI 对话优先使用 GLM；只有在 `backend/.env` 配置 `DEEPSEEK_API_KEY` 后，DeepSeek 才会作为 GLM 首个 token 前失败或空输出的备用，不会改变默认模型。默认仍为 `glm-4.7-flash`，DeepSeek 使用 `deepseek-flash`、官方地址 `https://api.deepseek.com`、非思考模式；只有 GLM 没有 Key 时才直接使用 DeepSeek。`DEEPSEEK_BASE_URL` 只在使用兼容网关时需要覆盖。Key 同样只放服务器，不进入前端或 Git。
 
 ### 公开对话历史（匿名）
 
 - `/chat` 与 `/chat/:conversationId` 会把会话保存到 MongoDB 的 `site_chat_conversations`；访客不需要登录，浏览器只在 `localStorage['nest.chat.visitor.v1']` 保存一个 UUID，请求通过 `X-Visitor-Id` 携带，服务端只存 SHA-256。
 - 同一浏览器刷新、重新打开页面仍能看到历史；换浏览器、清站点数据或换设备不会同步。每个访客最多 20 个会话、每个会话最多 100 轮，30 天无活动由 TTL 清理。
-- 历史接口：`GET /api/site-chat/conversations`、`GET /api/site-chat/conversations/:id`、`DELETE /api/site-chat/conversations/:id`；流式接口仍是 `POST /api/site-chat/stream`，事件为 `start/delta/done/error/ping`，空闲 30 秒 ping，前端 45 秒 watchdog。
-- 生成由 LangGraph 线性图编排：`loadConversation → buildContext → agent`；DeepSeek 走 `ChatDeepSeek`，GLM 回退走 `ChatOpenAI`，Mongo 轮次是唯一事实来源，不使用 LangGraph checkpointer。
+- 历史接口：`GET /api/site-chat/conversations`、`GET /api/site-chat/conversations/:id`、`DELETE /api/site-chat/conversations/:id`；发消息：`POST /api/site-chat/conversations`（首条）与 `POST /api/site-chat/conversations/:id/messages`（后续），两者都以 SSE 返回 `start/delta/done/error/ping`，空闲 30 秒 ping，前端 45 秒 watchdog。
+- 生成由 LangGraph 线性图编排：`loadConversation → buildContext → agent`；GLM 走 `ChatOpenAI`，DeepSeek 作为首 token 前失败的备用走 `ChatDeepSeek`，Mongo 轮次是唯一事实来源，不使用 LangGraph checkpointer。
 - 公开对话不写 `site_documents`，不影响首页内容；删除会话直接移除文档。Nginx 部署必须关闭 `proxy_buffering` 并把 `proxy_read_timeout` 设到 60 秒以上。
 
 ### 密钥安全
@@ -287,7 +287,7 @@ CHAT_TIMEOUT_MS=120000
 
 后端使用 Node 原生 `fetch` 调用 Chat Completions 兼容接口，再转换为本项目 SSE 事件；前端使用 `fetch` 流式读取，MobX 管理状态。模型目录由服务端控制，页面不能提交任意模型地址或 Key。
 
-两个 GLM 免费模型仍为内置项；未配置 DeepSeek 时默认 GLM-4.7-Flash，配置后默认 DeepSeek-Flash。也可手动选择 GLM-4-Flash 直接对话。可以在 `backend/.env` 增加最多10个其他兼容模型；下面是配置格式示例，需替换为供应商真实信息：
+两个 GLM 免费模型仍为内置项；公开对话与后台默认模型都优先 GLM-4.7-Flash。配置 DeepSeek 只作为公开对话的备用，不会把默认模型改成 DeepSeek。也可手动选择 GLM-4-Flash 直接对话。可以在 `backend/.env` 增加最多10个其他兼容模型；下面是配置格式示例，需替换为供应商真实信息：
 
 ```dotenv
 OTHER_LLM_API_KEY=替换为其他供应商密钥

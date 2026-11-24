@@ -574,7 +574,7 @@ for await (const event of graph.streamEvents(input, { version: 'v2', signal })) 
 
 - [x] **Step 5: 替换 service 的 provider 流**
 
-`SiteChatService` 删除 `ChatCompletionsProvider` 依赖，改为注入 `SiteChatGraph`；`stream()` 变成消费图并做 500ms 部分保存、终态与超时。保留 `availableModel()` 和限流逻辑；DeepSeek 优先不变。`SiteModule` 注册 `SiteChatGraph`。
+`SiteChatService` 删除 `ChatCompletionsProvider` 依赖，改为注入 `SiteChatGraph`；`stream()` 变成消费图并做 500ms 部分保存、终态与超时。保留 `availableModel()` 和限流逻辑；公开对话改为 GLM 优先、DeepSeek 备用。`SiteModule` 注册 `SiteChatGraph`。
 
 - [x] **Step 6: 重跑全套后端测试**
 
@@ -779,5 +779,5 @@ git commit -m "docs: record public chat history architecture and verification"
 
 - Task 1–5 已实现并提交：`b7e2ec0`、`f98bd75`、`d54511a`/`d3f76be`、`ac41a38`、`69cd440`。
 - 后端全量 177/177、13 套件；`site-chat-history` 13/13、`site-chat` 8/8；前端 check/lint/build 通过；Chrome 真实验收通过。
-- Task 3 Step 2 未新增单独的模型/图单测；由现有 `site-chat.e2e.test.mjs` 的 DeepSeek 优先用例与真实请求回归覆盖，计划中的“失败测试先写”未照做。
+- Task 3 Step 2 未新增单独的模型/图单测；由现有 `site-chat.e2e.test.mjs` 的 GLM 优先 / DeepSeek 备用切换用例与真实请求回归覆盖，计划中的“失败测试先写”未照做。
 - 30 秒 ping 已由 `site-chat-history.e2e.test.mjs` 的 `SITE_CHAT_PING_MS=50` 用例覆盖；45 秒前端 watchdog 由代码实现，Chrome 实测停止生成，未单独做 45 秒断线自动化。

@@ -3,7 +3,8 @@ import type { SiteFileAsset, SiteFileUploadTarget } from '../types/site'
 
 export function siteFileUploadKey(target: SiteFileUploadTarget): string {
   if (target.type === 'cover' || target.type === 'project') return `${target.type}:${target.projectId}`
-  return target.type === 'company' ? `company:${target.field}` : 'library'
+  if (target.type === 'work-cover') return `work-cover:${target.workId}`
+  return target.type === 'company' ? `company:${target.field}` : target.type
 }
 
 export function siteFileValidationError(file: File, expectedKind?: SiteFileAsset['kind']): string {

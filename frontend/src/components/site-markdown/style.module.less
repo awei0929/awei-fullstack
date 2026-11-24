@@ -17,3 +17,45 @@
 }
 .tableScroll { max-width: 100%; overflow: auto; margin-bottom: 1em; scrollbar-width: thin; table { border-collapse: collapse; width: 100%; min-width: 360px; margin: 0; } th, td { padding: 10px 14px; text-align: left; border: 1px solid #e9d5a72b; } th { color: #fff0d2; background: #ffffff08; } }
 .imageFallback { display: grid; place-content: center; gap: 6px; min-height: 100px; padding: 20px; border: 1px dashed #e9d5a744; border-radius: 10px; color: #c6cbb4; background: #ffffff05; font-size: 14px; text-align: center; small { display: block; overflow-wrap: anywhere; } }
+
+.paper {
+  color: var(--theme-text);
+  font-size: clamp(15px, 1.6vw, 16px);
+  line-height: 1.8;
+  transition: color 0.25s ease;
+
+  h1, h2, h3, h4, h5, h6 { color: var(--theme-text); }
+  h2 {
+    padding-bottom: .36em;
+    border-bottom: 1px solid var(--theme-line);
+    margin: 2em 0 .85em;
+    font-size: clamp(21px, 2.65vw, 25px);
+  }
+  h3 { margin: 1.6em 0 .5em; font-size: clamp(17px, 2vw, 19px); }
+  li + li { margin-top: .43em; }
+  li::marker { color: var(--theme-muted); }
+  strong { color: var(--theme-text); }
+  a { color: var(--theme-text); }
+  blockquote { color: var(--theme-muted); border-color: var(--theme-line); background: var(--theme-surface-soft); }
+  code, pre { background: var(--theme-surface-soft); }
+  pre { border-color: var(--theme-line); }
+  hr { border-color: var(--theme-line); }
+  input[type='checkbox'] { accent-color: var(--theme-text); }
+  :focus-visible { outline-color: var(--theme-text); }
+  .tableScroll {
+    th, td { border-color: var(--theme-line); }
+    th { color: var(--theme-text); background: var(--theme-surface-soft); }
+  }
+  .imageFallback { color: var(--theme-muted); border-color: var(--theme-line); background: var(--theme-surface-soft); }
+}
+
+@media print {
+  .paper {
+    color: #000;
+    a { color: #000; }
+    h1, h2, h3, h4, h5, h6, strong { color: #000; }
+    h2, hr { border-color: #ccc; }
+    blockquote, code, pre, .tableScroll th { background: #fff; border-color: #ccc; color: #000; }
+    .imageFallback { color: #000; border-color: #ccc; background: #fff; }
+  }
+}

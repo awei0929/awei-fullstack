@@ -43,19 +43,47 @@ export class SiteChatController {
     if (!removed) throw this.notFound();
   }
 
-  @Post('stream')
+  @Post('conversations')
   @HttpCode(200)
-  async stream(
+  async streamNew(
     @Req() request: Request,
     @Res() response: Response,
     @Body() input: PublicChatDto,
     @Headers('x-visitor-id') visitor?: string,
   ): Promise<void> {
+    return this.streamTurn(request, response, input, visitor);
+  }
+
+  @Post('conversations/:conversationId/messages')
+  @HttpCode(200)
+  async streamMessage(
+    @Req() request: Request,
+    @Res() response: Response,
+    @Body() input: PublicChatDto,
+    @Param('conversationId') conversationId: string,
+    @Headers('x-visitor-id') visitor?: string,
+  ): Promise<void> {
+    // 路径是会话归属的唯一来源；格式错误与越权都走 404，避免枚举。
+    if (!isUuid(conversationId)) throw this.notFound();
+    return this.streamTurn(request, response, input, visitor, conversationId);
+  }
+
+  private async streamTurn(
+    request: Request,
+    response: Response,
+    input: PublicChatDto,
+    visitor?: string,
+    conversationId?: string,
+  ): Promise<void> {
     // 受理失败（访客标识、关闭、限流、无模型Key）仍返回标准JSON错误，不会先写出200再报错。
     if (!isVisitorId(visitor)) {
       throw new BadRequestException({ message: '缺少有效的匿名访客标识。', code: 'SITE_CHAT_VISITOR_REQUIRED' });
     }
-    const prepared = await this.chat.begin(input, visitor, request.ip || request.socket.remoteAddress || 'unknown');
+    const prepared = await this.chat.begin(
+      { ...input, ...(conversationId ? { conversationId } : {}) },
+      visitor,
+      request.ip || request.socket.remoteAddress || 'unknown',
+    );
     const controller = new AbortController();
     let settled = false;
     let clientGone = false;

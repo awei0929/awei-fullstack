@@ -15,8 +15,15 @@ export class ChatConfig {
         { ...glm, id: 'glm-4.7-flash', label: 'GLM-4.7-Flash', model: 'glm-4.7-flash', disableThinking: true },
         { ...glm, id: 'glm-4-flash-250414', label: 'GLM-4-Flash-250414', model: 'glm-4-flash-250414', disableThinking: false },
       ];
+      // DeepSeek 只在提供Key时出现，避免未配置的部署多出一个不可用模型，也保持旧白名单数量不变。
+      // 公开对话使用非思考模式，降低首字延迟与费用；DeepSeek 的思考参数与GLM同名，可直接复用适配器。
+      const deepseek = this.config.get<string>('DEEPSEEK_API_KEY')?.trim() ? [{
+        id: 'deepseek-flash', label: 'DeepSeek-Flash', model: 'deepseek-flash',
+        baseUrl: this.config.get<string>('DEEPSEEK_BASE_URL') || 'https://api.deepseek.com',
+        apiKeyEnv: 'DEEPSEEK_API_KEY', disableThinking: true,
+      }] : [];
       const ids = new Set<string>();
-      return [...defaults, ...extras].map(value => {
+      return [...defaults, ...deepseek, ...extras].map(value => {
         if (!value || typeof value !== 'object' || Object.keys(value).some(key => !['id', 'label', 'model', 'baseUrl', 'apiKeyEnv', 'disableThinking'].includes(key))) throw new Error();
         const { id, label, model, baseUrl, apiKeyEnv, disableThinking = false } = value;
         if (typeof id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/.test(id) || ids.has(id)) throw new Error();
@@ -33,7 +40,10 @@ export class ChatConfig {
     }
   }
   catalog(): { models: ChatModel[]; defaultModelId: string } {
-    return { models: this.models().map(model => ({ id: model.id, label: model.label, available: Boolean(model.apiKey), ...(model.fallbackModelId ? { fallbackModelId: model.fallbackModelId } : {}) })), defaultModelId: 'glm-4.7-flash' };
+    const models = this.models();
+    // 配置了DeepSeek后后台也默认选它；未配置时保持原GLM默认，避免改变已有部署行为。
+    const defaultModelId = models.find(model => model.id === 'deepseek-flash' && model.apiKey)?.id ?? 'glm-4.7-flash';
+    return { models: models.map(model => ({ id: model.id, label: model.label, available: Boolean(model.apiKey), ...(model.fallbackModelId ? { fallbackModelId: model.fallbackModelId } : {}) })), defaultModelId };
   }
   timeout(): number {
     const raw = this.config.get<string>('CHAT_TIMEOUT_MS') || '120000';

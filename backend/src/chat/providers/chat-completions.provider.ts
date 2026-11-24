@@ -15,11 +15,12 @@ export class ChatCompletionsProvider {
     const response = await fetch(`${model.baseUrl}/chat/completions`, {
       method: 'POST', redirect: 'error', signal,
       headers: { Authorization: `Bearer ${model.apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-      body: JSON.stringify({ model: model.model, messages, stream: true, max_tokens: 4096, ...(model.disableThinking ? { thinking: { type: 'disabled' } } : {}) }),
+      body: JSON.stringify({ model: model.model, messages, stream: true, max_tokens: model.maxTokens ?? 4096, ...(model.disableThinking ? { thinking: { type: 'disabled' } } : {}) }),
     });
     if (!response.ok || !response.body || !response.headers.get('content-type')?.includes('text/event-stream')) {
       await response.body?.cancel();
       if (response.status === 401 || response.status === 403) throw new Error('模型鉴权失败，请检查服务端配置');
+      if (response.status === 402) throw new Error('模型额度不足，请稍后重试');
       if (response.status === 429) throw new ModelRateLimitError();
       throw new Error('模型服务暂时不可用，请稍后重试');
     }

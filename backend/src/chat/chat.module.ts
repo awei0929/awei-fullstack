@@ -17,5 +17,7 @@ import { ChatMemoryService } from './chat-memory.service.js';
   ])],
   controllers: [ChatController],
   providers: [ChatService, ChatMemoryService, ChatConfig, ChatCompletionsProvider],
+  // 公开对话复用同一模型配置与流适配器；不导出ChatService，匿名入口不能碰站主会话。
+  exports: [ChatConfig, ChatCompletionsProvider],
 })
 export class ChatModule {}

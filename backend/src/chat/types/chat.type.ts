@@ -12,5 +12,5 @@ export type ChatEvent =
   | { type: 'fallback'; conversationId: string; turn: ChatTurn }
   | { type: 'delta'; requestId: string; text: string }
   | { type: 'done'; conversationId: string; turn: ChatTurn };
-export interface ModelSettings { id: string; label: string; model: string; baseUrl: string; apiKey: string; disableThinking: boolean; fallbackModelId?: string }
+export interface ModelSettings { id: string; label: string; model: string; baseUrl: string; apiKey: string; disableThinking: boolean; fallbackModelId?: string; maxTokens?: number }
 export interface ModelMessage { role: 'system' | 'user' | 'assistant'; content: string }

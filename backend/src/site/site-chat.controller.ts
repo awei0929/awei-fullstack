@@ -1,15 +1,18 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, NotFoundException, Param, Post, Req, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, NotFoundException, Param, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { PublicChatDto } from './dto/public-chat.dto.js';
 import { SiteChatService } from './chat/site-chat.service.js';
+import { SiteChatConfig } from './chat/site-chat.config.js';
 import { SiteChatRepository } from './chat/site-chat.repository.js';
+import { createSseWriter } from './chat/site-chat.sse.js';
 import { hashVisitor, isUuid, isVisitorId } from './chat/site-chat.types.js';
 
-// 公开对话不挂Session/Owner/CSRF守卫；入口只接收问题与最近上下文，模型与提示词全部由服务端决定。
+// 公开对话不挂Session/Owner/CSRF守卫；入口只接收问题与会话ID，模型与提示词全部由服务端决定。
 @Controller('site-chat')
 export class SiteChatController {
   constructor(
     private readonly chat: SiteChatService,
+    private readonly config: SiteChatConfig,
     private readonly repository: SiteChatRepository,
   ) {}
 
@@ -42,34 +45,88 @@ export class SiteChatController {
 
   @Post('stream')
   @HttpCode(200)
-  async stream(@Req() request: Request, @Res() response: Response, @Body() input: PublicChatDto): Promise<void> {
-    // 受理失败（关闭、限流、无模型Key）仍返回标准JSON错误，不会先写出200再报错。
-    const prepared = await this.chat.prepare(input, request.ip || request.socket.remoteAddress || 'unknown');
+  async stream(
+    @Req() request: Request,
+    @Res() response: Response,
+    @Body() input: PublicChatDto,
+    @Headers('x-visitor-id') visitor?: string,
+  ): Promise<void> {
+    // 受理失败（访客标识、关闭、限流、无模型Key）仍返回标准JSON错误，不会先写出200再报错。
+    if (!isVisitorId(visitor)) {
+      throw new BadRequestException({ message: '缺少有效的匿名访客标识。', code: 'SITE_CHAT_VISITOR_REQUIRED' });
+    }
+    const prepared = await this.chat.begin(input, visitor, request.ip || request.socket.remoteAddress || 'unknown');
     const controller = new AbortController();
-    const close = () => controller.abort();
-    response.on('close', close);
-    if (response.destroyed) { controller.abort(); return; }
-    response.status(200).set({
-      'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store',
-      'X-Accel-Buffering': 'no', Connection: 'keep-alive',
+    let settled = false;
+    let clientGone = false;
+    const disconnect = () => {
+      if (settled) return;
+      clientGone = true;
+      controller.abort();
+    };
+    // 浏览器取消 fetch 时最先变化的是连接，不一定立刻反映在 response.destroyed 上。
+    request.socket.on('close', disconnect);
+    response.on('close', disconnect);
+    const writer = createSseWriter(response, {
+      turnId: prepared.turnId,
+      pingMs: this.config.pingMs(),
+      onClose: () => controller.abort(),
     });
-    response.flushHeaders();
-    const heartbeat = setInterval(() => { if (!response.destroyed) response.write(': heartbeat\n\n'); }, 15000);
+    await writer.start({ conversationId: prepared.conversationId, turnId: prepared.turnId, requestId: input.requestId });
+    if (clientGone || response.destroyed) {
+      await this.repository.finishTurn(prepared.visitorHash, prepared.conversationId, prepared.turnId, 'canceled');
+      writer.close();
+      return;
+    }
+
+    // 幂等重放：该轮已经完成，不调用模型，也不重复写库。
+    if (prepared.answer !== undefined) {
+      if (prepared.answer) await writer.delta(prepared.answer);
+      await writer.done({ conversationId: prepared.conversationId, turnId: prepared.turnId });
+      return;
+    }
+
+    let answer = '';
+    let lastSaved = 0;
+    const finish = async (status: 'completed' | 'failed' | 'canceled', error?: string | null) => {
+      if (settled) return;
+      settled = true;
+      await this.repository.finishTurn(prepared.visitorHash, prepared.conversationId, prepared.turnId, status, error);
+    };
+
     try {
       for await (const text of this.chat.stream(prepared, controller.signal)) {
-        if (response.destroyed) break;
-        response.write(`event: delta\ndata: ${JSON.stringify({ type: 'delta', text })}\n\n`);
+        if (clientGone || controller.signal.aborted || response.destroyed) break;
+        answer += text;
+        await writer.delta(text);
+        // 每 500ms 落一次增量，刷新页面时至少能看到已经生成的部分；最终终态再写一次完整正文。
+        if (Date.now() - lastSaved >= 500) {
+          lastSaved = Date.now();
+          await this.repository.appendAnswer(prepared.visitorHash, prepared.conversationId, prepared.turnId, answer);
+        }
       }
-      if (!response.destroyed) response.write(`event: done\ndata: ${JSON.stringify({ type: 'done' })}\n\n`);
+      if (clientGone || controller.signal.aborted || response.destroyed) {
+        await this.repository.appendAnswer(prepared.visitorHash, prepared.conversationId, prepared.turnId, answer);
+        await finish('canceled');
+        return;
+      }
+      await this.repository.appendAnswer(prepared.visitorHash, prepared.conversationId, prepared.turnId, answer);
+      await finish('completed');
+      await writer.done({ conversationId: prepared.conversationId, turnId: prepared.turnId });
     } catch (error) {
-      if (!response.destroyed) {
-        const message = error instanceof Error && error.message ? error.message : '对话暂时不可用，请稍后再试。';
-        response.write(`event: error\ndata: ${JSON.stringify({ type: 'error', message })}\n\n`);
+      const message = error instanceof Error && error.message ? error.message : '对话暂时不可用，请稍后再试。';
+      if (clientGone || controller.signal.aborted || response.destroyed) {
+        await this.repository.appendAnswer(prepared.visitorHash, prepared.conversationId, prepared.turnId, answer);
+        await finish('canceled');
+        return;
       }
+      await this.repository.appendAnswer(prepared.visitorHash, prepared.conversationId, prepared.turnId, answer);
+      await finish('failed', message);
+      await writer.error({ code: 'SITE_CHAT_UPSTREAM', message, retryable: true });
     } finally {
-      clearInterval(heartbeat);
-      response.off('close', close);
-      if (!response.destroyed) response.end();
+      request.socket.off('close', disconnect);
+      response.off('close', disconnect);
+      writer.close();
     }
   }
 

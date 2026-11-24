@@ -223,7 +223,9 @@ START
 | --- | --- | --- | --- |
 | 2026-11-24 | AC-01/02/07/11 | backend 全量 `MONGODB_URI=mongodb://127.0.0.1:27019/nest_test_base npm test` | 177/177、13 套件通过；Chrome 真实 DeepSeek 发送、刷新恢复、侧栏历史、删除当前回到 `/chat` |
 | 2026-11-24 | AC-03/05/06/09/10 | `site-chat-history.e2e.test.mjs` | 13/13：visitor 隔离、并发 409、幂等、旧 history 忽略、20/100 上限、TTL 索引 |
-| 2026-11-24 | AC-04/12/13 | `site-chat.e2e.test.mjs` + Chrome | 8/8；上游 429/中止/失败保留轮次；30s ping 与 45s watchdog 已实现，Chrome 实测停止生成；ping/watchdog 未单独做端到端断言 |
+| 2026-11-24 | AC-04 | `site-chat.e2e.test.mjs` + Chrome | 8/8；上游 429/中止/失败保留轮次；Chrome 实测停止生成 |
+| 2026-11-24 | AC-12 | `site-chat-history.e2e.test.mjs` | 13/13；空闲超过 `SITE_CHAT_PING_MS=50` 时收到 `event: ping`，轮次仍为 `streaming`，中止后转 `canceled` |
+| 2026-11-24 | AC-13 | 前端实现 + Chrome | `WATCHDOG_MS=45_000`，任何帧重置；Chrome 实测停止生成；45 秒断线未单独做自动化测试 |
 | 2026-11-24 | AC-08 | 代码检查 | `getVisitorId` 按 localStorage → sessionStorage → 内存回退；未做浏览器禁用实测 |
 | 2026-11-24 | 前端 | `npm run check`、`npm run lint`、`npm run build` | 通过；84 files、0 warnings/0 errors |
 

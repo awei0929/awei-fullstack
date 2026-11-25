@@ -1,6 +1,6 @@
 # SPEC-008 公开简历页
 
-- 状态：待验证（PDF 正文模式；本地 Chrome 桌面/手机/深色/打印已通过，真机与正式域名未验证）。日期：2026-11-25（原 2026-11-24 结构化简历扩展、2026-11-16 版本保留在下方实际验证）。
+- 状态：已验证（2026-11-25 已上线；线上 Chrome 桌面/手机、下载、worker 加载已复验，深色/打印/回退/错误态由本地同构建验证；真机未单独复验）。日期：2026-11-25（原 2026-11-24 结构化简历扩展、2026-11-16 版本保留在下方实际验证）。
 - 首页以「查看简历」替代能力场景入口。本文替代 [SPEC-003 P28](003-personal-site.md#p28能力三卡与可配置履历弹窗2026-11-08已验证) 和 [SPEC-007](007-ui-clarity.md) 中的公开能力展示约定。
 
 ## 行为与数据
@@ -19,7 +19,7 @@
 - [x] AC-03：后台录入、预览、上传、替换或清除、保存和刷新。扩展 `frontend/src/pages/admin` 与文件上传草稿目标，验证未保存时公开页无变化。
 - [x] AC-04：在隔离 MongoDB 中验证旧记录只读默认、旧客户端保存保留字段、完整保存、非法字段、权限和下载。先扩展 `backend/test/site.e2e.test.mjs`，确认失败后实现 `backend/src/site`；运行后端 HTTP、前端 lint/build 和差异检查。
 - [x] AC-05：后台可维护结构化简历（技能/工作/项目/教育/补充正文），保存后公开页与预览同步；旧四字段简历仍可读取、保存与展示；非法空条目/超长条目被拒绝。浏览器桌面/手机/深色与打印样式已验证。
-- [ ] AC-06：上传并保存新 PDF 后，访问 `/resume` 无需重新录入结构化字段即可看到新 PDF 的每一页；手机满宽可读、深色主题正常、打印每页一张 A4、「下载 PDF」拿到原文件；清除 `pdfUrl` 后回退结构化内容；PDF 加载失败显示重试与下载入口。本地 Chrome 已验证，真机与正式域名待验证。
+- [x] AC-06：上传并保存新 PDF 后，访问 `/resume` 无需重新录入结构化字段即可看到新 PDF 的每一页；手机满宽可读、深色主题正常、打印每页一张 A4、「下载 PDF」拿到原文件；清除 `pdfUrl` 后回退结构化内容；PDF 加载失败显示重试与下载入口。本地 Chrome 与线上 Chrome 已验证，真机未单独复验。
 
 ## 实际验证
 
@@ -38,6 +38,8 @@
 - 影响文件：`frontend/src/pages/resume/index.tsx`、`frontend/src/pages/resume/pdf-document.tsx`、`frontend/src/pages/resume/style.module.less`、`frontend/src/pages/admin/editors.tsx`、`frontend/package.json`（新增 `pdfjs-dist`）。
 - 验证（静态）：`npm run lint` 0 警告 0 错误；`npm run check` 通过；`npm run build` 通过，`pdf.worker.min-*.mjs` 产物存在，PDF 代码只进入 `resume` 分块。
 - 验证（Chrome，本地 `dist` + 反向代理线上只读 API）：1440 宽显示 3 页 canvas（1192×1686）；390×844@2x 手机满宽、工具栏不溢出；深色主题白纸正常；打印为 3 页 A4（209.9×297.0mm）；移除 `pdfUrl` 回退结构化页（标题、导出 PDF、技能/经历分区正常）；无控制台报错。
+- 上线后修复：生产 nginx 把 `.mjs` 响应为 `application/octet-stream`，模块 worker 被浏览器拒绝（页面进入「加载失败」）。改用 `?worker&url` 让 Vite 把 worker 打包成 `.js`（约 1.18MB）后恢复，不依赖服务器 MIME 配置。
+- 验证（线上）：发布 `928d4a2`、`a294864` 后入口 `index-Drk-Hehu.js`；`/resume` 在 1440 与 390×844@2x 均渲染 3 页 canvas，无 PDF/worker 报错；worker 资源 `Content-Type: application/javascript`；PDF 附件 200、851733B；`/favicon.svg` 200。
 
 ## 2026-11-24 结构化简历扩展
 

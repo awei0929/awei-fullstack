@@ -1,4 +1,4 @@
-## 2026-11-25：简历页改为直接展示上传的 PDF（待验证）
+## 2026-11-25：简历页改为直接展示上传的 PDF（已上线）
 
 - 用户需求（m00404、m00445）：在方案 A/B 中选 A——以后只维护简历 PDF，替换并保存后 `/resume` 正文直接变成新 PDF，不再重录结构化字段。
 - 新增 `frontend/src/pages/resume/pdf-document.tsx`：用 `pdfjs-dist` 6.5.438 渲染（worker 以 `?url` 资源输出，路由级懒加载），每页 canvas 固定 2 倍分辨率；加载失败显示「重新加载 / 下载 PDF」，单页渲染失败给提示。
@@ -6,7 +6,9 @@
 - 后台「简历 PDF」分区补充说明：保存后公开页直接使用该 PDF，结构化字段仅在无 PDF 时回退。
 - 验证：前端 `lint`（0 警告）、`check`、`build` 通过，`pdf.worker.min-*.mjs` 产物存在且 pdfjs 只进入 resume 分块；本地 `dist` + 反向代理线上只读 API，Chrome 桌面 1440 显示 3 页 canvas、手机 390×844@2x 满宽、深色主题白纸、打印 3 页 A4（209.9×297.0mm）、移除 `pdfUrl` 回退结构化页、PDF 502 错误态均通过，无控制台报错。
 - 影响文件：`frontend/src/pages/resume/{index.tsx,pdf-document.tsx,style.module.less}`、`frontend/src/pages/admin/editors.tsx`、`frontend/package.json`、`frontend/package-lock.json`、`docs/specs/008-public-resume.md`。
-- 未提交/推送/部署；真机与正式域名未验证。PDF 内的手机号、期望薪资会随页面直接展示，如不想公开需在导出 PDF 时处理。
+- 上线：`928d4a2`、`a294864` 推送到 main，GitHub Actions 45636376413、45638969942 均成功；首次上线发现生产 nginx 把 `.mjs` 当 `application/octet-stream`，pdf.js 模块 worker 被拒，改用 `?worker&url` 由 Vite 输出 `.js` 后恢复，不再依赖服务器 MIME。
+- 线上验证：入口 `index-Drk-Hehu.js`；`/resume` 在 1440 与 390×844@2x 均渲染 3 页 canvas、无 PDF/worker 报错；worker `application/javascript`；PDF 附件 200/851733B；`/favicon.svg` 200。
+- PDF 内的手机号、期望薪资会随页面直接展示，如不想公开需在导出 PDF 时处理；真机未单独复验。
 
 ## 2026-11-25：补齐浏览器标签页图标（本地已验证）
 

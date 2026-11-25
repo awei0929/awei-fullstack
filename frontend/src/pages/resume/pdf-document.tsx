@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy, type PDFPageProxy } from 'pdfjs-dist'
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
 import styles from './style.module.less'
 
 GlobalWorkerOptions.workerSrc = workerUrl

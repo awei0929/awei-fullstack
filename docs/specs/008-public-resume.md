@@ -39,6 +39,7 @@
 - 验证（静态）：`npm run lint` 0 警告 0 错误；`npm run check` 通过；`npm run build` 通过，`pdf.worker.min-*.mjs` 产物存在，PDF 代码只进入 `resume` 分块。
 - 验证（Chrome，本地 `dist` + 反向代理线上只读 API）：1440 宽显示 3 页 canvas（1192×1686）；390×844@2x 手机满宽、工具栏不溢出；深色主题白纸正常；打印为 3 页 A4（209.9×297.0mm）；移除 `pdfUrl` 回退结构化页（标题、导出 PDF、技能/经历分区正常）；无控制台报错。
 - 上线后修复：生产 nginx 把 `.mjs` 响应为 `application/octet-stream`，模块 worker 被浏览器拒绝（页面进入「加载失败」）。改用 `?worker&url` 让 Vite 把 worker 打包成 `.js`（约 1.18MB）后恢复，不依赖服务器 MIME 配置。
+- 加载体验（2026-11-25）：加载期间显示与纸张同尺寸的骨架屏，第 1 页优先渲染、其余页延后 200ms 排队；`/api/site/assets/:filename` 返回 `Cache-Control: public, max-age=31536000, immutable`（UUID 附件内容不可变），再次访问与刷新不再重复下载。
 - 验证（线上）：发布 `928d4a2`、`a294864` 后入口 `index-Drk-Hehu.js`；`/resume` 在 1440 与 390×844@2x 均渲染 3 页 canvas，无 PDF/worker 报错；worker 资源 `Content-Type: application/javascript`；PDF 附件 200、851733B；`/favicon.svg` 200。
 
 ## 2026-11-24 结构化简历扩展

@@ -1,3 +1,14 @@
+## 2026-11-25：修复新对话首条消息卡死 + 简历加载与提示样式
+
+- 背景（m00851）：新对话首条消息一直停在打字态，必须手动停止再发一遍；tips 提示黑白底色；简历页加载慢。
+- 根因：主模型 GLM 偶发长时间不返回任何字节，服务端只有 45s 总超时，期间不会切备用模型，页面就一直转圈。另一方面 `main.ts` 没设置 `trust proxy`，nginx 反代下 `request.ip` 恒为 127.0.0.1，所有访客共用一个 IP 限流桶（会互相挤掉）。
+- 修复：`SiteChatService.stream()` 为每次模型尝试单独 AbortController，新增首 token 看门狗（`SITE_CHAT_FIRST_TOKEN_MS`，默认 8000ms）——超时即中止主模型并切 `deepseek-flash`，备用也受同一看门狗约束；总超时仍由 `SITE_CHAT_TIMEOUT_MS` 控制。`main.ts` 增加 `app.set('trust proxy', …)`（默认 `loopback`，可用 `TRUST_PROXY` 覆盖），限流按真实访客 IP 计数。
+- 提示样式：全站错误提示 `.api-error-tip` 由反色（黑底白字/白底黑字）改为单一纯色卡面（`--theme-surface` 背景 + 常规文字 + 细边框）。
+- 简历加载：加载态改为纸张尺寸骨架屏（shimmer）、第 1 页优先渲染、其余页延后 200ms；`/api/site/assets/:filename` 增加一年 `immutable` 缓存。
+- 验证（本地）：`npm run build` 通过；用只 accept 不回包的假上游（127.0.0.1:3199）验证 8.0s 触发切换、9.0s 出首个 delta、9.5s 完成；后端 e2e `site-chat-history` 12/13 通过（`上游429` 用例因本机 .env 有 DEEPSEEK_API_KEY 会切备用而失败，CI 无该 Key 时符合预期）；前端 lint/check/build 通过。
+- 影响文件：`backend/src/main.ts`、`backend/src/site/chat/site-chat.service.ts`、`backend/src/site/chat/site-chat.config.ts`、`backend/src/site/site.controller.ts`、`frontend/src/pages/resume/pdf-document.tsx`、`frontend/src/pages/resume/style.module.less`、`frontend/src/styles/global.less`、`docs/specs/008-public-resume.md`、`docs/specs/010-editorial-home.md`。
+- 待办：线上验证（真实移动网络、浏览器）；tips 若另有所指需再确认。
+
 ## 2026-11-25：简历页改为直接展示上传的 PDF（已上线）
 
 - 用户需求（m00404、m00445）：在方案 A/B 中选 A——以后只维护简历 PDF，替换并保存后 `/resume` 正文直接变成新 PDF，不再重录结构化字段。

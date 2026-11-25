@@ -18,6 +18,8 @@ export class SiteChatConfig {
   rateWindow(): number { return integer(this.config, 'SITE_CHAT_RATE_WINDOW_MS', 600000, 60000, 86400000); }
   dailyLimit(): number { return integer(this.config, 'SITE_CHAT_DAILY_LIMIT', 200, 1, 10000); }
   timeout(): number { return integer(this.config, 'SITE_CHAT_TIMEOUT_MS', 45000, 1000, 120000); }
+  // 主模型首个 token 的等待上限；超过就中止当前尝试并切备用模型，避免整轮挂到总超时。
+  firstTokenMs(): number { return integer(this.config, 'SITE_CHAT_FIRST_TOKEN_MS', 8000, 1000, 60000); }
   maxTokens(): number { return integer(this.config, 'SITE_CHAT_MAX_TOKENS', 700, 100, 2048); }
   // 测试可以压到 50ms；生产默认 30s，且不应低于 10s，避免无意义地占连接。
   pingMs(): number { return integer(this.config, 'SITE_CHAT_PING_MS', 30000, 50, 120000); }

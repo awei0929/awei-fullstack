@@ -51,6 +51,8 @@ export class SiteController {
     const file = await this.assets.read(filename);
     response.setHeader('Content-Type', file.mime);
     response.setHeader('X-Content-Type-Options', 'nosniff');
+    // 附件按 UUID 命名、内容不可变，浏览器与 CDN 可以长期缓存。
+    response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     if (file.downloadName) {
       // ASCII回退名去除引号/反斜杠；RFC5987参数编码原Unicode名，不能拼接原始请求头值。
       const fallback = file.downloadName.replace(/[^\x20-\x7e]|["\\]/g, '_');

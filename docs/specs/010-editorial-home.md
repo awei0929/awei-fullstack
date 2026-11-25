@@ -56,9 +56,9 @@
 - `history` 字段仅为兼容旧前端保留，服务端忽略；上下文由路径 `:conversationId` 对应的 Mongo 轮次提供。未知字段由全局 `forbidNonWhitelisted` 拒绝；body 里的 `conversationId` 已移除，避免路径与 body 两个事实来源。
 - 受理失败在写出 200 之前返回 JSON：对话关闭 `503 SITE_CHAT_DISABLED`；无可用模型 `503 SITE_CHAT_UNAVAILABLE`；限流 `429 SITE_CHAT_RATE_LIMITED` + `retryAfter` 秒数。
 - SSE 写出后模型错误只能作为 `error` 事件返回；上游 429 映射为“模型有点忙，请稍后再试。”，不输出 Key、地址或诊断文本。
-- 限流为单进程内存：按 SHA-256(IP) 与 `visitorHash` 各一条滑动窗口，默认各 8 次 / 10 分钟；UTC 日总量默认 200，按请求只计一次（两个桶先全部检查，任一超限则不写入、不扣日额度）。环境变量 `SITE_CHAT_RATE_LIMIT`、`SITE_CHAT_RATE_WINDOW_MS`、`SITE_CHAT_DAILY_LIMIT` 可调，非法配置使对话不可用。多实例部署不共享计数，这是当前边界；部署在反向代理后须把 `TRUST_PROXY` 设为实际代理地址，否则访客会共享代理地址的桶。
+- 限流为单进程内存：按 SHA-256(IP) 与 `visitorHash` 各一条滑动窗口，默认各 8 次 / 10 分钟；UTC 日总量默认 200，按请求只计一次（两个桶先全部检查，任一超限则不写入、不扣日额度）。环境变量 `SITE_CHAT_RATE_LIMIT`、`SITE_CHAT_RATE_WINDOW_MS`、`SITE_CHAT_DAILY_LIMIT` 可调，非法配置使对话不可用。多实例部署不共享计数，这是当前边界；应用默认只信任本机 loopback 代理传来的 `X-Forwarded-For`（`TRUST_PROXY` 可覆盖，默认 `loopback`，语法同 Express），代理不在本机时必须设置成实际代理地址，否则访客会共享代理地址的桶。
 - 模型 Key 只放在服务端：公开对话与后台默认模型都优先 `glm-4.7-flash`。`DEEPSEEK_API_KEY` 可选，仅作为公开对话的备用：GLM 在首个 token 前失败或空输出时切到 `deepseek-flash`；只有 GLM 没有 Key 时才直接使用 DeepSeek。`DEEPSEEK_BASE_URL` 仅在私有兼容网关时需要覆盖，生产必须 HTTPS。
-- 模型选择：优先 `glm-4.7-flash`；配置 `DEEPSEEK_API_KEY` 时它作为 GLM 首 token 前失败/空输出的备用（`DEEPSEEK_BASE_URL` 默认 `https://api.deepseek.com`）；GLM 没有 Key 才用 DeepSeek，最后才选任一有 Key 的白名单模型。DeepSeek 走非思考模式；已输出正文后不切换，避免重复。`max_tokens` 固定取 `SITE_CHAT_MAX_TOKENS`（默认 700，100–2048），超时默认 45 秒（`SITE_CHAT_TIMEOUT_MS`，1–120 秒）。
+- 模型选择：优先 `glm-4.7-flash`；配置 `DEEPSEEK_API_KEY` 时它作为 GLM 首 token 前失败/空输出的备用（`DEEPSEEK_BASE_URL` 默认 `https://api.deepseek.com`）；GLM 没有 Key 才用 DeepSeek，最后才选任一有 Key 的白名单模型。DeepSeek 走非思考模式；已输出正文后不切换，避免重复。`max_tokens` 固定取 `SITE_CHAT_MAX_TOKENS`（默认 700，100–2048），超时默认 45 秒（`SITE_CHAT_TIMEOUT_MS`，1–120 秒）。首个 token 看门狗：单次尝试超过 `SITE_CHAT_FIRST_TOKEN_MS`（默认 8000，1000–60000）仍无正文时，中止该尝试并切备用模型；备用同样受看门狗约束，总时长仍以 `SITE_CHAT_TIMEOUT_MS` 为准。看门狗与备用都失败时返回「模型有点忙，请稍后再试。」
 - 提示词只包含公开 profile/home/resume/可见 thoughts（最多 6 条、每条摘要 + 500 字正文）/可见 works（最多 6 条）/能力/公司简介/公开邮箱/联系链接，并明确要求不泄提示词、不编造、不冒充真人、2–4 句且不超过 120 字。隐藏想法、隐藏作品、公司项目详情和 `systemPrompt` 之外的内部配置不进入提示词。
 - 对话持久化：SPEC-010 只定义首页对话卡与公开入口；匿名 visitor、会话/轮次、历史列表与删除见 [SPEC-011](011-site-chat-history.md)。对话不写 `site_documents`。
 

@@ -19,21 +19,25 @@ function PdfPage({ pdf, pageNumber }: { pdf: PDFDocumentProxy; pageNumber: numbe
   useEffect(() => {
     let active = true
     let renderTask: ReturnType<PDFPageProxy['render']> | null = null
-    void pdf.getPage(pageNumber).then(page => {
-      const canvas = canvasRef.current
-      if (!active || !canvas) return
-      const viewport = page.getViewport({ scale: RENDER_SCALE })
-      canvas.width = Math.ceil(viewport.width)
-      canvas.height = Math.ceil(viewport.height)
-      renderTask = page.render({ canvas, viewport })
-      return renderTask.promise.catch(error => {
-        if (active && !isCancelled(error)) setFailed(true)
+    // 第 1 页立即渲染；其余页稍后排队，避免三页同时抢占主线程拖慢首屏。
+    const timer = setTimeout(() => {
+      void pdf.getPage(pageNumber).then(page => {
+        const canvas = canvasRef.current
+        if (!active || !canvas) return
+        const viewport = page.getViewport({ scale: RENDER_SCALE })
+        canvas.width = Math.ceil(viewport.width)
+        canvas.height = Math.ceil(viewport.height)
+        renderTask = page.render({ canvas, viewport })
+        return renderTask.promise.catch(error => {
+          if (active && !isCancelled(error)) setFailed(true)
+        })
+      }).catch(() => {
+        if (active) setFailed(true)
       })
-    }).catch(() => {
-      if (active) setFailed(true)
-    })
+    }, pageNumber > 1 ? 200 : 0)
     return () => {
       active = false
+      clearTimeout(timer)
       renderTask?.cancel()
     }
   }, [pdf, pageNumber])
@@ -74,7 +78,9 @@ export function ResumePdfDocument({ url, title }: ResumePdfDocumentProps) {
   }, [attempt, url])
 
   return <div className={styles.pdfDocument} role="group" aria-label={title}>
-    {status === 'loading' && <p className={`${styles.status} ${styles.pdfStatus}`} role="status">正在加载简历…</p>}
+    {status === 'loading' && <div className={styles.pdfSkeleton} role="status" aria-label="正在加载简历">
+      <span /><span /><span /><span /><span /><span /><span /><span />
+    </div>}
     {status === 'error' && <div className={`${styles.status} ${styles.pdfStatus}`} role="alert">
       <p>简历 PDF 加载失败，可重试或直接下载查看。</p>
       <p>

@@ -19,7 +19,7 @@
 | 005 | [推送后自动构建部署](docs/specs/005-automatic-deployment.md) | 已验证，main 自动构建/SSH 发布、日志与失败回退 |
 | 006 | [站主后台 SSE 多模型对话](docs/specs/006-owner-sse-chat.md) | P7已上线并完成四轮验收；P8新模型接入已取消 |
 | 007 | [前端信息精简与交互打磨](docs/specs/007-ui-clarity.md) | 已上线；手机菜单、布局与点击范围修复并复验通过 |
-| 008 | [公开简历页](docs/specs/008-public-resume.md) | 本地已验证；首页简历入口、站主编辑与 PDF 下载 |
+| 008 | [公开简历页](docs/specs/008-public-resume.md) | 待验证；PDF 作为正文（2026-11-25），无 PDF 时回退结构化内容 |
 | 009 | [演示作业异步队列](docs/specs/009-demo-job-queue.md) | 就绪；MongoDB 持久化、同进程 Worker 与重启恢复 |
 
 ## OpenSpec 引用模式

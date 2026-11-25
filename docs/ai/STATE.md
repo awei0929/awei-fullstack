@@ -1,3 +1,29 @@
+## 2026-11-25：简历页改为直接展示上传的 PDF（待验证）
+
+- 用户需求（m00404、m00445）：在方案 A/B 中选 A——以后只维护简历 PDF，替换并保存后 `/resume` 正文直接变成新 PDF，不再重录结构化字段。
+- 新增 `frontend/src/pages/resume/pdf-document.tsx`：用 `pdfjs-dist` 6.5.438 渲染（worker 以 `?url` 资源输出，路由级懒加载），每页 canvas 固定 2 倍分辨率；加载失败显示「重新加载 / 下载 PDF」，单页渲染失败给提示。
+- `frontend/src/pages/resume/index.tsx`：有合法 `pdfUrl` 时正文切换为 PDF，工具栏「导出 PDF」换成「下载 PDF」，标签页标题改为「姓名-简历」；无 PDF 时完整回退原结构化页面。`style.module.less` 增加 PDF 容器、状态卡、手机、后台预览与打印样式（每页一张 A4）。
+- 后台「简历 PDF」分区补充说明：保存后公开页直接使用该 PDF，结构化字段仅在无 PDF 时回退。
+- 验证：前端 `lint`（0 警告）、`check`、`build` 通过，`pdf.worker.min-*.mjs` 产物存在且 pdfjs 只进入 resume 分块；本地 `dist` + 反向代理线上只读 API，Chrome 桌面 1440 显示 3 页 canvas、手机 390×844@2x 满宽、深色主题白纸、打印 3 页 A4（209.9×297.0mm）、移除 `pdfUrl` 回退结构化页、PDF 502 错误态均通过，无控制台报错。
+- 影响文件：`frontend/src/pages/resume/{index.tsx,pdf-document.tsx,style.module.less}`、`frontend/src/pages/admin/editors.tsx`、`frontend/package.json`、`frontend/package-lock.json`、`docs/specs/008-public-resume.md`。
+- 未提交/推送/部署；真机与正式域名未验证。PDF 内的手机号、期望薪资会随页面直接展示，如不想公开需在导出 PDF 时处理。
+
+## 2026-11-25：补齐浏览器标签页图标（本地已验证）
+
+- 问题：`frontend/index.html` 没有任何 favicon 链接，`frontend/public/` 下也没有图标文件，浏览器标签页只显示默认地球。
+- 新增 `frontend/public/favicon.svg`（黑底白字衬线 H 圆形，与站内 `.brandMark` 视觉一致）、`favicon-32.png`、`apple-touch-icon.png`（180px 满版黑底，供 iOS 圆角遮罩）。
+- `frontend/index.html` 增加 svg、32px png、apple-touch-icon 三个 link。
+- 验证：`npm run build` 通过，三个文件都复制进 `frontend/dist/`；`vite preview` 实测 `/favicon.svg`、`/favicon-32.png`、`/apple-touch-icon.png` 均 200 且 content-type 正确。
+- 未提交/推送/部署。
+
+## 2026-11-25：移动端输入框聚焦放大修复（本地已验证）
+
+- 用户反馈（m00074）：手机上点输入框后页面放大，看不到发送按钮。
+- 根因：iOS Safari 聚焦字号 <16px 的输入控件时自动整页放大；`frontend/src/pages/chat/style.module.less` 桌面 14px、≤900px 13px，`frontend/src/pages/site/home.module.less` 14px，放大后 `.composerFoot` 右侧发送按钮被移出可视区。
+- 修复：对话页与首页对话卡 textarea 统一 16px（`chat/style.module.less` 基础规则与移动端规则、`home.module.less` 基础规则），并加 `@media (hover: none) and (pointer: coarse)` 兜底触屏平板/横屏；不改 viewport 的 maximum-scale，保留访客缩放能力。
+- 验证：前端 `lint`、`check`、`build` 通过；未做真机验证，建议 iPhone Safari 复核聚焦不放大、发送按钮可见。
+- 未提交/推送/部署。
+
 ## 2026-11-24：对话页侧边栏优化（本地已验证）
 
 - 历史对话：272px 侧栏；标题旁显示会话数量；列表改为圆角行，active 行浅色卡片 + 左侧 2px 标记；删除按钮默认隐藏，hover/focus/active 时显示，触屏设备常显；元信息保持“相对时间 · 轮数”。

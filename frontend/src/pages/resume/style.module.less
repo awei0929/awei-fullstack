@@ -98,6 +98,7 @@
   color: var(--theme-text);
   font: inherit;
   font-size: 12px;
+  text-decoration: none;
   cursor: pointer;
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
@@ -385,12 +386,81 @@
   cursor: pointer;
 }
 
+.status a {
+  margin-left: 12px;
+  color: var(--doc-ink);
+  text-decoration: underline;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.pdfShell {
+  padding: 36px 24px 96px;
+}
+
+.pdfDocument {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 210mm;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.pdfPage {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+
+.pdfStatus {
+  width: 210mm;
+  max-width: 100%;
+  margin: 0 auto;
+  border: 1px solid #e2e2e2;
+  background: #fff;
+  color: #333;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), 0 12px 32px rgba(0, 0, 0, 0.1);
+  --doc-ink: #111;
+  --doc-muted: #555;
+  --doc-line: #e2e2e2;
+}
+
+.pdfPageError {
+  margin: 0;
+  padding: 10mm 8mm;
+  background: #fff;
+  color: #333;
+  font-size: 10pt;
+  text-align: center;
+}
+
 .preview {
   .paperShell {
     padding: 0;
   }
 
   .paper {
+    box-shadow: none;
+  }
+
+  .pdfShell {
+    padding: 0;
+  }
+
+  .pdfPage {
     box-shadow: none;
   }
 }
@@ -486,6 +556,14 @@
     padding: 0 14px;
     font-size: 12px;
   }
+
+  .pdfShell {
+    padding: 12px 10px 48px;
+  }
+
+  .pdfDocument {
+    gap: 8px;
+  }
 }
 
 @page {
@@ -545,6 +623,24 @@
 
   .pdfLink {
     display: none;
+  }
+
+  .pdfShell {
+    padding: 0;
+  }
+
+  .pdfDocument {
+    width: auto;
+    gap: 0;
+  }
+
+  .pdfPage {
+    break-after: page;
+    box-shadow: none;
+  }
+
+  .pdfPage:last-child {
+    break-after: auto;
   }
 
   a {

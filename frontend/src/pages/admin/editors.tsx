@@ -121,7 +121,7 @@ NestJS" hint="失焦后保存，空行会被忽略。" />
         <Group title="补充内容" description="可选。用 Markdown 写结构化字段放不下的内容，会显示在页面末尾。">
           <TextField label="Markdown 正文" value={resume.body} onChange={value => store.edit(draft => { draft.resume.body = value })} maxLength={20000} multiline rows={8} placeholder={'## 补充\n\n- 一段可以自由编辑的内容'} />
         </Group>
-        <Group title="简历 PDF">
+        <Group title="简历 PDF" description="上传并保存后，公开简历页直接展示这份 PDF；未上传时回退为上面的结构化内容。">
           <FileUploadControl target={{ type: 'resume' }} mode="pdf" showResult={false} />
           {resume.pdfUrl && <p className={styles.hint}>
             <a href={resume.pdfUrl} download>下载当前附件</a>

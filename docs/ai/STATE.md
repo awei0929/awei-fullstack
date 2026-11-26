@@ -6,7 +6,9 @@
 - 数据契约：`strengths?: string[]`（≤8 条×240 字）加入 `frontend/src/types/site.ts`、`backend/src/site/types/site.type.ts`、`backend/src/site/dto/save-site.dto.ts`、`frontend/src/api/site.ts` 读取解析、后台编辑器「个人优势」。
 - 验证（本地）：frontend lint 0 警告、check、build 通过；backend build 通过；本地 dist + 反代线上 API，`/resume` 标题「李武伟-全栈 Agent 开发工程师-简历」，分区依次 专业技能/个人优势/工作经历/项目经历/教育经历；390×844@2x 手机单列无溢出；「下载 PDF」指向原文件。
 - 影响文件：`frontend/src/pages/resume/{index.tsx,style.module.less}`（删除 `pdf-document.tsx`）、`frontend/src/api/site.ts`、`frontend/src/types/site.ts`、`frontend/src/pages/admin/editors.tsx`、`backend/src/site/types/site.type.ts`、`backend/src/site/dto/save-site.dto.ts`、`frontend/package.json`、`frontend/package-lock.json`、`docs/specs/008-public-resume.md`、`SPEC.md`。
-- 待办：线上复验（结构化正文、下载 PDF、手机、打印）；确认 GitHub Actions 对本次提交是否恢复。
+- 上线：提交 `6ed7c0f`，因 GitHub Actions 仍未恢复，用受限 SSH 手工发布 `<sha>-manual-1795657901`。线上复验：`/resume` 标题「李武伟-全栈 Agent 开发工程师-简历」、五个分区、390@2x 无横向滚动、「下载 PDF」200/851733B；`/api/site-chat/conversations` 仍正常流式。
+- 备注：线上 HTML 响应没有 `Cache-Control`（只有 ETag/Last-Modified），旧标签页可能缓存旧 index 并引用已删除的旧 bundle；后续可在 nginx 对 `index.html` 加 `no-cache`。
+- 待办：确认 GitHub Actions 恢复；真机复验。
 
 ## 2026-11-25：修复新对话首条消息卡死 + 简历加载与提示样式
 

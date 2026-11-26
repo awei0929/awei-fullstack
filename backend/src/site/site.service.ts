@@ -14,7 +14,7 @@ function siteVersionConflict(): ConflictException {
 // 老编辑器只提交四个基础字段；可选字段在 BSON 中不能落成 null，否则读取端会把它当成非法内容。
 function cleanResume(resume: SiteContent['resume']): SiteContent['resume'] {
   const value = { ...resume };
-  for (const key of ['summary', 'meta', 'skills', 'experience', 'projects', 'education'] as const) {
+  for (const key of ['summary', 'meta', 'skills', 'strengths', 'experience', 'projects', 'education'] as const) {
     if (value[key] === undefined || value[key] === null) delete value[key];
   }
   return value;

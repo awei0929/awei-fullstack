@@ -82,6 +82,7 @@ export interface SiteResume {
   summary?: string
   meta?: string
   skills?: SiteResumeSkillGroup[]
+  strengths?: string[]
   experience?: SiteResumeExperience[]
   projects?: SiteResumeProject[]
   education?: SiteResumeEducation[]

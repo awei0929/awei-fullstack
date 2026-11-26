@@ -66,6 +66,7 @@ export type SiteContent = {
     summary?: string;
     meta?: string;
     skills?: { label: string; items: string[] }[];
+    strengths?: string[];
     experience?: {
       company: string;
       role: string;

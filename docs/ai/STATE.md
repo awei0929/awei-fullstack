@@ -1,3 +1,13 @@
+## 2026-11-26：简历页改回结构化正文（按最新 PDF 重建，PDF 仅下载）
+
+- 背景（m01353）：PDF 正文模式首屏要加载 1.2 MB pdf.js worker + 851 KB PDF，`/resume` 打开明显慢；用户要求「按最新简历生成页面结构」，PDF 只作附件。
+- 内容：按 2026-11-25 最新 PDF 全量重建 `content.resume`（线上 version 18 → 19）：role 全栈 Agent 开发工程师、6 组技能、4 条个人优势、2 段工作、5 个项目、江西理工大学；保留 `pdfUrl`，不公开手机号与期望薪资。备份 `/tmp/site-backup.json`，结构化内容源 `/tmp/resume-new.json`。
+- 前端：`frontend/src/pages/resume/index.tsx` 删除 pdfMode 分支，正文恒为结构化内容并新增「个人优势」分区；删除 `pdf-document.tsx`；`style.module.less` 清理 PDF 容器/骨架屏样式；`npm uninstall pdfjs-dist`；工具栏 `pdfUrl` 存在时「下载 PDF」，否则「导出 PDF」。
+- 数据契约：`strengths?: string[]`（≤8 条×240 字）加入 `frontend/src/types/site.ts`、`backend/src/site/types/site.type.ts`、`backend/src/site/dto/save-site.dto.ts`、`frontend/src/api/site.ts` 读取解析、后台编辑器「个人优势」。
+- 验证（本地）：frontend lint 0 警告、check、build 通过；backend build 通过；本地 dist + 反代线上 API，`/resume` 标题「李武伟-全栈 Agent 开发工程师-简历」，分区依次 专业技能/个人优势/工作经历/项目经历/教育经历；390×844@2x 手机单列无溢出；「下载 PDF」指向原文件。
+- 影响文件：`frontend/src/pages/resume/{index.tsx,style.module.less}`（删除 `pdf-document.tsx`）、`frontend/src/api/site.ts`、`frontend/src/types/site.ts`、`frontend/src/pages/admin/editors.tsx`、`backend/src/site/types/site.type.ts`、`backend/src/site/dto/save-site.dto.ts`、`frontend/package.json`、`frontend/package-lock.json`、`docs/specs/008-public-resume.md`、`SPEC.md`。
+- 待办：线上复验（结构化正文、下载 PDF、手机、打印）；确认 GitHub Actions 对本次提交是否恢复。
+
 ## 2026-11-25：修复新对话首条消息卡死 + 简历加载与提示样式
 
 - 背景（m00851）：新对话首条消息一直停在打字态，必须手动停止再发一遍；tips 提示黑白底色；简历页加载慢。

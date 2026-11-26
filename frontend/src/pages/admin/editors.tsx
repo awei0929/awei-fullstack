@@ -80,6 +80,9 @@ Node.js / NestJS" hint="失焦后保存，空行会被忽略。" />
           </div>)}
           <button type="button" className={styles.addButton} disabled={skills.length >= 12} onClick={() => store.edit(draft => { (draft.resume.skills ??= []).push({ label: '新技能组', items: [] }) })}>＋ 添加技能组</button>
         </Group>
+        <Group title={`个人优势 · ${(resume.strengths ?? []).length}/8`} description="每行一条，显示在专业技能之后、工作经历之前。">
+          <LinesField label="优势条目（每行一条）" value={resume.strengths ?? []} onChange={value => store.edit(draft => { draft.resume.strengths = value })} rows={5} placeholder="AI Agent 开发：…\n全栈交付：…" hint="失焦后保存，空行会被忽略。" />
+        </Group>
         <Group title={`工作经历 · ${experience.length}/12`} description="按时间倒序排列；每段经历用短句说明职责和结果。">
           {experience.map((entry, index) => <div className={styles.linkCard} key={index}>
             <div className={styles.cardLead}><span>经历 {index + 1}</span></div>
@@ -121,7 +124,7 @@ NestJS" hint="失焦后保存，空行会被忽略。" />
         <Group title="补充内容" description="可选。用 Markdown 写结构化字段放不下的内容，会显示在页面末尾。">
           <TextField label="Markdown 正文" value={resume.body} onChange={value => store.edit(draft => { draft.resume.body = value })} maxLength={20000} multiline rows={8} placeholder={'## 补充\n\n- 一段可以自由编辑的内容'} />
         </Group>
-        <Group title="简历 PDF" description="上传并保存后，公开简历页直接展示这份 PDF；未上传时回退为上面的结构化内容。">
+        <Group title="简历 PDF" description="作为公开简历页的下载附件；正文由上面的结构化内容生成，保存后立即生效。">
           <FileUploadControl target={{ type: 'resume' }} mode="pdf" showResult={false} />
           {resume.pdfUrl && <p className={styles.hint}>
             <a href={resume.pdfUrl} download>下载当前附件</a>

@@ -52,7 +52,7 @@ const emptyChat: SiteChatContent = { enabled: false, heading: '', intro: '', pla
 // 旧简历只有四个基础字段；结构化字段缺失时按空内容展示，避免读取历史文档失败。
 const emptyResume: SiteResume = {
   name: '', role: '', body: '', pdfUrl: '',
-  summary: '', meta: '', skills: [], experience: [], projects: [], education: [],
+  summary: '', meta: '', skills: [], strengths: [], experience: [], projects: [], education: [],
 }
 
 export function isSiteResumePdf(value: string): boolean {
@@ -70,7 +70,7 @@ export function parseSiteContent(value: unknown, allowLegacyMissingDetails = fal
   const profile = object(content.profile, ['name', 'tagline', 'bio'])
   const home = object(content.home, ['eyebrow', 'title', 'subtitle', 'buttonLabel'])
   const resumeValue = Object.hasOwn(content, 'resume')
-    ? object(content.resume, ['name', 'role', 'body', 'pdfUrl'], ['summary', 'meta', 'skills', 'experience', 'projects', 'education'])
+    ? object(content.resume, ['name', 'role', 'body', 'pdfUrl'], ['summary', 'meta', 'skills', 'strengths', 'experience', 'projects', 'education'])
     : emptyResume
   const pdfUrl = text(resumeValue.pdfUrl, 2048)
   if (pdfUrl && !isSiteResumePdf(pdfUrl)) return invalid()
@@ -78,6 +78,7 @@ export function parseSiteContent(value: unknown, allowLegacyMissingDetails = fal
     const group = object(item, ['label', 'items'])
     return { label: text(group.label, 40, true), items: list(group.items, 20, (entry) => text(entry, 60, true)) }
   })
+  const resumeStrengths = resumeValue.strengths === undefined ? [] : list(resumeValue.strengths, 8, (line) => text(line, 240, true))
   const resumeExperience = resumeValue.experience === undefined ? [] : list(resumeValue.experience, 12, (item) => {
     const entry = object(item, ['company', 'role', 'period', 'summary', 'highlights'])
     return {
@@ -179,7 +180,7 @@ export function parseSiteContent(value: unknown, allowLegacyMissingDetails = fal
       name: text(resumeValue.name, 60), role: text(resumeValue.role, 80), body: text(resumeValue.body, 20000), pdfUrl,
       summary: resumeValue.summary === undefined ? '' : text(resumeValue.summary, 600),
       meta: resumeValue.meta === undefined ? '' : text(resumeValue.meta, 60),
-      skills: resumeSkills, experience: resumeExperience, projects: resumeProjects, education: resumeEducation,
+      skills: resumeSkills, strengths: resumeStrengths, experience: resumeExperience, projects: resumeProjects, education: resumeEducation,
     },
     contact: { email, links: list(contact.links, 8, (item) => {
       const link = object(item, ['label', 'url'])

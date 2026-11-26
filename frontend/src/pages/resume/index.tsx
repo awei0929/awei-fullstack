@@ -6,7 +6,6 @@ import { SiteMarkdown } from '../../components/site-markdown'
 import { ThemeToggle } from '../../components/theme-toggle'
 import { siteStore } from '../../store/site'
 import type { SiteContent } from '../../types/site'
-import { ResumePdfDocument } from './pdf-document'
 import styles from './style.module.less'
 
 interface ResumeExperienceProps {
@@ -27,23 +26,21 @@ export function ResumeExperience({ content, preview = false, loading = false, er
   const body = resume?.body ?? ''
   const hasBody = body.trim().length > 0
   const pdfUrl = resume?.pdfUrl && isSiteResumePdf(resume.pdfUrl) ? resume.pdfUrl : ''
-  const pdfMode = Boolean(pdfUrl)
   const email = content?.contact.email
   const contactEmail = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : ''
   const skills = resume?.skills ?? []
+  const strengths = resume?.strengths ?? []
   const experience = resume?.experience ?? []
   const projects = resume?.projects ?? []
   const education = resume?.education ?? []
-  const hasSections = skills.length > 0 || experience.length > 0 || projects.length > 0 || education.length > 0
+  const hasSections = skills.length > 0 || strengths.length > 0 || experience.length > 0 || projects.length > 0 || education.length > 0
 
   useEffect(() => {
     if (preview) return
     const previousTitle = document.title
-    document.title = pdfMode
-      ? (name ? `${name}-简历` : '简历 · HEY.')
-      : (name ? `${name}${role ? `-${role}` : ''}-简历` : '简历 · HEY.')
+    document.title = name ? `${name}${role ? `-${role}` : ''}-简历` : '简历 · HEY.'
     return () => { document.title = previousTitle }
-  }, [name, pdfMode, preview, role])
+  }, [name, preview, role])
 
   useEffect(() => {
     if (preview) return
@@ -64,7 +61,7 @@ export function ResumeExperience({ content, preview = false, loading = false, er
         </nav>
         <div className={styles.toolbarActions}>
           <ThemeToggle />
-          {pdfMode
+          {pdfUrl
             ? <a className={styles.printAction} href={pdfUrl} download aria-label="下载简历 PDF">
                 下载 PDF <span aria-hidden="true">↓</span>
               </a>
@@ -75,101 +72,103 @@ export function ResumeExperience({ content, preview = false, loading = false, er
       </div>
     </header>}
 
-    {pdfMode
-      ? <main className={styles.pdfShell} aria-labelledby={titleId}>
-          <h1 className={styles.srOnly} id={titleId} ref={headingRef} tabIndex={-1}>{name || '简历'}</h1>
-          <ResumePdfDocument key={pdfUrl} url={pdfUrl} title={[name, role].filter(Boolean).join(' · ') || '简历'} />
-      </main>
-      : <main className={styles.paperShell} aria-labelledby={titleId}>
-          <article className={styles.paper}>
-            <header className={styles.docHeader}>
-              <h1 id={titleId} tabIndex={-1} ref={headingRef}>{name || '简历'}</h1>
-              {role && <p className={styles.role}>{role}</p>}
-              {(summary || contactEmail || meta || pdfUrl) && <div className={styles.contactLine}>
-                {contactEmail && <a href={`mailto:${contactEmail}`}>{contactEmail}</a>}
-                {meta && <span>{meta}</span>}
-                {pdfUrl && <a className={styles.pdfLink} href={pdfUrl} download>PDF 附件</a>}
-              </div>}
-              {summary && <p className={styles.summary}>{summary}</p>}
-            </header>
+    <main className={styles.paperShell} aria-labelledby={titleId}>
+      <article className={styles.paper}>
+        <header className={styles.docHeader}>
+          <h1 id={titleId} tabIndex={-1} ref={headingRef}>{name || '简历'}</h1>
+          {role && <p className={styles.role}>{role}</p>}
+          {(summary || contactEmail || meta || pdfUrl) && <div className={styles.contactLine}>
+            {contactEmail && <a href={`mailto:${contactEmail}`}>{contactEmail}</a>}
+            {meta && <span>{meta}</span>}
+            {pdfUrl && <a className={styles.pdfLink} href={pdfUrl} download>PDF 附件</a>}
+          </div>}
+          {summary && <p className={styles.summary}>{summary}</p>}
+        </header>
 
-            {loading && !content && <p className={styles.status} role="status">正在加载简历…</p>}
+        {loading && !content && <p className={styles.status} role="status">正在加载简历…</p>}
 
-            {skills.length > 0 && <section className={styles.section} aria-labelledby="resume-skills">
-              <h2 className={styles.sectionTitle} id="resume-skills">专业技能</h2>
-              <div className={styles.skillList}>
-                {skills.map((group, index) => <div className={styles.skillRow} key={`${group.label}-${index}`}>
-                  <h3>{group.label}</h3>
-                  <p>{group.items.join(' · ')}</p>
-                </div>)}
+        {skills.length > 0 && <section className={styles.section} aria-labelledby="resume-skills">
+          <h2 className={styles.sectionTitle} id="resume-skills">专业技能</h2>
+          <div className={styles.skillList}>
+            {skills.map((group, index) => <div className={styles.skillRow} key={`${group.label}-${index}`}>
+              <h3>{group.label}</h3>
+              <p>{group.items.join(' · ')}</p>
+            </div>)}
+          </div>
+        </section>}
+
+        {strengths.length > 0 && <section className={styles.section} aria-labelledby="resume-strengths">
+          <h2 className={styles.sectionTitle} id="resume-strengths">个人优势</h2>
+          <ul className={styles.bullets}>
+            {strengths.map((line, index) => <li key={index}>{line}</li>)}
+          </ul>
+        </section>}
+
+        {experience.length > 0 && <section className={styles.section} aria-labelledby="resume-experience">
+          <h2 className={styles.sectionTitle} id="resume-experience">工作经历</h2>
+          <div className={styles.entryList}>
+            {experience.map((entry, index) => <article className={styles.entry} key={`${entry.company}-${index}`}>
+              <div className={styles.entryHead}>
+                <div>
+                  <h3>{entry.company}</h3>
+                  {entry.role && <p className={styles.entryRole}>{entry.role}</p>}
+                </div>
+                {entry.period && <p className={styles.entryPeriod}>{entry.period}</p>}
               </div>
-            </section>}
+              {entry.summary && <p className={styles.entrySummary}>{entry.summary}</p>}
+              {entry.highlights.length > 0 && <ul className={styles.bullets}>
+                {entry.highlights.map((line, lineIndex) => <li key={lineIndex}>{line}</li>)}
+              </ul>}
+            </article>)}
+          </div>
+        </section>}
 
-            {experience.length > 0 && <section className={styles.section} aria-labelledby="resume-experience">
-              <h2 className={styles.sectionTitle} id="resume-experience">工作经历</h2>
-              <div className={styles.entryList}>
-                {experience.map((entry, index) => <article className={styles.entry} key={`${entry.company}-${index}`}>
-                  <div className={styles.entryHead}>
-                    <div>
-                      <h3>{entry.company}</h3>
-                      {entry.role && <p className={styles.entryRole}>{entry.role}</p>}
-                    </div>
-                    {entry.period && <p className={styles.entryPeriod}>{entry.period}</p>}
-                  </div>
-                  {entry.summary && <p className={styles.entrySummary}>{entry.summary}</p>}
-                  {entry.highlights.length > 0 && <ul className={styles.bullets}>
-                    {entry.highlights.map((line, lineIndex) => <li key={lineIndex}>{line}</li>)}
-                  </ul>}
-                </article>)}
+        {projects.length > 0 && <section className={styles.section} aria-labelledby="resume-projects">
+          <h2 className={styles.sectionTitle} id="resume-projects">项目经历</h2>
+          <div className={styles.projectList}>
+            {projects.map((project, index) => <article className={styles.project} key={`${project.name}-${index}`}>
+              <div className={styles.projectHead}>
+                <div>
+                  <h3>{project.name}</h3>
+                  {project.role && <p className={styles.projectRole}>{project.role}</p>}
+                </div>
+                {project.period && <p className={styles.projectPeriod}>{project.period}</p>}
               </div>
-            </section>}
+              {project.summary && <p className={styles.projectSummary}>{project.summary}</p>}
+              {project.tech.length > 0 && <p className={styles.tech}>技术栈：{project.tech.join(' · ')}</p>}
+              {project.highlights.length > 0 && <ul className={styles.bullets}>
+                {project.highlights.map((line, lineIndex) => <li key={lineIndex}>{line}</li>)}
+              </ul>}
+            </article>)}
+          </div>
+        </section>}
 
-            {projects.length > 0 && <section className={styles.section} aria-labelledby="resume-projects">
-              <h2 className={styles.sectionTitle} id="resume-projects">项目经历</h2>
-              <div className={styles.projectList}>
-                {projects.map((project, index) => <article className={styles.project} key={`${project.name}-${index}`}>
-                  <div className={styles.projectHead}>
-                    <div>
-                      <h3>{project.name}</h3>
-                      {project.role && <p className={styles.projectRole}>{project.role}</p>}
-                    </div>
-                    {project.period && <p className={styles.projectPeriod}>{project.period}</p>}
-                  </div>
-                  {project.summary && <p className={styles.projectSummary}>{project.summary}</p>}
-                  {project.tech.length > 0 && <p className={styles.tech}>技术栈：{project.tech.join(' · ')}</p>}
-                  {project.highlights.length > 0 && <ul className={styles.bullets}>
-                    {project.highlights.map((line, lineIndex) => <li key={lineIndex}>{line}</li>)}
-                  </ul>}
-                </article>)}
+        {education.length > 0 && <section className={styles.section} aria-labelledby="resume-education">
+          <h2 className={styles.sectionTitle} id="resume-education">教育经历</h2>
+          <div className={styles.educationList}>
+            {education.map((entry, index) => <div className={styles.educationRow} key={`${entry.school}-${index}`}>
+              <div>
+                <h3>{entry.school}</h3>
+                {entry.major && <p>{entry.major}</p>}
               </div>
-            </section>}
+              {entry.period && <p className={styles.educationPeriod}>{entry.period}</p>}
+            </div>)}
+          </div>
+        </section>}
 
-            {education.length > 0 && <section className={styles.section} aria-labelledby="resume-education">
-              <h2 className={styles.sectionTitle} id="resume-education">教育经历</h2>
-              <div className={styles.educationList}>
-                {education.map((entry, index) => <div className={styles.educationRow} key={`${entry.school}-${index}`}>
-                  <div>
-                    <h3>{entry.school}</h3>
-                    {entry.major && <p>{entry.major}</p>}
-                  </div>
-                  {entry.period && <p className={styles.educationPeriod}>{entry.period}</p>}
-                </div>)}
-              </div>
-            </section>}
+        {hasBody && <section className={styles.section} aria-label="补充内容">
+          <h2 className={styles.sectionTitle}>补充内容</h2>
+          <div className={styles.body}><SiteMarkdown content={body} theme="paper" /></div>
+        </section>}
 
-            {hasBody && <section className={styles.section} aria-label="补充内容">
-              <h2 className={styles.sectionTitle}>补充内容</h2>
-              <div className={styles.body}><SiteMarkdown content={body} theme="paper" /></div>
-            </section>}
+        {!hasSections && !hasBody && !loading && !error && <p className={styles.status} role="status">简历内容尚未发布。</p>}
 
-            {!hasSections && !hasBody && !pdfUrl && !loading && !error && <p className={styles.status} role="status">简历内容尚未发布。</p>}
-
-            <footer className={styles.paperFooter}>
-              <span>{[name, role].filter(Boolean).join(' · ')}</span>
-              {contactEmail && <span>{contactEmail}</span>}
-            </footer>
-          </article>
-      </main>}
+        <footer className={styles.paperFooter}>
+          <span>{[name, role].filter(Boolean).join(' · ')}</span>
+          {contactEmail && <span>{contactEmail}</span>}
+        </footer>
+      </article>
+    </main>
   </div>
 }
 

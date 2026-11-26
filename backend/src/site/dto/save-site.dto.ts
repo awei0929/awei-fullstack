@@ -86,6 +86,7 @@ class ResumeDto {
   @IsOptional() @Text(600) summary?: string;
   @IsOptional() @Text(60) meta?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(12) @IsObject({ each: true }) @ValidateNested({ each: true }) @Type(() => ResumeSkillDto) skills?: ResumeSkillDto[];
+  @IsOptional() @TextList(8, 240) strengths?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(12) @IsObject({ each: true }) @ValidateNested({ each: true }) @Type(() => ResumeExperienceDto) experience?: ResumeExperienceDto[];
   @IsOptional() @IsArray() @ArrayMaxSize(12) @IsObject({ each: true }) @ValidateNested({ each: true }) @Type(() => ResumeProjectDto) projects?: ResumeProjectDto[];
   @IsOptional() @IsArray() @ArrayMaxSize(8) @IsObject({ each: true }) @ValidateNested({ each: true }) @Type(() => ResumeEducationDto) education?: ResumeEducationDto[];

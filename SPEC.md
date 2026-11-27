@@ -23,7 +23,7 @@
 | 009 | [演示作业异步队列](docs/specs/009-demo-job-queue.md) | 就绪；MongoDB 持久化、同进程 Worker 与重启恢复 |
 | 010 | [编辑式首页与公开内容分区](docs/specs/010-editorial-home.md) | 本地已验证；首页编辑排版、日夜主题、想法/作品/公开对话 |
 | 011 | [公开对话历史与 LangGraph Agent](docs/specs/011-site-chat-history.md) | 已实现（本地验证通过，未部署）；匿名会话历史、SSE、LangGraph |
-| 012 | [对话日志与后台查看](docs/specs/012-conversation-logs.md) | 已验证（本地；未部署）；公开/站主逐轮日志、耗时与错误、admin 查看 |
+| 012 | [对话日志与后台查看](docs/specs/012-conversation-logs.md) | 已验证（本地 + 线上；已部署）；公开/站主逐轮日志、耗时与错误、admin 查看 |
 
 ## OpenSpec 引用模式
 

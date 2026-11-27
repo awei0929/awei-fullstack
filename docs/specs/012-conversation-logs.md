@@ -1,7 +1,7 @@
 # SPEC-012：对话日志与后台查看
 
 - 编号：012
-- 状态：已验证（本地；未部署）
+- 状态：已验证（本地 + 线上；已部署）
 - 更新日期：2026-11-27
 - 关联任务 / 前置 SPEC / 替代关系：依赖 [SPEC-006](006-owner-sse-chat.md) 的站主对话与 [SPEC-011](011-site-chat-history.md) 的公开对话；替代 SPEC-011“本次不包含后台查看访客对话”的边界，但不改变访客侧历史与权限。
 - 当前实现与需求差异：已按本 SPEC 实现；公开与站主对话均记录日志，admin 新增“对话日志”分区。
@@ -69,7 +69,7 @@ type ChatLog = {
 ## 实现影响与决策
 
 - 后端模块 / 文件：
-  - 新增 `backend/src/chat-logs/`：`chat-logs.module.ts`、`chat-logs.controller.ts`、`chat-logs.service.ts`、`schemas/chat-log.schema.ts`、`dto/list-chat-logs.dto.ts`、`types/chat-log.type.ts`、`error-message.ts`。
+  - 新增 `backend/src/chat-logs/`：`chat-logs.module.ts`、`chat-logs.controller.ts`、`chat-logs.service.ts`、`schemas/chat-log.schema.ts`、`dto/list-chat-logs.dto.ts`、`types/chat-log.type.ts`、`utils/error-message.ts`。
   - `backend/src/site/site-chat.controller.ts`：访客校验后开始记录；`begin` 失败写失败日志；成功 attach 会话/轮次；正常、取消、异常、幂等重放都在 finally 收口。
   - `backend/src/chat/chat.controller.ts`：`prepare` 前开始记录；失败写失败日志；SSE 结束后按最后一轮状态写终态、回答、错误和耗时；无终态兜底为 failed。
   - `backend/src/app.module.ts`、`backend/src/site/site.module.ts`、`backend/src/chat/chat.module.ts`：接入 `ChatLogsModule`；`app.setup.ts` 的 no-store 路径加入 `chat-logs`。
@@ -106,12 +106,12 @@ type ChatLog = {
 - [x] 完成后端日志模块与两条对话链路接入
 - [x] 完成 admin 日志分区、筛选、分页与错误/空态
 - [x] 完成构建、lint、e2e 与本地浏览器验证
-- [ ] 全量后端测试稳定通过
+- [x] 全量后端测试稳定通过
 - [x] 同步 SPEC-011 边界、SPEC 索引、系统基线与 STATE
 
 ## 验证记录
 
-代码基准：`f54f0e3` + 未提交改动（`backend/src/chat-logs/*`、`backend/src/site/site-chat.controller.ts`、`backend/src/chat/chat.controller.ts`、`frontend/src/{types,api,store}/chat-log*`、`frontend/src/pages/admin/{logs-panel*,sections,fields,index}.tsx`、`backend/test/chat-logs.e2e.test.mjs` 及文档）。工作目录：项目根目录。
+代码基准：`f54f0e3` + 对话日志改动，提交 `52f8012`（`feat(chat): add per-turn conversation logs and admin viewer`）。工作目录：项目根目录。
 
 前置条件：隔离 MongoDB `mongodb://127.0.0.1:27018/<临时库>`；e2e 使用随机 `awei_e2e_<uuid>` 库并清理；本地浏览器环境使用独立库与临时 owner，不记录凭据。
 
@@ -125,12 +125,16 @@ type ChatLog = {
 | 2026-11-27 | 全量回归（修复前） | `MONGODB_URI=mongodb://127.0.0.1:27018/nest_test_base npm test` | 失败：181 tests / 14 suites，180 pass，1 fail。`test/owner-init.e2e.test.mjs:41` 的 `created.code` 期望 0、实际 1；其余套件全通过。原因为日志模块启动建索引与初始化脚本并发，`records.init()` 抛错阻断脚本 |
 | 2026-11-27 | 全量回归（修复后） | `cd backend && MONGODB_URI=mongodb://127.0.0.1:27018/nest_test_base npm test` | 通过：181 tests / 14 suites，181 pass，0 fail，23.87s；owner-init 并发建索引场景恢复正常 |
 | 2026-11-27 | AC-04/05/09 | 静态核对对应控制器/service 分支 | 静态通过；未构造真实断连与 prepare 失败请求 |
+| 2026-11-27 | 自动部署 | `git push origin main`（提交 `52f8012`） | [Actions 46002814344](https://github.com/awei0929/awei-fullstack/actions/runs/46002814344) 三个 job 全部成功；发布 `52f801263fc9ae2f6e9a1817419181d1bf2f68a2-46002814344-1`，服务重启后第 2 次健康检查通过 |
+| 2026-11-27 | 线上只读探针 | `curl` 访问 `https://159.75.18.65/`、`/admin`、`/api/site`、`/api/chat-logs` | 首页 200、后台 200、公开配置 200；未登录 `/api/chat-logs` 返回 401 且 `Cache-Control: no-store`；新 admin bundle 包含“对话日志”文案，确认前后端产物已上线 |
+| 2026-11-27 | 线上人工验收 | 登录站主后台打开“对话日志”、发起真实公开/站主对话 | 未执行：本轮无线上站主凭据，不能声称已做登录态页面与真实模型验收 |
 
 ## 未决事项与交接
 
-- 当前已完成：日志采集、存储、受保护查询接口、admin 展示、公开/站主两条链路接入、定向 e2e、全量回归与浏览器验收。
-- 当前阻塞 / 未验证：AC-04/AC-05 尚未用真实请求覆盖；生产 MongoDB 索引与真实模型链路未验证。
+- 当前已完成：日志采集、存储、受保护查询接口、admin 展示、公开/站主两条链路接入、定向 e2e、全量回归、浏览器验收与线上自动部署。
+- 当前阻塞 / 未验证：AC-04/AC-05 尚未用真实请求覆盖；线上登录态后台与真实模型对话未执行；服务启动成功，但未直接查询生产 MongoDB 确认 `chat_logs` 索引已创建（索引失败被设计为只 warn）。
 - 下一步：
   1. 视需要为公开断连、站主非法模型 prepare 失败补定向 e2e，覆盖 AC-04/AC-05。
-  2. 部署前确认生产 MongoDB 允许创建 `chat_logs` 索引；日志不设 TTL，后续按数据量决定保留策略。
+  2. 用站主账号登录线上后台，打开“对话日志”，分别发起一轮公开对话与站主对话，确认卡片出现、耗时与错误字段可读。
+  3. 视数据量决定 `chat_logs` 的保留策略与 TTL；当前不自动清理。
 - 最近需求或决策变化及原因：用户要求“admin 查看日志”，因此 SPEC-011 原先排除后台查看访客对话的边界由本规格替代；日志仍不暴露访客身份，只展示问答与运行结果。

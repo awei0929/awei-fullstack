@@ -2,12 +2,12 @@
 
 - 类型：存量功能基线，记录当前实现；详细新增需求与认证合同以 [SPEC-001](001-session-auth.md) 为准。
 - 状态：已验证（2026-11-06；模块整理见SPEC-002；3–5位账号规则与最终42项HTTP回归见SPEC-001；认证实现时的前端工程与浏览器证据见SPEC-001，历史记录保留原状态）。
-- 更新日期：2026-11-27（同步 SPEC-012 对话日志；此前已同步 SPEC-010 编辑式首页、SPEC-011 对话历史与 LangGraph；原基线历史验证不改写）。
+- 更新日期：2026-11-27（同步 SPEC-012 对话日志并完成线上部署；此前已同步 SPEC-010 编辑式首页、SPEC-011 对话历史与 LangGraph；原基线历史验证不改写）。
 - 前端信息精简与交互打磨见 [SPEC-007](007-ui-clarity.md)：公开详情/登录、官网编辑与预览、聊天/记忆及任务页减少重复辅助文字，以分组和状态表达操作；接口、持久化及权限合同不变。验证与上线边界以该规格为准。
 - 首页简历入口、公开 `/resume` 和后台简历编辑见 [SPEC-008](008-public-resume.md)。2026-11-24 起简历支持可选结构化技能/工作/项目/教育分区，旧四字段合同兼容；公开页采用文档式排版，并与首页共用黑白主题、导航与字体尺度；支持 A4 打印导出 PDF。旧能力场景仅在站主预览展示。
 - 编辑式首页、想法/作品内容分区与匿名公开 AI 对话见 [SPEC-010](010-editorial-home.md)：首页改为黑白编辑排版并支持白天/黑夜切换，新增 `thoughts/works/chat`；公开对话不挂 Session/Owner/CSRF，按 IP 内存限流，只使用公开资料；优先 GLM，配置 `DEEPSEEK_API_KEY` 时仅作为首个 token 前失败/空输出的备用，未配置时 GLM 自带 4-Flash 备用。
 - 公开对话历史与 LangGraph Agent 见 [SPEC-011](011-site-chat-history.md)：匿名 `localStorage` visitor、`site_chat_conversations` 单文档会话、20 会话/100 轮与 30 天 TTL、SSE `start/delta/done/error/ping`、LangChain `ChatDeepSeek` + LangGraph 线性图；前端 `/chat` 与 `/chat/:conversationId` 共享历史侧栏。
-- 对话日志见 [SPEC-012](012-conversation-logs.md)：公开与站主每轮问答写入独立 `chat_logs`，记录提问、回答、状态、耗时、错误；`GET /api/chat-logs` 仅 Session + SiteOwner 可读，后台 `/admin` 新增“对话日志”分区；日志不保存访客身份或 IP。
+- 对话日志见 [SPEC-012](012-conversation-logs.md)：公开与站主每轮问答写入独立 `chat_logs`，记录提问、回答、状态、耗时、错误；`GET /api/chat-logs` 仅 Session + SiteOwner 可读，后台 `/admin` 新增“对话日志”分区；日志不保存访客身份或 IP。功能随提交 `52f8012` 自动部署上线，线上探针见该规格。
 - 前端路径：`/`、`/thoughts`、`/works` 为站点内容入口（后两者复用同一份内容并滚动到对应分区），`/resume` 为独立简历页，`/about` 已移除并回退首页，`/chat` 为独立对话页，`/chat/:conversationId` 恢复历史会话，`/conversation` 重定向 `/chat`；不再用 `#hash` 作为页面导航。
 - 官网增量合同以[SPEC-003](003-personal-site.md)为准；P24整体移除作品档案、项目详情与站主项目配置，不影响本基线的独立`/tasks`、认证和任务数据隔离。
 - 图片、PDF与附件上传增量见[SPEC-004](004-disk-file-uploads.md)，沿用站主/Session/CSRF和独立磁盘媒体；不改变本基线任务与认证合同。

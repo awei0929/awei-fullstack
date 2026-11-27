@@ -1,4 +1,4 @@
-## 2026-11-27：对话日志与 admin 查看（本地已验证，未部署）
+## 2026-11-27：对话日志与 admin 查看（本地验证 + 线上部署）
 
 - 背景（m00001）：用户要求每一轮对话都可观察，记录用户提问、回答、耗时与错误，并在 admin 页面展示；日志要覆盖公开对话与站主对话的完整链路。
 - 后端：新增 `backend/src/chat-logs/`（集合 `chat_logs`、`ChatLogsService`、`GET /api/chat-logs`、DTO/类型/错误文案）。公开入口在访客校验后开始记录，`begin` 失败、断连、幂等重放、正常完成都收口；站主入口在 `prepare` 前开始记录，以 SSE done 的轮次为终态，异常兜底 failed。日志为旁路，写入/索引失败只 warn，不阻断对话；`requestId` 幂等，终态只允许 streaming→终态。
@@ -7,7 +7,8 @@
 - 验证（本地）：backend `npm run build` 通过；全量 `npm test` 181/181 通过（Mongo 27018 隔离库）；新增 `backend/test/chat-logs.e2e.test.mjs` 通过，覆盖公开/站主成功、公开 500 失败、筛选分页、401/403/400。frontend `npm run check`、`npm run lint`（0/0，91 files）、`npm run build` 均通过。headless Chrome 1440×900 登录 owner 打开 `/admin` → “对话日志”：3 张卡片、筛选/分页/耗时/错误展示正常，无横向溢出。
 - 修复：`ChatLogsService.onModuleInit` 的 `records.init()` 改为 try/catch，避免索引构建失败阻断启动；此前全量测试 owner-init 并发建索引偶发失败，修复后全量通过。
 - 影响文件：`backend/src/chat-logs/*`、`backend/src/site/site-chat.controller.ts`、`backend/src/chat/chat.controller.ts`、`backend/src/{app.module.ts,site/site.module.ts,chat/chat.module.ts,app.setup.ts}`、`backend/test/chat-logs.e2e.test.mjs`、`frontend/src/{types/chat-log.ts,api/chat-logs.ts,store/chat-logs.ts}`、`frontend/src/pages/admin/{logs-panel.tsx,logs-panel.module.less,sections.ts,fields.tsx,index.tsx}`、`docs/specs/012-conversation-logs.md`、`SPEC.md`、`docs/specs/000-current-system.md`、`docs/specs/011-site-chat-history.md`。
-- 未提交/推送/部署；用户原有 `.gitignore` 改动保留。待办：AC-04 公开断连、AC-05 站主 prepare 失败尚未构造真实请求；生产 MongoDB 索引与真实模型链路待部署验证；日志暂不设 TTL。
+- 上线：提交 `52f8012` 已推送 main；[Actions 46002814344](https://github.com/awei0929/awei-fullstack/actions/runs/46002814344) 的 Validate / Build and test / Deploy or roll back 全部成功，发布 `52f801263fc9ae2f6e9a1817419181d1bf2f68a2-46002814344-1`，服务重启后第 2 次健康检查通过。线上只读复验：首页/后台/`/api/site` 200，未登录 `/api/chat-logs` 401 且 `no-store`，新 admin bundle 含“对话日志”；登录态后台与真实模型对话未执行（无线上站主凭据）。
+- 当前状态：功能已部署；用户原有 `.gitignore` 改动仍未提交并保留。待办：AC-04 公开断连、AC-05 站主 prepare 失败尚未构造真实请求；线上登录态页面与真实模型链路待站主验收；`chat_logs` 索引是否已在生产创建未直接查询，日志暂不设 TTL。
 
 ## 2026-11-26：简历页改回结构化正文（按最新 PDF 重建，PDF 仅下载）
 

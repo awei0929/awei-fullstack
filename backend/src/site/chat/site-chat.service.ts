@@ -13,6 +13,7 @@ import { SiteChatLimiter } from './site-chat.limiter.js';
 import { SiteChatRepository } from './site-chat.repository.js';
 import { hashVisitor } from './site-chat.types.js';
 import { SiteChatGraph } from './agent/site-chat.graph.js';
+import type { SiteChatTrace } from './site-chat.types.js';
 
 export type PreparedPublicChat = {
   conversationId: string;
@@ -110,6 +111,7 @@ export class SiteChatService {
   async *stream(
     prepared: PreparedPublicChat,
     signal: AbortSignal,
+    trace?: SiteChatTrace,
   ): AsyncGenerator<string> {
     const outer = new AbortController();
     const forward = () => outer.abort();
@@ -143,15 +145,28 @@ export class SiteChatService {
     try {
       let emitted = false;
       armFirstToken();
+      const primaryStarted = Date.now();
+      let primaryFirst = false;
       try {
         for await (const text of this.generate(
           prepared,
           prepared.model,
           attempt.signal,
+          trace,
         )) {
           if (!emitted) {
             emitted = true;
             disarmFirstToken();
+          }
+          if (!primaryFirst) {
+            primaryFirst = true;
+            trace?.({
+              stage: 'model.firstToken',
+              status: 'completed',
+              modelId: prepared.model.id,
+              durationMs: Date.now() - primaryStarted,
+              detail: prepared.model.label,
+            });
           }
           yield text;
         }
@@ -160,6 +175,11 @@ export class SiteChatService {
         // 只有主模型一个 token 都没吐出来时才切换；已经输出半句再重试会造成重复内容。
         if (!prepared.fallback || emitted || outer.signal.aborted)
           throw error;
+        trace?.({
+          stage: 'model.fallback',
+          status: 'completed',
+          detail: `${prepared.model.label}（${prepared.model.id}）→ ${prepared.fallback.label}（${prepared.fallback.id}）`,
+        });
         await this.repository.switchModel(
           prepared.visitorHash,
           prepared.conversationId,
@@ -168,15 +188,28 @@ export class SiteChatService {
         );
         nextAttempt();
         armFirstToken();
+        const fallbackStarted = Date.now();
+        let fallbackFirst = false;
         try {
           for await (const text of this.generate(
             prepared,
             prepared.fallback,
             attempt.signal,
+            trace,
           )) {
             if (!emitted) {
               emitted = true;
               disarmFirstToken();
+            }
+            if (!fallbackFirst) {
+              fallbackFirst = true;
+              trace?.({
+                stage: 'model.firstToken',
+                status: 'completed',
+                modelId: prepared.fallback.id,
+                durationMs: Date.now() - fallbackStarted,
+                detail: prepared.fallback.label,
+              });
             }
             yield text;
           }
@@ -188,6 +221,11 @@ export class SiteChatService {
       disarmFirstToken();
       // 主模型正常结束但没有任何正文（例如只返回思考片段）也算失败，允许切换一次备用。
       if (!emitted && prepared.fallback && !outer.signal.aborted) {
+        trace?.({
+          stage: 'model.fallback',
+          status: 'completed',
+          detail: `${prepared.model.label}（${prepared.model.id}）→ ${prepared.fallback.label}（${prepared.fallback.id}）`,
+        });
         await this.repository.switchModel(
           prepared.visitorHash,
           prepared.conversationId,
@@ -196,15 +234,28 @@ export class SiteChatService {
         );
         nextAttempt();
         armFirstToken();
+        const fallbackStarted = Date.now();
+        let fallbackFirst = false;
         try {
           for await (const text of this.generate(
             prepared,
             prepared.fallback,
             attempt.signal,
+            trace,
           )) {
             if (!emitted) {
               emitted = true;
               disarmFirstToken();
+            }
+            if (!fallbackFirst) {
+              fallbackFirst = true;
+              trace?.({
+                stage: 'model.firstToken',
+                status: 'completed',
+                modelId: prepared.fallback.id,
+                durationMs: Date.now() - fallbackStarted,
+                detail: prepared.fallback.label,
+              });
             }
             yield text;
           }
@@ -240,6 +291,7 @@ export class SiteChatService {
     prepared: PreparedPublicChat,
     model: ModelSettings,
     signal: AbortSignal,
+    trace?: SiteChatTrace,
   ): AsyncGenerator<string> {
     yield* this.graph.stream(
       {
@@ -250,6 +302,7 @@ export class SiteChatService {
         maxTokens: prepared.maxTokens,
       },
       signal,
+      trace,
     );
   }
 

@@ -49,11 +49,19 @@ export class ChatController {
       question: input.content,
       startedAt: new Date(startedAt),
     });
+    void this.logs.trace(logId, { stage: 'request', status: 'started', detail: '已受理站主对话请求' });
+    void this.logs.meta(logId, { requestedModelId: input.modelId });
     let prepared: PreparedChat;
     try {
       prepared = await this.chat.prepare(request.authUser!.id, params.id, input);
     } catch (error) {
       // prepare 阶段的 404/409/限流同样是一轮对话的失败结果，先终结日志再返回 HTTP 错误。
+      await this.logs.trace(logId, {
+        stage: 'request',
+        status: 'failed',
+        durationMs: Date.now() - startedAt,
+        detail: chatErrorMessage(error, '对话未能开始，请稍后再试。'),
+      });
       await this.logs.finish(logId, {
         status: 'failed',
         answer: '',
@@ -63,12 +71,36 @@ export class ChatController {
       throw error;
     }
     await this.logs.attach(logId, prepared.conversationId, prepared.turn.requestId);
+    await this.logs.meta(logId, {
+      modelId: prepared.turn.modelId,
+      modelLabel: prepared.turn.modelLabel,
+      requestedModelId: prepared.turn.requestedModelId,
+      requestedModelLabel: prepared.turn.requestedModelLabel,
+      fallbackUsed: prepared.turn.modelId !== prepared.turn.requestedModelId,
+    });
+    await this.logs.trace(logId, {
+      stage: 'request',
+      status: 'completed',
+      durationMs: Date.now() - startedAt,
+      detail: '会话与轮次已创建',
+    });
     // 以 done 事件里的 turn 为准，能覆盖 completed/failed/canceled/interrupted 全部终态。
     let finalTurn: ChatTurn = prepared.turn;
+    let currentModelId = prepared.turn.modelId;
+    let currentModelLabel = prepared.turn.modelLabel;
+    let firstToken = false;
+    let firstTokenMs: number | null = null;
+    const modelStarted = Date.now();
+    void this.logs.trace(logId, {
+      stage: 'model.request',
+      status: 'started',
+      detail: `${prepared.turn.modelLabel}（${prepared.turn.modelId}）`,
+    });
     const close = () => { void this.chat.disconnect(prepared); };
     response.on('close', close);
     if (response.destroyed) {
       await this.chat.disconnect(prepared);
+      await this.logs.trace(logId, { stage: 'stream', status: 'failed', detail: '写入响应前客户端已断开' });
       await this.logs.finish(logId, { status: 'canceled', answer: '', durationMs: Date.now() - startedAt });
       return;
     }
@@ -78,6 +110,31 @@ export class ChatController {
     try {
       await this.chat.stream(prepared, event => {
         if (event.type === 'done') finalTurn = event.turn;
+        if (event.type === 'delta' && !firstToken) {
+          firstToken = true;
+          firstTokenMs = Date.now() - modelStarted;
+          void this.logs.trace(logId, {
+            stage: 'model.firstToken',
+            status: 'completed',
+            durationMs: firstTokenMs,
+            detail: `${currentModelLabel}（${currentModelId}）`,
+          });
+          void this.logs.meta(logId, { firstTokenMs });
+        }
+        if (event.type === 'fallback') {
+          currentModelId = event.turn.modelId;
+          currentModelLabel = event.turn.modelLabel;
+          void this.logs.trace(logId, {
+            stage: 'model.fallback',
+            status: 'completed',
+            detail: `切换到备用模型 ${event.turn.modelLabel}（${event.turn.modelId}）`,
+          });
+          void this.logs.meta(logId, {
+            modelId: event.turn.modelId,
+            modelLabel: event.turn.modelLabel,
+            fallbackUsed: true,
+          });
+        }
         if (!response.destroyed) response.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
       });
     } finally {
@@ -85,6 +142,17 @@ export class ChatController {
       response.off('close', close);
       if (!response.destroyed) response.end();
       // stream 正常会发出 done；若上游直接抛错导致没有终态，按 failed 收口，避免日志永远停在生成中。
+      await this.logs.trace(logId, {
+        stage: 'stream',
+        status: finalTurn.status === 'completed' ? 'completed' : 'failed',
+        durationMs: Date.now() - startedAt,
+        detail: finalTurn.status === 'completed' ? '回答生成完成' : '生成未正常完成',
+      });
+      await this.logs.meta(logId, {
+        modelId: finalTurn.modelId,
+        modelLabel: finalTurn.modelLabel,
+        ...(firstTokenMs !== null ? { firstTokenMs } : {}),
+      });
       await this.logs.finish(logId, {
         status: finalTurn.status === 'streaming' ? 'failed' : finalTurn.status,
         answer: finalTurn.answer,

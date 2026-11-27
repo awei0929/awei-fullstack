@@ -1,8 +1,9 @@
 import { request } from './http'
-import type { ChatLog, ChatLogChannel, ChatLogPage, ChatLogQuery, ChatLogStatus } from '../types/chat-log'
+import type { ChatLog, ChatLogChannel, ChatLogDetail, ChatLogPage, ChatLogQuery, ChatLogStatus, ChatLogTrace, ChatLogTraceStatus } from '../types/chat-log'
 
 const CHANNELS: ChatLogChannel[] = ['site', 'owner']
 const STATUSES: ChatLogStatus[] = ['streaming', 'completed', 'failed', 'canceled', 'interrupted']
+const TRACE_STATUSES: ChatLogTraceStatus[] = ['started', 'completed', 'failed']
 
 function invalid(): never {
   throw new Error('对话日志格式无效，请稍后重试')
@@ -39,6 +40,16 @@ function integer(value: unknown): number {
   return value
 }
 
+function nullableInteger(value: unknown): number | null {
+  if (value === null) return null
+  return integer(value)
+}
+
+function nullableBoolean(value: unknown): boolean {
+  if (typeof value !== 'boolean') return invalid()
+  return value
+}
+
 function parseLog(value: unknown): ChatLog {
   const item = object(value)
   if (!CHANNELS.includes(item.channel as ChatLogChannel)) return invalid()
@@ -56,6 +67,27 @@ function parseLog(value: unknown): ChatLog {
     durationMs: item.durationMs as number | null,
     startedAt: dateText(item.startedAt),
     finishedAt: nullableDateText(item.finishedAt),
+    modelId: nullableText(item.modelId),
+    modelLabel: nullableText(item.modelLabel),
+    requestedModelId: nullableText(item.requestedModelId),
+    requestedModelLabel: nullableText(item.requestedModelLabel),
+    fallbackUsed: nullableBoolean(item.fallbackUsed),
+    firstTokenMs: nullableInteger(item.firstTokenMs),
+    promptTokens: nullableInteger(item.promptTokens),
+    completionTokens: nullableInteger(item.completionTokens),
+    totalTokens: nullableInteger(item.totalTokens),
+  }
+}
+
+function parseTrace(value: unknown): ChatLogTrace {
+  const item = object(value)
+  if (!TRACE_STATUSES.includes(item.status as ChatLogTraceStatus)) return invalid()
+  return {
+    at: dateText(item.at),
+    stage: text(item.stage),
+    status: item.status as ChatLogTraceStatus,
+    durationMs: nullableInteger(item.durationMs),
+    detail: nullableText(item.detail),
   }
 }
 
@@ -73,5 +105,14 @@ export async function listChatLogs(query: ChatLogQuery = {}): Promise<ChatLogPag
     total: integer(body.total),
     limit: integer(body.limit),
     offset: integer(body.offset),
+  }
+}
+
+export async function getChatLog(id: string): Promise<ChatLogDetail> {
+  const body = object(await request<unknown>(`/chat-logs/${encodeURIComponent(id)}`))
+  if (!Array.isArray(body.trace) || body.trace.length > 100) return invalid()
+  return {
+    ...parseLog(body),
+    trace: body.trace.map(parseTrace),
   }
 }

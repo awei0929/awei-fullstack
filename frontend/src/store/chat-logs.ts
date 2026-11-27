@@ -1,7 +1,7 @@
 import { makeAutoObservable, reaction, runInAction } from 'mobx'
 import * as chatLogsApi from '../api/chat-logs'
 import { HttpError } from '../api/http'
-import type { ChatLog, ChatLogChannel, ChatLogStatus } from '../types/chat-log'
+import type { ChatLog, ChatLogChannel, ChatLogDetail, ChatLogStatus } from '../types/chat-log'
 import { authStore } from './auth'
 
 const PAGE_SIZE = 20
@@ -15,8 +15,13 @@ export class ChatLogsStore {
   loading = false
   error = ''
   loaded = false
+  detailId: string | null = null
+  detail: ChatLogDetail | null = null
+  detailLoading = false
+  detailError = ''
   private active = false
   private requestVersion = 0
+  private detailVersion = 0
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true })
@@ -46,6 +51,7 @@ export class ChatLogsStore {
     this.active = false
     this.requestVersion += 1
     this.loading = false
+    this.closeDetail()
   }
 
   setChannel(value: ChatLogChannel | 'all'): void {
@@ -78,6 +84,51 @@ export class ChatLogsStore {
     void this.load()
   }
 
+  openDetail(id: string): void {
+    this.detailId = id
+    this.detail = null
+    this.detailError = ''
+    this.detailLoading = false
+    void this.loadDetail()
+  }
+
+  closeDetail(): void {
+    this.detailVersion += 1
+    this.detailId = null
+    this.detail = null
+    this.detailError = ''
+    this.detailLoading = false
+  }
+
+  retryDetail(): void {
+    if (this.detailId) void this.loadDetail()
+  }
+
+  // 详情是独立请求：打开新卡片时让旧请求失效，避免慢响应覆盖当前详情。
+  private async loadDetail(): Promise<void> {
+    const id = this.detailId
+    if (!id || !authStore.user || !authStore.ready) return
+    const identity = authStore.identityVersion
+    const version = ++this.detailVersion
+    this.detailLoading = true
+    this.detailError = ''
+    try {
+      const detail = await chatLogsApi.getChatLog(id)
+      if (version !== this.detailVersion || this.detailId !== id) return
+      runInAction(() => {
+        this.detail = detail
+        this.detailLoading = false
+      })
+    } catch (error) {
+      if (version !== this.detailVersion || this.detailId !== id) return
+      runInAction(() => {
+        this.detailError = error instanceof Error ? error.message : '日志详情加载失败，请稍后重试'
+        this.detailLoading = false
+      })
+      if (error instanceof HttpError && error.status === 401) authStore.expireSession(identity)
+    }
+  }
+
   // 身份切换时清空上一位站主的分页和内容，避免旧响应落到新会话。
   private syncIdentity(): void {
     this.requestVersion += 1
@@ -87,6 +138,7 @@ export class ChatLogsStore {
     this.loading = false
     this.error = ''
     this.loaded = false
+    this.closeDetail()
     if (!authStore.user || !authStore.ready) return
     void this.load()
   }

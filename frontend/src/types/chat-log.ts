@@ -2,6 +2,15 @@
 
 export type ChatLogChannel = 'site' | 'owner'
 export type ChatLogStatus = 'streaming' | 'completed' | 'failed' | 'canceled' | 'interrupted'
+export type ChatLogTraceStatus = 'started' | 'completed' | 'failed'
+
+export interface ChatLogTrace {
+  at: string
+  stage: string
+  status: ChatLogTraceStatus
+  durationMs: number | null
+  detail: string | null
+}
 
 export interface ChatLog {
   id: string
@@ -15,6 +24,19 @@ export interface ChatLog {
   durationMs: number | null
   startedAt: string
   finishedAt: string | null
+  modelId: string | null
+  modelLabel: string | null
+  requestedModelId: string | null
+  requestedModelLabel: string | null
+  fallbackUsed: boolean
+  firstTokenMs: number | null
+  promptTokens: number | null
+  completionTokens: number | null
+  totalTokens: number | null
+}
+
+export interface ChatLogDetail extends ChatLog {
+  trace: ChatLogTrace[]
 }
 
 export interface ChatLogPage {

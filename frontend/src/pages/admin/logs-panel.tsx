@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, ConfigProvider, Select, Spin, theme } from 'antd'
+import { Alert, Button, ConfigProvider, Drawer, Select, Spin, theme } from 'antd'
 import { observer } from 'mobx-react-lite'
 import { chatLogsStore as store } from '../../store/chat-logs'
-import type { ChatLog, ChatLogChannel, ChatLogStatus } from '../../types/chat-log'
+import type { ChatLog, ChatLogChannel, ChatLogStatus, ChatLogTraceStatus } from '../../types/chat-log'
 import styles from './logs-panel.module.less'
 
 const CHANNEL_LABEL: Record<ChatLogChannel, string> = { site: '公开对话', owner: '站主对话' }
@@ -12,6 +12,21 @@ const STATUS_LABEL: Record<ChatLogStatus, string> = {
   failed: '失败',
   canceled: '已取消',
   interrupted: '已中断',
+}
+const TRACE_STATUS_LABEL: Record<ChatLogTraceStatus, string> = {
+  started: '开始',
+  completed: '完成',
+  failed: '失败',
+}
+const STAGE_LABEL: Record<string, string> = {
+  request: '请求受理',
+  'agent.loadConversation': 'Agent · 加载会话历史',
+  'agent.buildContext': 'Agent · 构建上下文',
+  'agent.agent': 'Agent · 生成回答',
+  'model.request': '模型调用',
+  'model.firstToken': '首 token',
+  'model.fallback': '备用模型切换',
+  stream: '流式输出结束',
 }
 
 function timeLabel(value: string): string {
@@ -25,10 +40,30 @@ function timeLabel(value: string): string {
   })
 }
 
-function durationLabel(log: ChatLog): string {
+function clockLabel(value: string): string {
+  return new Date(value).toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    fractionalSecondDigits: 3,
+    hour12: false,
+  })
+}
+
+function durationLabel(value: number | null): string {
+  if (value === null) return '未记录'
+  if (value < 1000) return `${value} ms`
+  return `${(value / 1000).toFixed(value < 10000 ? 1 : 0)} s`
+}
+
+function logDuration(log: ChatLog): string {
   if (log.durationMs === null) return log.status === 'streaming' ? '生成中' : '未记录耗时'
-  if (log.durationMs < 1000) return `${log.durationMs} ms`
-  return `${(log.durationMs / 1000).toFixed(log.durationMs < 10000 ? 1 : 0)} s`
+  return durationLabel(log.durationMs)
+}
+
+function tokenLabel(log: ChatLog): string {
+  if (log.totalTokens === null) return '未返回'
+  return `输入 ${log.promptTokens ?? 0} / 输出 ${log.completionTokens ?? 0} / 合计 ${log.totalTokens}`
 }
 
 // 单条回答超过这个长度时先截断展示，避免刷新页面就把全部历史正文塞进 DOM。
@@ -41,6 +76,8 @@ export const LogsPanel = observer(function LogsPanel() {
     store.activate()
     return () => store.deactivate()
   }, [])
+
+  const detail = store.detail
 
   return <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm, token: { colorPrimary: '#555f3c', colorBgBase: '#ffffff', colorText: '#272925', colorTextSecondary: '#656961', colorTextPlaceholder: '#777b73', colorBorder: '#dcded7', borderRadius: 8, fontFamily: 'inherit' } }}>
     <section className={styles.panel} aria-label="对话日志">
@@ -97,10 +134,11 @@ export const LogsPanel = observer(function LogsPanel() {
                     <div className={styles.meta}>
                       <time dateTime={log.startedAt}>{timeLabel(log.startedAt)}</time>
                       <span className={styles.channel}>{CHANNEL_LABEL[log.channel]}</span>
+                      {log.modelLabel && <span className={styles.modelTag}>{log.modelLabel}{log.fallbackUsed ? ' · 备用' : ''}</span>}
                     </div>
                     <div className={styles.state}>
                       <span className={`${styles.status} ${styles[log.status]}`}>{STATUS_LABEL[log.status]}</span>
-                      <span className={styles.duration} title="从受理到生成结束的耗时">{durationLabel(log)}</span>
+                      <span className={styles.duration} title="从受理到生成结束的耗时">{logDuration(log)}</span>
                     </div>
                   </div>
                   <div className={styles.block}>
@@ -112,7 +150,10 @@ export const LogsPanel = observer(function LogsPanel() {
                     {log.answer ? <p className={styles.answer}>{answer}</p> : <p className={styles.emptyAnswer}>未生成回答</p>}
                     {isLong && <button type="button" className={styles.expand} onClick={() => setExpanded((current) => ({ ...current, [log.id]: !isOpen }))}>{isOpen ? '收起回答' : `展开全文（${Array.from(log.answer).length} 字）`}</button>}
                   </div>
-                  <p className={`${styles.error} ${log.error ? styles.hasError : ''}`}>错误：{log.error ?? '无错误'}</p>
+                  <div className={styles.cardFoot}>
+                    <p className={`${styles.error} ${log.error ? styles.hasError : ''}`}>错误：{log.error ?? '无错误'}</p>
+                    <button type="button" className={styles.detailButton} onClick={() => store.openDetail(log.id)}>查看详情 →</button>
+                  </div>
                 </article>
               })}
             </div>}
@@ -125,6 +166,72 @@ export const LogsPanel = observer(function LogsPanel() {
           <Button size="small" disabled={!store.hasNext || store.loading} onClick={store.next}>下一页</Button>
         </div>
       </footer>}
+
+      <Drawer
+        open={Boolean(store.detailId)}
+        onClose={store.closeDetail}
+        width="min(560px, 100vw)"
+        title="日志详情"
+        className={styles.drawer}
+        extra={<Button size="small" loading={store.detailLoading} onClick={store.retryDetail}>刷新详情</Button>}
+      >
+        {store.detailLoading && !detail ? <div className={styles.detailLoading}><Spin /><p>正在读取详情…</p></div> : null}
+        {store.detailError ? <Alert
+          type="error"
+          showIcon
+          title={store.detailError}
+          action={<Button size="small" onClick={store.retryDetail}>重试</Button>}
+        /> : null}
+        {detail ? <div className={styles.detail}>
+          <div className={styles.detailHead}>
+            <div>
+              <span className={styles.channel}>{CHANNEL_LABEL[detail.channel]}</span>
+              <span className={`${styles.status} ${styles[detail.status]}`}>{STATUS_LABEL[detail.status]}</span>
+            </div>
+            <span className={styles.detailDuration}>{logDuration(detail)}</span>
+          </div>
+
+          <dl className={styles.facts}>
+            <div><dt>模型</dt><dd>{detail.modelLabel ?? '未知'}{detail.modelId ? `（${detail.modelId}）` : ''}</dd></div>
+            <div><dt>请求模型</dt><dd>{detail.requestedModelLabel ?? detail.requestedModelId ?? '未记录'}</dd></div>
+            <div><dt>备用切换</dt><dd>{detail.fallbackUsed ? '是' : '否'}</dd></div>
+            <div><dt>首 token</dt><dd>{durationLabel(detail.firstTokenMs)}</dd></div>
+            <div><dt>Token 用量</dt><dd>{tokenLabel(detail)}</dd></div>
+            <div><dt>开始时间</dt><dd>{timeLabel(detail.startedAt)}</dd></div>
+            <div><dt>结束时间</dt><dd>{detail.finishedAt ? timeLabel(detail.finishedAt) : '尚未结束'}</dd></div>
+            <div><dt>会话 ID</dt><dd className={styles.mono}>{detail.conversationId ?? '未记录'}</dd></div>
+            <div><dt>轮次 ID</dt><dd className={styles.mono}>{detail.turnId ?? '未记录'}</dd></div>
+          </dl>
+
+          {detail.error && <div className={styles.detailError}><span>错误</span><p>{detail.error}</p></div>}
+
+          <section className={styles.detailBlock}>
+            <h3>用户提问</h3>
+            <p>{detail.question}</p>
+          </section>
+          <section className={styles.detailBlock}>
+            <h3>回答</h3>
+            <p>{detail.answer || '未生成回答'}</p>
+          </section>
+
+          <section className={styles.detailBlock}>
+            <h3>执行轨迹 <small>{detail.trace.length} 个事件</small></h3>
+            {detail.channel === 'owner' && <p className={styles.note}>站主对话为直连模型，没有 LangGraph 节点；这里展示请求、模型调用、首 token 与结束事件。</p>}
+            {detail.trace.length ? <ol className={styles.timeline}>{detail.trace.map((event, index) => <li className={`${styles.traceItem} ${styles[`trace_${event.status}`]}`} key={`${event.at}-${index}`}>
+              <time className={styles.traceTime}>{clockLabel(event.at)}</time>
+              <span className={styles.traceDot} aria-hidden="true" />
+              <div className={styles.traceBody}>
+                <div className={styles.traceTitle}>
+                  <strong>{STAGE_LABEL[event.stage] ?? event.stage}</strong>
+                  <span>{TRACE_STATUS_LABEL[event.status]}{event.durationMs !== null ? ` · ${durationLabel(event.durationMs)}` : ''}</span>
+                </div>
+                {event.detail && <p>{event.detail}</p>}
+              </div>
+            </li>)}</ol>
+              : <p className={styles.note}>这条日志还没有轨迹。若是旧日志，它产生时尚未启用轨迹采集。</p>}
+          </section>
+        </div> : null}
+      </Drawer>
     </section>
   </ConfigProvider>
 })

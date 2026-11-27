@@ -7,6 +7,7 @@ import { SiteChatConfig } from './chat/site-chat.config.js';
 import { SiteChatRepository } from './chat/site-chat.repository.js';
 import { createSseWriter } from './chat/site-chat.sse.js';
 import { hashVisitor, isUuid, isVisitorId } from './chat/site-chat.types.js';
+import type { SiteChatTraceEvent } from './chat/site-chat.types.js';
 import { ChatLogsService } from '../chat-logs/chat-logs.service.js';
 import { chatErrorMessage } from '../chat-logs/utils/error-message.js';
 
@@ -94,6 +95,11 @@ export class SiteChatController {
       question: input.message,
       startedAt: new Date(startedAt),
     });
+    void this.logs.trace(logId, {
+      stage: 'request',
+      status: 'started',
+      detail: '已受理对话请求',
+    });
     let prepared: PreparedPublicChat;
     try {
       prepared = await this.chat.begin(
@@ -103,6 +109,12 @@ export class SiteChatController {
       );
     } catch (error) {
       // 受理失败也要留下这一轮日志，错误文案与返回给访客的安全文案一致。
+      await this.logs.trace(logId, {
+        stage: 'request',
+        status: 'failed',
+        durationMs: Date.now() - startedAt,
+        detail: chatErrorMessage(error, '对话未能开始，请稍后再试。'),
+      });
       await this.logs.finish(logId, {
         status: 'failed',
         answer: '',
@@ -112,6 +124,40 @@ export class SiteChatController {
       throw error;
     }
     await this.logs.attach(logId, prepared.conversationId, prepared.turnId);
+    await this.logs.meta(logId, {
+      modelId: prepared.model.id,
+      modelLabel: prepared.model.label,
+      requestedModelId: prepared.model.id,
+      requestedModelLabel: prepared.model.label,
+      fallbackUsed: false,
+    });
+    await this.logs.trace(logId, {
+      stage: 'request',
+      status: 'completed',
+      durationMs: Date.now() - startedAt,
+      detail: '会话与轮次已创建',
+    });
+    // graph/service 只负责回调事件；这里统一落到日志，回调内部再按字段补模型与 token 信息。
+    const trace = (event: SiteChatTraceEvent) => {
+      void this.logs.trace(logId, event);
+      if (event.modelId) {
+        void this.logs.meta(logId, {
+          modelId: event.modelId,
+          ...(event.modelLabel ? { modelLabel: event.modelLabel } : {}),
+          fallbackUsed: event.modelId !== prepared.model.id,
+        });
+      }
+      if (event.stage === 'model.firstToken' && event.durationMs !== undefined) {
+        void this.logs.meta(logId, { firstTokenMs: event.durationMs });
+      }
+      if (event.tokens) {
+        void this.logs.meta(logId, {
+          promptTokens: event.tokens.prompt,
+          completionTokens: event.tokens.completion,
+          totalTokens: event.tokens.total,
+        });
+      }
+    };
     const controller = new AbortController();
     let settled = false;
     let clientGone = false;
@@ -131,6 +177,7 @@ export class SiteChatController {
     await writer.start({ conversationId: prepared.conversationId, turnId: prepared.turnId, requestId: input.requestId });
     if (clientGone || response.destroyed) {
       await this.repository.finishTurn(prepared.visitorHash, prepared.conversationId, prepared.turnId, 'canceled');
+      await this.logs.trace(logId, { stage: 'stream', status: 'failed', detail: '写入响应前客户端已断开' });
       await this.logs.finish(logId, { status: 'canceled', answer: '', durationMs: Date.now() - startedAt });
       writer.close();
       return;
@@ -139,6 +186,7 @@ export class SiteChatController {
     // 幂等重放：该轮已经完成，不调用模型，也不重复写库。
     if (prepared.answer !== undefined) {
       if (prepared.answer) await writer.delta(prepared.answer);
+      await this.logs.trace(logId, { stage: 'stream', status: 'completed', detail: '命中已完成轮次，直接重放回答' });
       await this.logs.finish(logId, {
         status: 'completed',
         answer: prepared.answer,
@@ -156,6 +204,13 @@ export class SiteChatController {
       try {
         await this.repository.finishTurn(prepared.visitorHash, prepared.conversationId, prepared.turnId, status, error);
       } finally {
+        // 先补轨迹终态，再写用例终态；即使轨迹写失败也不影响 finish 的旁路容错。
+        await this.logs.trace(logId, {
+          stage: 'stream',
+          status: status === 'completed' ? 'completed' : 'failed',
+          durationMs: Date.now() - startedAt,
+          detail: status === 'canceled' ? '客户端断开，生成取消' : status === 'failed' ? '生成失败' : '回答生成完成',
+        });
         // 即使会话落库失败，也要把已生成内容和耗时写进日志，保证这一轮可观测。
         await this.logs.finish(logId, {
           status,
@@ -167,7 +222,7 @@ export class SiteChatController {
     };
 
     try {
-      for await (const text of this.chat.stream(prepared, controller.signal)) {
+      for await (const text of this.chat.stream(prepared, controller.signal, trace)) {
         if (clientGone || controller.signal.aborted || response.destroyed) break;
         answer += text;
         await writer.delta(text);

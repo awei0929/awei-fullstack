@@ -1,10 +1,10 @@
 # SPEC-012：对话日志与后台查看
 
 - 编号：012
-- 状态：已验证（本地 + 线上；已部署）
+- 状态：已验证（本地；详情与执行轨迹待部署）
 - 更新日期：2026-11-27
 - 关联任务 / 前置 SPEC / 替代关系：依赖 [SPEC-006](006-owner-sse-chat.md) 的站主对话与 [SPEC-011](011-site-chat-history.md) 的公开对话；替代 SPEC-011“本次不包含后台查看访客对话”的边界，但不改变访客侧历史与权限。
-- 当前实现与需求差异：已按本 SPEC 实现；公开与站主对话均记录日志，admin 新增“对话日志”分区。
+- 当前实现与需求差异：已按本 SPEC 实现；公开与站主对话均记录日志，admin 新增“对话日志”分区。2026-11-27 追加详情抽屉：模型、token、首 token、备用切换与执行轨迹，解决“日志只有摘要、没有背后 Agent 过程”的反馈。
 
 ## 目标与范围
 
@@ -14,9 +14,13 @@
   - 站主对话（`/admin` 的 AI 对话）每一轮生成一条日志。
   - 记录用户提问、最终回答、状态、耗时、错误信息、入口、会话/轮次标识。
   - 在站主后台新增“对话日志”分区，支持按入口、状态筛选和分页查看。
+  - 每轮日志补充实际模型/请求模型、是否备用切换、首 token 耗时、prompt/completion/total token。
+  - 记录执行轨迹：公开对话的 LangGraph 节点（loadConversation/buildContext/agent）与模型请求；站主对话的请求、模型请求、首 token、备用切换与流式结束。
+  - 卡片可打开“日志详情”抽屉，查看完整问答、模型与 token 信息、耗时、错误和按时间排序的轨迹。
 - 本次不包含：
   - 在日志中保存访客 UUID、哈希、IP、请求头或模型密钥；这些信息不进入日志。
   - 日志编辑、删除、导出、全文搜索、实时推送和自动清理/TTL。
+  - 保存系统提示词、完整消息上下文、模型原始推理内容或 Markdown 思考过程；轨迹只存阶段名、状态、耗时、模型和 token 用量。
   - 改变公开对话或站主对话的上下文、模型、限流和会话历史行为。
   - 公开访客查看日志；日志接口只对站主开放。
 
@@ -29,7 +33,15 @@
   - “用户提问”原文。
   - “回答”原文；未生成回答时显示“未生成回答”；超过 360 个字符时截断并可“展开全文”。
   - “错误：无错误”或具体错误文案；失败时错误文案显示为红色。
+  - 实际模型标签；发生过备用切换时显示“· 备用”；右下角“查看详情 →”。
+- 点击“查看详情”打开右侧抽屉（桌面 560px，窄屏满宽）：
+  - 顶部显示入口、状态、耗时；事实区显示实际模型、请求模型、是否备用切换、首 token、token 用量（输入/输出/合计）、开始/结束时间、会话/轮次 ID（未记录时显示“未记录”）。
+  - 显示错误；无错误时显示“无错误”。
+  - 显示完整“用户提问”和“回答”，不截断。
+  - “执行轨迹”按时间正序展示每一幕：阶段名（请求受理/会话上下文/构建上下文/Agent 推理/模型调用/首 token/备用模型切换/流式输出结束）、状态、耗时、说明。公开对话带 LangGraph 节点；站主对话明确提示“直连模型，没有 LangGraph 节点”。旧日志没有轨迹时显示“该轮未记录执行轨迹”。
+  - 抽屉内“刷新详情”重新请求；加载失败保留已显示内容并允许重试。
 - 切换筛选后从第 1 页重新查询；上一页/下一页在边界禁用；刷新保持当前筛选。
+- 详情与列表分离：列表不返回轨迹，避免一页 20 条日志携带全部事件。
 - 加载时保留已有列表；查询失败显示错误 Alert 和“重试”，不把旧数据清空，也不把失败伪装成空列表。
 - 空数据时显示“还没有对话日志 / 完成一轮公开或站主对话后，这里会出现记录。”
 - 未登录访问日志接口返回 401；已登录但不是站主返回 403。页面只站长可见。
@@ -39,7 +51,8 @@
 
 | 方法 / 路径 | 权限与输入 | 成功状态 / 响应 | 失败状态 / 数据影响 |
 | --- | --- | --- | --- |
-| `GET /api/chat-logs` | Session + SiteOwner；query：`channel?=site\|owner`、`status?=streaming\|completed\|failed\|canceled\|interrupted`、`limit?=1..100`（默认 20）、`offset?=0..100000`（默认 0） | `200 { logs, total, limit, offset }`；`logs` 按 `startedAt` 倒序 | 未登录 `401`；非站主 `403`；非法枚举/越界/非数字 `400`；数据库异常 `500`，不返回部分伪造数据 |
+| `GET /api/chat-logs` | Session + SiteOwner；query：`channel?=site\|owner`、`status?=streaming\|completed\|failed\|canceled\|interrupted`、`limit?=1..100`（默认 20）、`offset?=0..100000`（默认 0） | `200 { logs, total, limit, offset }`；`logs` 按 `startedAt` 倒序，不含 `trace` | 未登录 `401`；非站主 `403`；非法枚举/越界/非数字 `400`；数据库异常 `500`，不返回部分伪造数据 |
+| `GET /api/chat-logs/:id` | Session + SiteOwner；`id` 为 UUID v4 | `200 ChatLogDetail`（列表字段 + `trace`） | 未登录 `401`；非站主 `403`；非法 UUID `400`；不存在 `404`；数据库异常 `500` |
 
 单条日志响应结构：
 
@@ -56,12 +69,35 @@ type ChatLog = {
   durationMs: number | null;  // 开始到终态；生成中为 null
   startedAt: string;          // ISO 时间
   finishedAt: string | null;  // 终态时间
+  modelId: string | null;             // 实际使用的模型 ID
+  modelLabel: string | null;          // 实际模型展示名
+  requestedModelId: string | null;    // 请求时选择的模型 ID
+  requestedModelLabel: string | null; // 请求模型展示名
+  fallbackUsed: boolean;              // 是否发生备用模型切换
+  firstTokenMs: number | null;        // 首个正文 token 耗时
+  promptTokens: number | null;        // 输入 token
+  completionTokens: number | null;    // 输出 token
+  totalTokens: number | null;         // 合计 token
+};
+
+type ChatLogTrace = {
+  at: string;                 // ISO 时间
+  stage: string;              // request / agent.* / model.request / model.firstToken / model.fallback / stream
+  status: 'started' | 'completed' | 'failed';
+  durationMs: number | null;
+  detail: string | null;      // 最多 1000 码点
+};
+
+type ChatLogDetail = ChatLog & {
+  trace: ChatLogTrace[];      // 最多 50 条，按 at 正序返回
 };
 ```
 
 - `requestId` 不作为响应字段暴露；它只用于写入幂等。唯一索引为 `{ channel, requestKey }`，同一入口同一 `requestId` 的重试复用同一条日志。
 - 查询不返回 `requestKey`、访客哈希、IP、模型 Key、系统提示词或上游地址。
-- 写入字段：`id`、`channel`、`requestKey`、`conversationId`、`turnId`、`question`、`answer`、`status`、`error`、`durationMs`、`startedAt`、`finishedAt`；MongoDB 集合为 `chat_logs`。
+- 写入字段：`id`、`channel`、`requestKey`、`conversationId`、`turnId`、`question`、`answer`、`status`、`error`、`durationMs`、`startedAt`、`finishedAt`、模型/token 字段、`fallbackUsed`、`trace`；MongoDB 集合为 `chat_logs`。
+- `trace` 为内嵌子文档数组，写入时按 `$slice: -50` 截断；`detail(id)` 返回前按 `at` 正序排序。
+- `meta` 只更新传入的模型/token 字段；`trace` 只追加事件。旧日志缺少新字段时读取按 `null`/`false`/`[]` 兜底。
 - 索引：唯一 `{ channel: 1, requestKey: 1 }`；普通 `{ startedAt: -1 }`、`{ channel: 1, startedAt: -1 }`、`{ status: 1, startedAt: -1 }`。
 - 状态只允许 `streaming → completed|failed|canceled|interrupted`；终态写入是条件更新，重复写不会覆盖已有终态。
 - 数据迁移：不涉及。旧对话不会补写日志；上线后新产生的轮次开始记录。日志当前不设 TTL，删除与保留策略留待后续需求。
@@ -72,11 +108,14 @@ type ChatLog = {
   - 新增 `backend/src/chat-logs/`：`chat-logs.module.ts`、`chat-logs.controller.ts`、`chat-logs.service.ts`、`schemas/chat-log.schema.ts`、`dto/list-chat-logs.dto.ts`、`types/chat-log.type.ts`、`utils/error-message.ts`。
   - `backend/src/site/site-chat.controller.ts`：访客校验后开始记录；`begin` 失败写失败日志；成功 attach 会话/轮次；正常、取消、异常、幂等重放都在 finally 收口。
   - `backend/src/chat/chat.controller.ts`：`prepare` 前开始记录；失败写失败日志；SSE 结束后按最后一轮状态写终态、回答、错误和耗时；无终态兜底为 failed。
+  - `backend/src/site/chat/agent/site-chat.graph.ts`：通过 `graph.streamEvents` 收集 LangGraph 节点与模型调用事件，读取 `usage_metadata`；`site-chat.service.ts` 记录首 token 与备用切换；`site-chat.controller.ts` 把事件写入日志 meta/trace，再收口终态。
+  - `backend/src/chat/chat.controller.ts`（站主）：直连模型，额外记录请求、模型调用、首 token、备用切换和流式结束，不伪造 LangGraph 节点。
+  - `backend/src/chat-logs/chat-logs.service.ts`：新增 `meta`、`trace`、`detail`；trace 截断 50 条，detail 读取时按时间排序。
   - `backend/src/app.module.ts`、`backend/src/site/site.module.ts`、`backend/src/chat/chat.module.ts`：接入 `ChatLogsModule`；`app.setup.ts` 的 no-store 路径加入 `chat-logs`。
 - 前端 API / Store / 页面：
   - `frontend/src/types/chat-log.ts`、`frontend/src/api/chat-logs.ts`：请求与运行时响应校验，非法响应统一报“对话日志格式无效，请稍后重试”。
   - `frontend/src/store/chat-logs.ts`：筛选、分页、加载版本、身份版本、401 过期会话、失败保留旧列表。
-  - `frontend/src/pages/admin/logs-panel.tsx`、`logs-panel.module.less`：日志卡片、筛选、分页、错误重试与空态。
+  - `frontend/src/pages/admin/logs-panel.tsx`、`logs-panel.module.less`：日志卡片、筛选、分页、错误重试与空态；卡片模型标签与“查看详情”抽屉，按阶段/状态/耗时渲染轨迹。
   - `frontend/src/pages/admin/sections.ts`、`fields.tsx`、`index.tsx`：新增“对话日志”分区、图标与独立布局；`standalone` 统一控制窄侧栏、移动端控件和隐藏保存按钮。
 - 配置、依赖与其他影响：不新增环境变量或依赖；沿用 MongoDB、NestJS、React/MobX/Ant Design。
 - 决策：
@@ -85,6 +124,9 @@ type ChatLog = {
   - 以 `requestId` 幂等：SSE 重试、刷新重放不会产生重复日志；同一条日志从 streaming 更新到终态。
   - 公开与站主共表：用 `channel` 区分，后台可筛选；两者字段一致，避免两套页面和接口。
   - 不记录访客身份：日志只需回答“问了什么、答了什么、多久、是否失败”，不扩大匿名数据的留存面。
+  - 列表与详情分离：列表保持轻量，详情按 `id` 单独拉取 `trace`；避免分页接口返回几十条完整事件。
+  - 轨迹只存可观测事实：阶段名、状态、耗时、模型名、token 用量；不保存提示词、完整上下文或模型推理正文。轨迹里的错误只保留阶段说明和 HTTP 状态码，避免把上游响应体、地址或密钥写进日志。
+  - 站主链路如实标注“直连模型，没有 LangGraph 节点”，不为对齐公开链路而伪造节点事件。
 
 ## 验收条件
 
@@ -99,6 +141,10 @@ type ChatLog = {
 | AC-07 | 按入口 `site`、按状态 `failed`、`limit=1&offset=1` 查询 | 过滤与分页结果正确，`total` 为过滤后的总数 | `chat-logs.e2e.test.mjs` |
 | AC-08 | 匿名、普通用户、非法参数访问日志接口 | 分别 401、403、400；不返回日志数据 | `chat-logs.e2e.test.mjs` |
 | AC-09 | 日志写入/索引失败 | 对话主流程不被阻断；只记录后端告警 | 代码路径核对；启动索引失败已改为 warn |
+| AC-10 | 公开对话完成，打开详情 | `trace` 含 `agent.loadConversation`、`agent.buildContext`、`agent.agent`、`model.request completed`、`model.firstToken`；`at` 可解析且按时间正序；含模型字段 | `chat-logs.e2e.test.mjs` |
+| AC-11 | 站主对话完成，打开详情 | `trace` 含 request/model.request/model.firstToken/stream，且不含 `agent.*`；备用切换时 `fallbackUsed=true` 并显示实际模型 | `chat-logs.e2e.test.mjs`；本地浏览器样例 |
+| AC-12 | 打开旧日志（无模型/trace 字段） | 页面正常展示，模型/token/首 token 显示“未记录/未返回”，轨迹显示“该轮未记录执行轨迹” | 代码路径核对；本地样例 |
+| AC-13 | 详情接口权限与参数 | 未登录 401；非站主 403；非法 UUID 400；不存在的 UUID 404 | `chat-logs.e2e.test.mjs` |
 
 ## 实施清单
 
@@ -107,11 +153,13 @@ type ChatLog = {
 - [x] 完成 admin 日志分区、筛选、分页与错误/空态
 - [x] 完成构建、lint、e2e 与本地浏览器验证
 - [x] 全量后端测试稳定通过
+- [x] 完成日志详情、模型/token 元数据与执行轨迹
+- [x] 完成详情抽屉、旧日志兜底与桌面/移动端布局验证
 - [x] 同步 SPEC-011 边界、SPEC 索引、系统基线与 STATE
 
 ## 验证记录
 
-代码基准：`f54f0e3` + 对话日志改动，提交 `52f8012`（`feat(chat): add per-turn conversation logs and admin viewer`）。工作目录：项目根目录。
+代码基准：`f54f0e3` + 对话日志改动，提交 `52f8012`（`feat(chat): add per-turn conversation logs and admin viewer`）。2026-11-27 详情/轨迹改动在当前工作区，待提交。工作目录：项目根目录。
 
 前置条件：隔离 MongoDB `mongodb://127.0.0.1:27018/<临时库>`；e2e 使用随机 `awei_e2e_<uuid>` 库并清理；本地浏览器环境使用独立库与临时 owner，不记录凭据。
 
@@ -128,13 +176,18 @@ type ChatLog = {
 | 2026-11-27 | 自动部署 | `git push origin main`（提交 `52f8012`） | [Actions 46002814344](https://github.com/awei0929/awei-fullstack/actions/runs/46002814344) 三个 job 全部成功；发布 `52f801263fc9ae2f6e9a1817419181d1bf2f68a2-46002814344-1`，服务重启后第 2 次健康检查通过 |
 | 2026-11-27 | 线上只读探针 | `curl` 访问 `https://159.75.18.65/`、`/admin`、`/api/site`、`/api/chat-logs` | 首页 200、后台 200、公开配置 200；未登录 `/api/chat-logs` 返回 401 且 `Cache-Control: no-store`；新 admin bundle 包含“对话日志”文案，确认前后端产物已上线 |
 | 2026-11-27 | 线上人工验收 | 登录站主后台打开“对话日志”、发起真实公开/站主对话 | 未执行：本轮无线上站主凭据，不能声称已做登录态页面与真实模型验收 |
+| 2026-11-27 | AC-10/11/13 | `cd backend && npm run build && MONGODB_URI=mongodb://127.0.0.1:27018/nest_test_base node --test test/chat-logs.e2e.test.mjs` | 通过：1/1，410ms；公开详情含 LangGraph 节点与模型事件，站主详情不含 `agent.*`；非法 UUID 400、匿名 401 |
+| 2026-11-27 | 全量回归（详情） | `cd backend && MONGODB_URI=mongodb://127.0.0.1:27018/nest_test_base npm test` | 通过：181 tests / 14 suites，181 pass，0 fail，23.5s；chat-logs 套件 1/1 |
+| 2026-11-27 | AC-06/10/11 | 本地后端 3000 + Vite 5173；headless Chrome 登录 owner，打开“对话日志”→ 站主记录“查看详情”；1440×900 | 通过：抽屉宽 560，7 个轨迹事件，模型 GLM-4.7-Flash → DeepSeek Flash 备用、首 token 410ms、token 230/42/272；显示“直连模型，没有 LangGraph 节点”；`scrollWidth=innerWidth=1440` |
+| 2026-11-27 | AC-06 | 同页面切 390×844，打开详情 | 通过：抽屉宽 390，facts 单列，`scrollWidth=innerWidth=390`，无横向溢出 |
+| 2026-11-27 | 前端检查（详情） | `cd frontend && npm run check`；`npm run lint`；`npm run build` | 通过：check 无输出；lint 0 warnings / 0 errors，91 files；build 1840 modules，admin JS 278.30 kB（gzip 84.85 kB），CSS 53.51 kB |
 
 ## 未决事项与交接
 
-- 当前已完成：日志采集、存储、受保护查询接口、admin 展示、公开/站主两条链路接入、定向 e2e、全量回归、浏览器验收与线上自动部署。
-- 当前阻塞 / 未验证：AC-04/AC-05 尚未用真实请求覆盖；线上登录态后台与真实模型对话未执行；服务启动成功，但未直接查询生产 MongoDB 确认 `chat_logs` 索引已创建（索引失败被设计为只 warn）。
+- 当前已完成：日志采集、存储、受保护查询接口、admin 展示、公开/站主两条链路接入、详情与执行轨迹、定向 e2e、全量回归、浏览器桌面/移动端验收；上一版已线上部署，详情版待部署。
+- 当前阻塞 / 未验证：AC-04/AC-05 尚未用真实请求覆盖；AC-12 只用本地样例核对；线上详情抽屉尚未在登录态验收；服务启动成功，但未直接查询生产 MongoDB 确认 `chat_logs` 索引已创建（索引失败被设计为只 warn）。
 - 下一步：
-  1. 视需要为公开断连、站主非法模型 prepare 失败补定向 e2e，覆盖 AC-04/AC-05。
-  2. 用站主账号登录线上后台，打开“对话日志”，分别发起一轮公开对话与站主对话，确认卡片出现、耗时与错误字段可读。
+  1. 部署详情版后，用站主账号登录线上后台，打开一条新日志的“查看详情”，确认模型、token 与轨迹可读。
+  2. 视需要为公开断连、站主非法模型 prepare 失败补定向 e2e，覆盖 AC-04/AC-05。
   3. 视数据量决定 `chat_logs` 的保留策略与 TTL；当前不自动清理。
 - 最近需求或决策变化及原因：用户要求“admin 查看日志”，因此 SPEC-011 原先排除后台查看访客对话的边界由本规格替代；日志仍不暴露访客身份，只展示问答与运行结果。

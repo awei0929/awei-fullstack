@@ -89,6 +89,32 @@ describe('对话日志真实HTTP', () => {
     assert.ok(siteFailed.error);
     assert.equal(JSON.stringify(siteFailed).includes('secret upstream diagnostic'), false);
 
+    // 详情接口补足列表不返回的执行轨迹；公开对话应由 LangGraph 节点和模型调用组成。
+    const siteDetail = await eventually(
+      () => owner.request(`/chat-logs/${siteCompleted.id}`).then(response => response.json()),
+      value => value.trace?.some(event => event.stage === 'stream' && event.status === 'completed'),
+    );
+    assert.equal(siteDetail.id, siteCompleted.id);
+    assert.ok(siteDetail.modelId);
+    assert.ok(siteDetail.requestedModelId);
+    assert.ok(siteDetail.trace.some(event => event.stage === 'agent.loadConversation'));
+    assert.ok(siteDetail.trace.some(event => event.stage === 'agent.buildContext'));
+    assert.ok(siteDetail.trace.some(event => event.stage === 'agent.agent'));
+    assert.ok(siteDetail.trace.some(event => event.stage === 'model.request' && event.status === 'completed'));
+    assert.ok(siteDetail.trace.some(event => event.stage === 'model.firstToken'));
+    for (const event of siteDetail.trace) {
+      assert.ok(!Number.isNaN(Date.parse(event.at)));
+      assert.ok(['started', 'completed', 'failed'].includes(event.status));
+    }
+
+    const ownerDetail = await eventually(
+      () => owner.request(`/chat-logs/${ownerCompleted.id}`).then(response => response.json()),
+      value => value.trace?.some(event => event.stage === 'stream' && event.status === 'completed'),
+    );
+    assert.equal(ownerDetail.channel, 'owner');
+    assert.ok(ownerDetail.trace.some(event => event.stage === 'model.request'));
+    assert.equal(ownerDetail.trace.some(event => event.stage.startsWith('agent.')), false);
+
     const siteOnly = await owner.request('/chat-logs?channel=site').then(response => response.json());
     assert.equal(siteOnly.total, 2);
     const failedOnly = await owner.request('/chat-logs?status=failed').then(response => response.json());
@@ -103,5 +129,7 @@ describe('对话日志真实HTTP', () => {
     assert.equal((await outsider.request('/chat-logs')).status, 403);
     assert.equal((await owner.request('/chat-logs?limit=0')).status, 400);
     assert.equal((await owner.request('/chat-logs?channel=other')).status, 400);
+    assert.equal((await owner.request('/chat-logs/not-a-uuid')).status, 400);
+    assert.equal((await client(state).request(`/chat-logs/${siteCompleted.id}`)).status, 401);
   });
 });

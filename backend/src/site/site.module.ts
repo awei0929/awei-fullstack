@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module.js';
 import { ChatModule } from '../chat/chat.module.js';
+import { ChatLogsModule } from '../chat-logs/chat-logs.module.js';
 import { SiteController } from './site.controller.js';
 import { SiteChatController } from './site-chat.controller.js';
 import { SiteService } from './site.service.js';
@@ -16,7 +17,7 @@ import { SiteChatRepository } from './chat/site-chat.repository.js';
 
 // 官网作为独立业务模块，通过imports复用认证与聊天适配器，不重新注册会话或模型配置。
 @Module({
-  imports: [AuthModule, ChatModule, MongooseModule.forFeature([
+  imports: [AuthModule, ChatModule, ChatLogsModule, MongooseModule.forFeature([
     { name: SiteRecord.name, schema: SiteRecordSchema },
     { name: SiteChatConversationRecord.name, schema: SiteChatConversationSchema },
   ])],

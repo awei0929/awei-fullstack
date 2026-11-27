@@ -1,5 +1,7 @@
 import { ChatModule } from './chat/chat.module.js';
 import { ChatController } from './chat/chat.controller.js';
+import { ChatLogsModule } from './chat-logs/chat-logs.module.js';
+import { ChatLogsController } from './chat-logs/chat-logs.controller.js';
 import { SiteModule } from './site/site.module.js';
 import { SiteController } from './site/site.controller.js';
 import { SiteChatController } from './site/site-chat.controller.js';
@@ -39,6 +41,7 @@ import { JobsController } from './queue/jobs.controller.js';
     PublicModule,
     SiteModule,
     ChatModule,
+    ChatLogsModule,
     TasksModule,
     QueueModule,
     SystemModule,
@@ -61,6 +64,6 @@ export class AppModule implements NestModule {
       .apply(RequestLoggerMiddleware)
       // forRoutes 指定需要记录的 Controller，包含它们全部HTTP方法；不打印密码、Cookie或请求体。
       // 全局 /api 前缀由 Nest 统一处理，不需要在这里重复拼写。
-      .forRoutes(TasksController, StatsController, AuthController, PublicController, SiteController, SiteChatController, ChatController, JobsController);
+      .forRoutes(TasksController, StatsController, AuthController, PublicController, SiteController, SiteChatController, ChatController, ChatLogsController, JobsController);
   }
 }

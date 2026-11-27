@@ -1,0 +1,64 @@
+@ink: #292c27;
+@secondary: #50564a;
+@muted: #616857;
+@line: #dddfd6;
+@olive: #555f3c;
+@paper: #f6f6f2;
+@danger: #a04b32;
+
+// 日志是阅读型页面：顶部筛选保持固定，正文区独立滚动，卡片按“时间 → 提问 → 回答 → 错误”顺序阅读。
+.panel { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; color: @ink; background: @paper; }
+.panel :focus-visible { outline-color: @olive; }
+.toolbar { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; padding: 10px 24px; border-bottom: 1px solid @line; background: #fafaf7; }
+.filters { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.select { width: 128px; }
+.select :global(.ant-select-selector) { font-size: 12px; }
+.summary { display: flex; align-items: center; gap: 12px; flex-shrink: 0; color: @muted; font-size: 12px; font-variant-numeric: tabular-nums; }
+.summary button { color: @secondary; border-color: #d5dacb; background: transparent; box-shadow: none; font-size: 12px; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 20px 24px 28px; scrollbar-width: thin; scrollbar-color: #c3c7bb transparent; }
+.alert { max-width: 920px; margin: 0 auto 16px; }
+.loading { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: @muted; font-size: 13px; }
+.loading p { margin: 0; }
+.empty { max-width: 920px; margin: 0 auto; padding: clamp(48px, 10vh, 120px) 0 24px; }
+.empty h2 { margin: 0 0 8px; color: @ink; font-size: clamp(24px, 2.2vw, 32px); font-weight: 500; letter-spacing: -.4px; }
+.empty p { margin: 0; color: @muted; font-size: 13px; line-height: 1.8; }
+.list { max-width: 920px; margin: 0 auto; display: grid; gap: 12px; }
+.card { min-width: 0; padding: 16px 20px 14px; border: 1px solid #e0e2db; border-radius: 10px; background: #fff; box-shadow: 0 1px 2px #24291b05; }
+.cardHead { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.meta { display: flex; align-items: center; gap: 10px; min-width: 0; color: @muted; font-size: 11px; font-variant-numeric: tabular-nums; }
+.meta time { white-space: nowrap; }
+.channel { padding: 2px 7px; border: 1px solid #dde1d4; border-radius: 4px; background: #f4f6ee; color: #5a6348; font-size: 10px; line-height: 16px; white-space: nowrap; }
+.state { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.status { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; line-height: 18px; white-space: nowrap; }
+.status::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.completed { color: #4f6b3e; }
+.streaming { color: #8a6a35; }
+.failed { color: @danger; }
+.canceled, .interrupted { color: #77796f; }
+.duration { color: @muted; font-size: 11px; line-height: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.block { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: 1px solid #f0f1ec; }
+.label { color: @muted; font-size: 11px; line-height: 1.8; letter-spacing: .5px; }
+.question, .answer { margin: 0; color: @ink; font-size: 13px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.question { font-weight: 500; }
+.answer { color: @secondary; }
+.emptyAnswer { margin: 0; color: #92958a; font-size: 13px; line-height: 1.85; }
+.expand { margin-top: 6px; padding: 2px 0; border: 0; background: transparent; color: @olive; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
+.expand:hover { color: #39412a; }
+.error { margin: 8px 0 0; padding-top: 10px; border-top: 1px solid #f0f1ec; color: #8a8d82; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
+.hasError { color: @danger; }
+.pager { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; padding: 10px 24px; border-top: 1px solid @line; background: #fafaf7; color: @muted; font-size: 12px; font-variant-numeric: tabular-nums; }
+.pager > div { display: flex; gap: 8px; }
+.pager button { color: @secondary; border-color: #d5dacb; background: transparent; box-shadow: none; font-size: 12px; }
+
+@media (max-width: 760px) {
+  .toolbar { flex-wrap: wrap; gap: 10px; padding: 10px 12px; }
+  .filters { width: 100%; }
+  .select { flex: 1; width: auto; min-width: 0; }
+  .summary { width: 100%; justify-content: space-between; }
+  .scroll { padding: 14px 12px 20px; }
+  .card { padding: 14px 14px 12px; }
+  .block { grid-template-columns: 1fr; gap: 4px; }
+  .label { font-size: 10px; }
+  .pager { padding: 10px 12px; }
+  .empty { padding-top: 56px; }
+}

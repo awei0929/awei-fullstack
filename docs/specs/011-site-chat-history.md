@@ -3,7 +3,7 @@
 - 编号：011
 - 状态：已实现（本地验证通过，未部署）
 - 更新日期：2026-11-24
-- 关联任务 / 前置 SPEC / 替代关系：依赖 [SPEC-010](010-editorial-home.md)；替代其中“不包含对话历史持久化、多会话”的边界。
+- 关联任务 / 前置 SPEC / 替代关系：依赖 [SPEC-010](010-editorial-home.md)；替代其中“不包含对话历史持久化、多会话”的边界。后续 [SPEC-012](012-conversation-logs.md) 补充站主查看每轮问答日志，并替代本规格“不包含后台查看访客对话”的边界；访客侧历史、权限和 SSE 合同不变。
 - 当前实现与需求差异：已按本 SPEC 实现；`/chat` 使用服务端会话与 `site_chat_conversations`，`POST /api/site-chat/conversations`（首条）或 `POST /api/site-chat/conversations/:conversationId/messages`（后续）先落用户轮次再流式回答，旧 `history` 字段仅保留兼容、不再参与上下文。
 
 ## 目标与范围
@@ -19,7 +19,7 @@
   - 登录账号、跨设备同步、多人共享会话。
   - 多 Agent 协作、工具调用、RAG/向量检索、人工介入。
   - 会话重命名、导出、消息编辑或重新生成。
-  - 后台查看访客对话、内容审核、敏感信息过滤。
+  - 后台按访客浏览或关联完整会话、内容审核、敏感信息过滤（站主查看逐轮问答日志由 [SPEC-012](012-conversation-logs.md) 单独定义，只含问答与运行结果，不含访客身份）。
   - 替换站主后台 `/admin` 的 owner chat 或迁移其历史。
 
 ## 用户行为

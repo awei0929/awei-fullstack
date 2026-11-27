@@ -1,4 +1,4 @@
-export type Section = 'home' | 'thoughts' | 'works' | 'resume' | 'capabilities' | 'profile' | 'contact' | 'appearance' | 'files' | 'conversation' | 'chat'
+export type Section = 'home' | 'thoughts' | 'works' | 'resume' | 'capabilities' | 'profile' | 'contact' | 'appearance' | 'files' | 'conversation' | 'chat' | 'logs'
 export type CapabilityEditorTab = 'technology' | 'company' | 'projects'
 
 export const sections: { id: Section; label: string }[] = [
@@ -13,4 +13,5 @@ export const sections: { id: Section; label: string }[] = [
   { id: 'files', label: '文件上传' },
   { id: 'conversation', label: '对话设置' },
   { id: 'chat', label: 'AI 对话' },
+  { id: 'logs', label: '对话日志' },
 ]

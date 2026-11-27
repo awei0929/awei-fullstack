@@ -83,6 +83,7 @@ export function Icon({ name }: { name: Section }) {
     files: <><path d="M14 3H5v18h14V8Z" /><path d="M14 3v5h5M12 17v-6m-3 3 3-3 3 3" /></>,
     conversation: <><path d="M4 5h16v11H9l-5 4V5Z" /><path d="M12 8v1.5M9.5 12a2.5 2.5 0 0 0 5 0" /></>,
     chat: <><path d="M3 4h18v13H9l-6 4V4Z" /><path d="M7 9h10M7 13h6" /></>,
+    logs: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
   }
   return <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
 }

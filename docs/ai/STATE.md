@@ -1,3 +1,14 @@
+## 2026-11-27：对话日志与 admin 查看（本地已验证，未部署）
+
+- 背景（m00001）：用户要求每一轮对话都可观察，记录用户提问、回答、耗时与错误，并在 admin 页面展示；日志要覆盖公开对话与站主对话的完整链路。
+- 后端：新增 `backend/src/chat-logs/`（集合 `chat_logs`、`ChatLogsService`、`GET /api/chat-logs`、DTO/类型/错误文案）。公开入口在访客校验后开始记录，`begin` 失败、断连、幂等重放、正常完成都收口；站主入口在 `prepare` 前开始记录，以 SSE done 的轮次为终态，异常兜底 failed。日志为旁路，写入/索引失败只 warn，不阻断对话；`requestId` 幂等，终态只允许 streaming→终态。
+- 前端：新增 `frontend/src/types/chat-log.ts`、`api/chat-logs.ts`、`store/chat-logs.ts`、`pages/admin/logs-panel.tsx` 与样式；admin 侧栏新增“对话日志”，页内可按入口/状态筛选、分页、刷新，卡片展示时间、入口、状态、耗时、提问、回答、错误（无错误显示“无错误”），失败保留旧列表并显示重试。
+- 文档：新增 `docs/specs/012-conversation-logs.md`；更新 `SPEC.md` 索引（补 010/011/012）、`docs/specs/011-site-chat-history.md` 的后台边界、`docs/specs/000-current-system.md` 的当日基线与数据说明。
+- 验证（本地）：backend `npm run build` 通过；全量 `npm test` 181/181 通过（Mongo 27018 隔离库）；新增 `backend/test/chat-logs.e2e.test.mjs` 通过，覆盖公开/站主成功、公开 500 失败、筛选分页、401/403/400。frontend `npm run check`、`npm run lint`（0/0，91 files）、`npm run build` 均通过。headless Chrome 1440×900 登录 owner 打开 `/admin` → “对话日志”：3 张卡片、筛选/分页/耗时/错误展示正常，无横向溢出。
+- 修复：`ChatLogsService.onModuleInit` 的 `records.init()` 改为 try/catch，避免索引构建失败阻断启动；此前全量测试 owner-init 并发建索引偶发失败，修复后全量通过。
+- 影响文件：`backend/src/chat-logs/*`、`backend/src/site/site-chat.controller.ts`、`backend/src/chat/chat.controller.ts`、`backend/src/{app.module.ts,site/site.module.ts,chat/chat.module.ts,app.setup.ts}`、`backend/test/chat-logs.e2e.test.mjs`、`frontend/src/{types/chat-log.ts,api/chat-logs.ts,store/chat-logs.ts}`、`frontend/src/pages/admin/{logs-panel.tsx,logs-panel.module.less,sections.ts,fields.tsx,index.tsx}`、`docs/specs/012-conversation-logs.md`、`SPEC.md`、`docs/specs/000-current-system.md`、`docs/specs/011-site-chat-history.md`。
+- 未提交/推送/部署；用户原有 `.gitignore` 改动保留。待办：AC-04 公开断连、AC-05 站主 prepare 失败尚未构造真实请求；生产 MongoDB 索引与真实模型链路待部署验证；日志暂不设 TTL。
+
 ## 2026-11-26：简历页改回结构化正文（按最新 PDF 重建，PDF 仅下载）
 
 - 背景（m01353）：PDF 正文模式首屏要加载 1.2 MB pdf.js worker + 851 KB PDF，`/resume` 打开明显慢；用户要求「按最新简历生成页面结构」，PDF 只作附件。

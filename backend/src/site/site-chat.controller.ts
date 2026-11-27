@@ -2,10 +2,13 @@ import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, 
 import type { Request, Response } from 'express';
 import { PublicChatDto } from './dto/public-chat.dto.js';
 import { SiteChatService } from './chat/site-chat.service.js';
+import type { PreparedPublicChat } from './chat/site-chat.service.js';
 import { SiteChatConfig } from './chat/site-chat.config.js';
 import { SiteChatRepository } from './chat/site-chat.repository.js';
 import { createSseWriter } from './chat/site-chat.sse.js';
 import { hashVisitor, isUuid, isVisitorId } from './chat/site-chat.types.js';
+import { ChatLogsService } from '../chat-logs/chat-logs.service.js';
+import { chatErrorMessage } from '../chat-logs/utils/error-message.js';
 
 // 公开对话不挂Session/Owner/CSRF守卫；入口只接收问题与会话ID，模型与提示词全部由服务端决定。
 @Controller('site-chat')
@@ -14,6 +17,8 @@ export class SiteChatController {
     private readonly chat: SiteChatService,
     private readonly config: SiteChatConfig,
     private readonly repository: SiteChatRepository,
+    // 日志是旁路依赖：只写观测数据，不参与对话是否成功的判断。
+    private readonly logs: ChatLogsService,
   ) {}
 
   @Get()
@@ -79,11 +84,34 @@ export class SiteChatController {
     if (!isVisitorId(visitor)) {
       throw new BadRequestException({ message: '缺少有效的匿名访客标识。', code: 'SITE_CHAT_VISITOR_REQUIRED' });
     }
-    const prepared = await this.chat.begin(
-      { ...input, ...(conversationId ? { conversationId } : {}) },
-      visitor,
-      request.ip || request.socket.remoteAddress || 'unknown',
-    );
+    // 从受理瞬间开始计时，覆盖限流/建会话等受理失败，也覆盖后续模型生成。
+    // requestId 是每轮唯一的幂等键，重试同一轮时日志只保留一条。
+    const startedAt = Date.now();
+    const logId = await this.logs.start({
+      channel: 'site',
+      requestKey: input.requestId,
+      conversationId: conversationId ?? null,
+      question: input.message,
+      startedAt: new Date(startedAt),
+    });
+    let prepared: PreparedPublicChat;
+    try {
+      prepared = await this.chat.begin(
+        { ...input, ...(conversationId ? { conversationId } : {}) },
+        visitor,
+        request.ip || request.socket.remoteAddress || 'unknown',
+      );
+    } catch (error) {
+      // 受理失败也要留下这一轮日志，错误文案与返回给访客的安全文案一致。
+      await this.logs.finish(logId, {
+        status: 'failed',
+        answer: '',
+        error: chatErrorMessage(error, '对话未能开始，请稍后再试。'),
+        durationMs: Date.now() - startedAt,
+      });
+      throw error;
+    }
+    await this.logs.attach(logId, prepared.conversationId, prepared.turnId);
     const controller = new AbortController();
     let settled = false;
     let clientGone = false;
@@ -103,6 +131,7 @@ export class SiteChatController {
     await writer.start({ conversationId: prepared.conversationId, turnId: prepared.turnId, requestId: input.requestId });
     if (clientGone || response.destroyed) {
       await this.repository.finishTurn(prepared.visitorHash, prepared.conversationId, prepared.turnId, 'canceled');
+      await this.logs.finish(logId, { status: 'canceled', answer: '', durationMs: Date.now() - startedAt });
       writer.close();
       return;
     }
@@ -110,6 +139,11 @@ export class SiteChatController {
     // 幂等重放：该轮已经完成，不调用模型，也不重复写库。
     if (prepared.answer !== undefined) {
       if (prepared.answer) await writer.delta(prepared.answer);
+      await this.logs.finish(logId, {
+        status: 'completed',
+        answer: prepared.answer,
+        durationMs: Date.now() - startedAt,
+      });
       await writer.done({ conversationId: prepared.conversationId, turnId: prepared.turnId });
       return;
     }
@@ -119,7 +153,17 @@ export class SiteChatController {
     const finish = async (status: 'completed' | 'failed' | 'canceled', error?: string | null) => {
       if (settled) return;
       settled = true;
-      await this.repository.finishTurn(prepared.visitorHash, prepared.conversationId, prepared.turnId, status, error);
+      try {
+        await this.repository.finishTurn(prepared.visitorHash, prepared.conversationId, prepared.turnId, status, error);
+      } finally {
+        // 即使会话落库失败，也要把已生成内容和耗时写进日志，保证这一轮可观测。
+        await this.logs.finish(logId, {
+          status,
+          answer,
+          error: error ?? null,
+          durationMs: Date.now() - startedAt,
+        });
+      }
     };
 
     try {
@@ -149,7 +193,8 @@ export class SiteChatController {
         return;
       }
       await this.repository.appendAnswer(prepared.visitorHash, prepared.conversationId, prepared.turnId, answer);
-      await finish('failed', message);
+      // 后台日志保留可用于排查的具体错误；返回给匿名访客的仍然是安全文案。
+      await finish('failed', chatErrorMessage(error, message));
       await writer.error({ code: 'SITE_CHAT_UPSTREAM', message, retryable: true });
     } finally {
       request.socket.off('close', disconnect);

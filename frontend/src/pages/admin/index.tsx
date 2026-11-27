@@ -12,6 +12,7 @@ import { isSafeSiteUrl } from '../../api/site'
 import { SitePreview as Preview } from './site-preview'
 import { Editors } from './editors'
 import { ChatPanel } from './chat-panel'
+import { LogsPanel } from './logs-panel'
 import { sections } from './sections'
 import type { CapabilityEditorTab, Section } from './sections'
 import { Icon } from './fields'
@@ -49,6 +50,8 @@ export const AdminPage = observer(function AdminPage() {
   const blocker = useBlocker(({ currentLocation, nextLocation }) => (store.dirty || store.busy) && currentLocation.pathname !== nextLocation.pathname)
   const activeSection = sections.find((item) => item.id === section)!
   const previewSection = section === 'resume' || section === 'capabilities' || section === 'thoughts' || section === 'works' || section === 'conversation' ? section : undefined
+  // 对话与日志共用窄侧栏、无草稿操作的独立工作区外壳。
+  const standalone = section === 'chat' || section === 'logs'
   const conflict = store.conflict
   const user = authStore.user
   const status = store.status
@@ -152,33 +155,33 @@ export const AdminPage = observer(function AdminPage() {
                 : store.status === 'error' ? <><h1>配置加载失败</h1><p role="alert">{store.loadError}</p><Button size="large" type="primary" onClick={() => void store.load()}>重新加载</Button><Link className={styles.returnLink} to="/">返回官网</Link></>
                   : <div className={styles.loading}><Spin size="large" /><h1>正在打开工作台</h1></div>}
       </div>
-    </main> : <div className={`${styles.admin} ${section === 'chat' ? styles.chatAdmin : ''}`}>
+    </main> : <div className={`${styles.admin} ${standalone ? styles.chatAdmin : ''}`}>
       <aside className={styles.sidebar}>
         <Link className={styles.brand} to="/">HEY.<span>创作后台</span></Link>
-        <nav aria-label="配置分区">{sections.map((item) => <button key={item.id} type="button" title={section === 'chat' ? item.label : undefined} aria-label={section === 'chat' ? item.label : undefined} aria-current={section === item.id ? 'page' : undefined} className={`${styles.navItem} ${section === item.id ? styles.active : ''}`} onClick={() => { setSection(item.id); setMobilePanel('editor') }}><Icon name={item.id} /><span>{item.label}</span>{section === item.id && <i />}</button>)}</nav>
+        <nav aria-label="配置分区">{sections.map((item) => <button key={item.id} type="button" title={standalone ? item.label : undefined} aria-label={standalone ? item.label : undefined} aria-current={section === item.id ? 'page' : undefined} className={`${styles.navItem} ${section === item.id ? styles.active : ''}`} onClick={() => { setSection(item.id); setMobilePanel('editor') }}><Icon name={item.id} /><span>{item.label}</span>{section === item.id && <i />}</button>)}</nav>
         <div className={styles.owner}><img src="/site/hero-character.png" alt="" /><div><strong>站主</strong></div><button type="button" onClick={() => void logout()} disabled={store.busy}>退出</button></div>
-        <Link to="/" className={styles.sidebarReturn}>{section === 'chat' ? '官网 ↗' : '返回网站 ↗'}</Link>
+        <Link to="/" className={styles.sidebarReturn}>{standalone ? '官网 ↗' : '返回网站 ↗'}</Link>
       </aside>
       <main className={styles.main}>
         <header className={styles.header}>
           <div className={styles.pageTitle}><span className={styles.mobileBrand}>HEY.</span><h1>{activeSection.label}</h1></div>
-          <div className={styles.headerActions}>{section !== 'chat' && <span className={`${styles.dirty} ${store.dirty ? styles.hasChanges : ''}`}><i />{store.dirty ? '有未保存修改' : '已保存'}</span>}{section === 'chat' ? <button type="button" className={styles.outlineButton} onClick={() => setSection('home')}>返回官网编辑</button> : <><a href="/" target="_blank" rel="noopener noreferrer" className={styles.outlineButton}>查看官网 ↗</a><button type="button" className={styles.primaryButton} disabled={!store.canEdit || !store.dirty || store.outcomeUnknown} onClick={saveAll}>{store.saving ? '正在保存…' : '保存并更新官网'}</button></>}</div>
+          <div className={styles.headerActions}>{!standalone && <span className={`${styles.dirty} ${store.dirty ? styles.hasChanges : ''}`}><i />{store.dirty ? '有未保存修改' : '已保存'}</span>}{section === 'chat' ? <button type="button" className={styles.outlineButton} onClick={() => setSection('home')}>返回官网编辑</button> : section === 'logs' ? <a href="/" target="_blank" rel="noopener noreferrer" className={styles.outlineButton}>查看官网 ↗</a> : <><a href="/" target="_blank" rel="noopener noreferrer" className={styles.outlineButton}>查看官网 ↗</a><button type="button" className={styles.primaryButton} disabled={!store.canEdit || !store.dirty || store.outcomeUnknown} onClick={saveAll}>{store.saving ? '正在保存…' : '保存并更新官网'}</button></>}</div>
         </header>
-        <div className={styles.mobileControls}>{section === 'chat' && <span className={styles.chatMobileBrand}>HEY.</span>}<label><select aria-label="当前分区" value={section} onChange={(event) => { setSection(event.target.value as Section); setMobilePanel('editor') }}>{sections.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>{section === 'chat' && <div className={styles.mobileChatLinks}><button type="button" disabled={store.busy} onClick={() => void logout()}>退出</button><Link to="/" aria-label="返回官网">官网 ↗</Link></div>}{section !== 'chat' && <div className={styles.segmented}><button type="button" aria-pressed={mobilePanel === 'editor'} onClick={() => setMobilePanel('editor')}>编辑</button><button type="button" aria-pressed={mobilePanel === 'preview'} onClick={() => { setDevice('mobile'); setMobilePanel('preview') }}>预览</button></div>}</div>
+        <div className={styles.mobileControls}>{standalone && <span className={styles.chatMobileBrand}>HEY.</span>}<label><select aria-label="当前分区" value={section} onChange={(event) => { setSection(event.target.value as Section); setMobilePanel('editor') }}>{sections.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>{standalone && <div className={styles.mobileChatLinks}><button type="button" disabled={store.busy} onClick={() => void logout()}>退出</button><Link to="/" aria-label="返回官网">官网 ↗</Link></div>}{!standalone && <div className={styles.segmented}><button type="button" aria-pressed={mobilePanel === 'editor'} onClick={() => setMobilePanel('editor')}>编辑</button><button type="button" aria-pressed={mobilePanel === 'preview'} onClick={() => { setDevice('mobile'); setMobilePanel('preview') }}>预览</button></div>}</div>
         {section === 'chat' && store.dirty && <p className={styles.chatDraftNotice}>官网草稿未保存，已为你保留</p>}
-        {((section !== 'chat' && (store.saveError || store.notice)) || authStore.logoutError) && <div className={styles.statusMessages} aria-live="polite">
-          {section !== 'chat' && store.saveError && <div className={styles.errorBanner}><span>! {store.saveError}</span>{(store.conflict || store.outcomeUnknown) && <button type="button" onClick={() => void showLatest()} disabled={store.busy}>查看最新内容</button>}</div>}
-          {section !== 'chat' && store.notice && <p className={styles.successBanner}>✓ {store.notice}</p>}
+        {((!standalone && (store.saveError || store.notice)) || authStore.logoutError) && <div className={styles.statusMessages} aria-live="polite">
+          {!standalone && store.saveError && <div className={styles.errorBanner}><span>! {store.saveError}</span>{(store.conflict || store.outcomeUnknown) && <button type="button" onClick={() => void showLatest()} disabled={store.busy}>查看最新内容</button>}</div>}
+          {!standalone && store.notice && <p className={styles.successBanner}>✓ {store.notice}</p>}
           {authStore.logoutError && <p className={styles.errorBanner}>{authStore.logoutError}</p>}
         </div>}
-        {section === 'chat' ? <ChatPanel /> : <div className={styles.workspace}>
+        {section === 'chat' ? <ChatPanel /> : section === 'logs' ? <LogsPanel /> : <div className={styles.workspace}>
           <form ref={formRef} className={`${styles.editor} ${mobilePanel !== 'editor' ? styles.mobileHidden : ''}`} onSubmit={(event) => event.preventDefault()}><fieldset disabled={!store.canEdit}><Editors section={section} capabilityTab={capabilityTab} onCapabilityTabChange={setCapabilityTab} capabilityCategory={capabilityCategory} onCapabilityCategoryChange={setCapabilityCategory} companyProjectId={companyProjectId} onCompanyProjectChange={setCompanyProjectId} /></fieldset></form>
           <section className={`${styles.preview} ${mobilePanel !== 'preview' ? styles.mobileHidden : ''}`} aria-label={store.dirty ? '未保存预览' : '官网预览'}>
             <div className={styles.previewHeading}><div><h2>{store.dirty ? '未保存预览' : '官网预览'}</h2></div><div className={styles.segmented}><button type="button" aria-pressed={device === 'desktop'} onClick={() => setDevice('desktop')}>桌面</button><button type="button" aria-pressed={device === 'mobile'} onClick={() => setDevice('mobile')}>手机</button></div></div>
             <Preview content={store.draft!} device={device} section={previewSection} />
           </section>
         </div>}
-        {section !== 'chat' && <footer className={styles.mobileSave}><span className={`${styles.dirty} ${store.dirty ? styles.hasChanges : ''}`}><i />{store.dirty ? '未保存' : '已保存'}</span><button className={styles.primaryButton} type="button" disabled={!store.canEdit || !store.dirty || store.outcomeUnknown} onClick={saveAll}>{store.saving ? '保存中…' : '保存并更新官网'}</button><button type="button" className={styles.textButton} disabled={store.busy} onClick={() => void logout()}>退出</button><Link to="/" aria-label="返回官网">↗</Link></footer>}
+        {!standalone && <footer className={styles.mobileSave}><span className={`${styles.dirty} ${store.dirty ? styles.hasChanges : ''}`}><i />{store.dirty ? '未保存' : '已保存'}</span><button className={styles.primaryButton} type="button" disabled={!store.canEdit || !store.dirty || store.outcomeUnknown} onClick={saveAll}>{store.saving ? '保存中…' : '保存并更新官网'}</button><button type="button" className={styles.textButton} disabled={store.busy} onClick={() => void logout()}>退出</button><Link to="/" aria-label="返回官网">↗</Link></footer>}
       </main>
     </div>}
     <Modal open={blocker.state === 'blocked'} title={store.busy ? '正在处理，请稍候' : '还有未保存的修改'} closable={!store.busy} mask={{ closable: false }} onCancel={() => blocker.state === 'blocked' && blocker.reset()} footer={<><Button disabled={store.busy} onClick={() => blocker.state === 'blocked' && blocker.reset()}>继续编辑</Button><Button danger disabled={store.busy} onClick={() => { store.discard(); if (blocker.state === 'blocked') blocker.proceed() }}>放弃修改并离开</Button></>}><p>{store.busy ? '等待当前请求完成后再离开，避免无法确认保存结果。' : '离开后，这份未保存的草稿将被丢弃。'}</p></Modal>

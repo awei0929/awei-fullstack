@@ -1,7 +1,7 @@
 # SPEC-012：对话日志与后台查看
 
 - 编号：012
-- 状态：已验证（本地；详情与执行轨迹待部署）
+- 状态：已验证（本地 + 线上；详情与执行轨迹已部署）
 - 更新日期：2026-11-27
 - 关联任务 / 前置 SPEC / 替代关系：依赖 [SPEC-006](006-owner-sse-chat.md) 的站主对话与 [SPEC-011](011-site-chat-history.md) 的公开对话；替代 SPEC-011“本次不包含后台查看访客对话”的边界，但不改变访客侧历史与权限。
 - 当前实现与需求差异：已按本 SPEC 实现；公开与站主对话均记录日志，admin 新增“对话日志”分区。2026-11-27 追加详情抽屉：模型、token、首 token、备用切换与执行轨迹，解决“日志只有摘要、没有背后 Agent 过程”的反馈。
@@ -159,7 +159,7 @@ type ChatLogDetail = ChatLog & {
 
 ## 验证记录
 
-代码基准：`f54f0e3` + 对话日志改动，提交 `52f8012`（`feat(chat): add per-turn conversation logs and admin viewer`）。2026-11-27 详情/轨迹改动在当前工作区，待提交。工作目录：项目根目录。
+代码基准：`f54f0e3` + 对话日志改动，提交 `52f8012`（`feat(chat): add per-turn conversation logs and admin viewer`）。2026-11-27 详情/轨迹提交 `2b0e34c`（`feat(chat): add conversation log details and agent trace`）并已部署。工作目录：项目根目录。
 
 前置条件：隔离 MongoDB `mongodb://127.0.0.1:27018/<临时库>`；e2e 使用随机 `awei_e2e_<uuid>` 库并清理；本地浏览器环境使用独立库与临时 owner，不记录凭据。
 
@@ -181,13 +181,15 @@ type ChatLogDetail = ChatLog & {
 | 2026-11-27 | AC-06/10/11 | 本地后端 3000 + Vite 5173；headless Chrome 登录 owner，打开“对话日志”→ 站主记录“查看详情”；1440×900 | 通过：抽屉宽 560，7 个轨迹事件，模型 GLM-4.7-Flash → DeepSeek Flash 备用、首 token 410ms、token 230/42/272；显示“直连模型，没有 LangGraph 节点”；`scrollWidth=innerWidth=1440` |
 | 2026-11-27 | AC-06 | 同页面切 390×844，打开详情 | 通过：抽屉宽 390，facts 单列，`scrollWidth=innerWidth=390`，无横向溢出 |
 | 2026-11-27 | 前端检查（详情） | `cd frontend && npm run check`；`npm run lint`；`npm run build` | 通过：check 无输出；lint 0 warnings / 0 errors，91 files；build 1840 modules，admin JS 278.30 kB（gzip 84.85 kB），CSS 53.51 kB |
+| 2026-11-27 | 部署（详情） | 推送 `2b0e34c` 触发 Actions `46010665135`；首次构建因 `chat-fallback` 紧时序用例失败，重跑失败 job | 通过：Build and test 1m47s，Deploy or roll back 7m42s；release `2b0e34c84a256d5d5b1ee109e017eb48816aaa78-46010665135-1`；health check 第 2 次通过 |
+| 2026-11-27 | 线上只读探针（详情） | `https://159.75.18.65/`、`/admin`、`/api/site`、未登录 `/api/chat-logs`、`/assets/admin-C8KdkYlg.js` | 通过：前三个 200；未登录接口 401 + `Cache-Control: no-store`；admin chunk 200 且包含“对话日志”“日志详情”“执行轨迹”“直连模型” |
 
 ## 未决事项与交接
 
-- 当前已完成：日志采集、存储、受保护查询接口、admin 展示、公开/站主两条链路接入、详情与执行轨迹、定向 e2e、全量回归、浏览器桌面/移动端验收；上一版已线上部署，详情版待部署。
-- 当前阻塞 / 未验证：AC-04/AC-05 尚未用真实请求覆盖；AC-12 只用本地样例核对；线上详情抽屉尚未在登录态验收；服务启动成功，但未直接查询生产 MongoDB 确认 `chat_logs` 索引已创建（索引失败被设计为只 warn）。
+- 当前已完成：日志采集、存储、受保护查询接口、admin 展示、公开/站主两条链路接入、详情与执行轨迹、定向 e2e、全量回归、浏览器桌面/移动端验收；详情版已线上部署。
+- 当前阻塞 / 未验证：AC-04/AC-05 尚未用真实请求覆盖；AC-12 只用本地样例核对；线上登录态详情抽屉尚未人工验收；未直接查询生产 MongoDB 确认 `chat_logs` 索引已创建（索引失败被设计为只 warn）。
 - 下一步：
-  1. 部署详情版后，用站主账号登录线上后台，打开一条新日志的“查看详情”，确认模型、token 与轨迹可读。
-  2. 视需要为公开断连、站主非法模型 prepare 失败补定向 e2e，覆盖 AC-04/AC-05。
+  1. 用站主账号登录线上后台，打开一条新日志的“查看详情”，确认模型、token 与轨迹可读。
+  2. 为公开断连、站主非法模型 prepare 失败补定向 e2e，覆盖 AC-04/AC-05。
   3. 视数据量决定 `chat_logs` 的保留策略与 TTL；当前不自动清理。
 - 最近需求或决策变化及原因：用户要求“admin 查看日志”，因此 SPEC-011 原先排除后台查看访客对话的边界由本规格替代；日志仍不暴露访客身份，只展示问答与运行结果。

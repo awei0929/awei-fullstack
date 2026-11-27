@@ -1,4 +1,4 @@
-## 2026-11-27：对话日志详情与 Agent 执行轨迹（本地验证，待部署）
+## 2026-11-27：对话日志详情与 Agent 执行轨迹（本地验证 + 线上部署）
 
 - 背景（m00683，原文“日志为什么没有详情呀 没有背后的agent日志呢”）：基础版日志只有轮级问答/耗时/错误，无法看到模型调用与 Agent 过程。
 - 后端：`chat_logs` 增加 `modelId/modelLabel/requestedModelId/requestedModelLabel/fallbackUsed/firstTokenMs/promptTokens/completionTokens/totalTokens/trace`；`ChatLogsService` 新增 `meta/trace/detail`，trace 最多 50 条、detail 1000 码点，详情读取按 `at` 正序；新增 `GET /api/chat-logs/:id`（Session + SiteOwner，UUID v4），列表仍不含 trace。
@@ -7,7 +7,9 @@
 - 前端：`types/chat-log.ts`、`api/chat-logs.ts`（`getChatLog` + trace 校验）、`store/chat-logs.ts`（详情加载/版本/401）、`logs-panel.tsx`（模型标签 + 详情 Drawer + 时间线）、`logs-panel.module.less`；旧日志缺字段时显示“未记录/未返回/该轮未记录执行轨迹”。
 - 验证（本地）：backend `npm run build` 通过；`backend/test/chat-logs.e2e.test.mjs` 1/1（410ms，含公开 Agent 节点、站主无 `agent.*`、非法 UUID 400、匿名 401）；全量 `npm test` 181/181 通过（23.5s）。frontend `check`、`lint`（0/0，91 files）、`build` 通过（admin JS 278.30 kB / gzip 84.85 kB）。headless Chrome 1440×900 详情抽屉宽 560，7 个事件，模型/备用/首 token/token 正常；390×844 宽 390、单列、无横向溢出。
 - 影响文件：`backend/src/chat-logs/*`、`backend/src/site/chat/{agent/site-chat.graph.ts,site-chat.service.ts,site-chat.types.ts}`、`backend/src/site/site-chat.controller.ts`、`backend/src/chat/chat.controller.ts`、`backend/test/chat-logs.e2e.test.mjs`、`frontend/src/{types/chat-log.ts,api/chat-logs.ts,store/chat-logs.ts}`、`frontend/src/pages/admin/{logs-panel.tsx,logs-panel.module.less}`、`docs/specs/012-conversation-logs.md`、`docs/specs/000-current-system.md`。
-- 当前状态：本地验证完成，尚未提交/部署；用户原有 `.gitignore` 改动保留。待办：提交并部署；线上登录态打开一条新日志详情复验。
+- 部署：提交 `2b0e34c` 推送后 Actions `46010665135`；首次构建因 `chat-fallback` 紧时序用例失败，重跑失败 job 后 Build and test 1m47s、Deploy 7m42s 通过，release `2b0e34c84a256d5d5b1ee109e017eb48816aaa78-46010665135-1`，health check 第 2 次通过。
+- 线上探针：`/`、`/admin`、`/api/site` 200；未登录 `/api/chat-logs` 401 + `Cache-Control: no-store`；admin chunk `/assets/admin-C8KdkYlg.js` 200，包含“对话日志”“日志详情”“执行轨迹”“直连模型”。
+- 当前状态：详情版已上线；用户原有 `.gitignore` 改动保留。待办：线上登录态打开一条新日志详情复验。
 
 ## 2026-11-27：对话日志与 admin 查看（本地验证 + 线上部署）
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { siteAdminStore as store } from '../../store/site-admin'
 import type { SiteCapabilityCategory } from '../../types/site'
@@ -14,6 +15,7 @@ function nextId(prefix: string): string {
 
 export const Editors = observer(function Editors({ section, capabilityTab, onCapabilityTabChange, capabilityCategory, onCapabilityCategoryChange, companyProjectId, onCompanyProjectChange }: { section: Section; capabilityTab: CapabilityEditorTab; onCapabilityTabChange: (tab: CapabilityEditorTab) => void; capabilityCategory: SiteCapabilityCategory; onCapabilityCategoryChange: (category: SiteCapabilityCategory) => void; companyProjectId: string | null; onCompanyProjectChange: (id: string | null) => void }) {
   const content = store.draft!
+  const [markdown, setMarkdown] = useState('')
   switch (section) {
     case 'files': return <FileUploadsEditor />
     case 'home': return <>
@@ -64,6 +66,22 @@ export const Editors = observer(function Editors({ section, capabilityTab, onCap
       const projects = resume.projects ?? []
       const education = resume.education ?? []
       return <>
+        <Group title="从 Markdown 导入" description="粘贴木及简历导出的 Markdown，解析后填进下面的头部信息与各板块；简历 PDF 和补充内容不受影响。">
+          <textarea
+            className={styles.importArea}
+            value={markdown}
+            rows={6}
+            spellCheck={false}
+            placeholder={'# 姓名 · 岗位方向\n\n## 专业技能\n\nTypeScript、React、Node.js\n\n## 项目经历\n\n### 项目名称\n\n**项目简介：** …'}
+            onChange={(event) => setMarkdown(event.target.value)}
+          />
+          <div className={styles.importRow}>
+            <button type="button" className={styles.addButton} disabled={!store.canEdit || !markdown.trim()} onClick={() => store.importResumeMarkdown(markdown)}>解析并填入</button>
+            {markdown && <button type="button" className={styles.textButton} onClick={() => setMarkdown('')}>清空粘贴内容</button>}
+          </div>
+          {store.resumeImportError && <p className={styles.inlineError} role="alert">{store.resumeImportError}</p>}
+          {store.resumeImportNotice && <p className={styles.hint}>{store.resumeImportNotice}</p>}
+        </Group>
         <Group title="简历头部" description="姓名、方向和一句概括会显示在页面最上方；联系邮箱取自「联系入口」。">
           <TextField label="姓名" value={resume.name} onChange={value => store.edit(draft => { draft.resume.name = value })} maxLength={60} />
           <TextField label="岗位方向" value={resume.role} onChange={value => store.edit(draft => { draft.resume.role = value })} maxLength={80} placeholder="Web 全栈开发" />

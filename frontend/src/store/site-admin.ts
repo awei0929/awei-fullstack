@@ -3,6 +3,7 @@ import * as siteApi from '../api/site'
 import { getSession } from '../api/auth'
 import { HttpError } from '../api/http'
 import type { SiteContent, SiteDocument, SiteFileAsset, SiteFileUploadTarget } from '../types/site'
+import { parseResumeMarkdown, type ResumeMarkdownResult } from '../utils/resume-markdown'
 import { siteFileMarkdown, siteFileUploadKey, siteFileValidationError } from '../utils/site-files'
 import { authStore } from './auth'
 
@@ -27,6 +28,8 @@ export class SiteAdminStore {
   audioUploadError = ''
   latestError = ''
   notice = ''
+  resumeImportError = ''
+  resumeImportNotice = ''
   conflict = false
   outcomeUnknown = false
   private active = false
@@ -169,6 +172,53 @@ export class SiteAdminStore {
     change(this.draft)
     this.notice = ''
     if (!this.conflict && !this.outcomeUnknown) this.saveError = ''
+  }
+
+  importResumeMarkdown(markdown: string): void {
+    if (!this.canEdit || !this.draft) return
+    let parsed: ResumeMarkdownResult
+    try {
+      parsed = parseResumeMarkdown(markdown)
+    } catch (error) {
+      this.resumeImportError = error instanceof Error ? error.message : 'Markdown 解析失败'
+      this.resumeImportNotice = ''
+      return
+    }
+    const kept: string[] = []
+    this.edit((draft) => {
+      const resume = draft.resume
+      const previousLabels = (resume.skills ?? []).map((group) => group.label)
+      if (parsed.name) resume.name = parsed.name
+      if (parsed.role) resume.role = parsed.role
+      if (parsed.meta) resume.meta = parsed.meta
+      // 只覆盖 Markdown 里确实解析到的板块，缺失的板块保留已有内容，避免导入变成清空。
+      if (parsed.skills.length) {
+        resume.skills = parsed.skills.map((group, index) => ({
+          label: previousLabels[index]?.trim() || group.label,
+          items: group.items,
+        }))
+      } else if (resume.skills?.length) kept.push('专业技能')
+      if (parsed.strengths.length) resume.strengths = parsed.strengths
+      else if (resume.strengths?.length) kept.push('个人优势')
+      if (parsed.experience.length) resume.experience = parsed.experience
+      else if (resume.experience?.length) kept.push('工作经历')
+      if (parsed.projects.length) resume.projects = parsed.projects
+      else if (resume.projects?.length) kept.push('项目经历')
+      if (parsed.education.length) resume.education = parsed.education
+      else if (resume.education?.length) kept.push('教育经历')
+      // 简历 PDF 与补充正文不来自 Markdown，保持原样。
+    })
+    const parts: string[] = []
+    if (parsed.skills.length) parts.push(`${parsed.skills.length} 组技能`)
+    if (parsed.strengths.length) parts.push(`${parsed.strengths.length} 条优势`)
+    if (parsed.experience.length) parts.push(`${parsed.experience.length} 段经历`)
+    if (parsed.projects.length) parts.push(`${parsed.projects.length} 个项目`)
+    if (parsed.education.length) parts.push(`${parsed.education.length} 条教育`)
+    const notes = [`已解析 ${parts.join('、')}，确认无误后点「保存并更新官网」。`]
+    if (kept.length) notes.push(`Markdown 里没有${kept.join('、')}，已保留原有内容。`)
+    if (parsed.ignoredHeadings.length) notes.push(`已跳过未识别章节：${parsed.ignoredHeadings.join('、')}。`)
+    this.resumeImportError = ''
+    this.resumeImportNotice = notes.join('')
   }
 
   private async writeToken(identity: number): Promise<string> {

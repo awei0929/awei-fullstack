@@ -1,6 +1,6 @@
 # SPEC-008 公开简历页
 
-- 状态：已验证（2026-11-26 改回结构化正文、PDF 仅下载；本地与线上 Chrome 桌面/手机已复验）。日期：2026-11-26（2026-11-25 的 PDF 正文模式已撤回，2026-11-24 结构化扩展与 2026-11-16 版本保留在下方实际验证）。
+- 状态：已验证（2026-11-26 改回结构化正文、PDF 仅下载；本地与线上 Chrome 桌面/手机已复验；2026-11-28 后台支持粘贴 Markdown 导入，本地隔离库已验证）。日期：2026-11-26（2026-11-25 的 PDF 正文模式已撤回，2026-11-24 结构化扩展与 2026-11-16 版本保留在下方实际验证）。
 - 首页以「查看简历」替代能力场景入口。本文替代 [SPEC-003 P28](003-personal-site.md#p28能力三卡与可配置履历弹窗2026-11-08已验证) 和 [SPEC-007](007-ui-clarity.md) 中的公开能力展示约定。
 
 ## 行为与数据
@@ -61,3 +61,15 @@
 - 数据：站点 version 11，`resume` 已填充 6 个技能组、2 段工作、4 个项目、1 条教育，`contact.email=IUya0929@163.com`；PDF 已复制到 `backend/.data/site-assets/cfc300e3-7e3f-4501-a133-34df46e98745.pdf`，公开地址 `/api/site/assets/cfc300e3-7e3f-4501-a133-34df46e98745.pdf`。备份 `/tmp/site-content-backup-before-resume.json`。
 - 验证：`site.e2e.test.mjs` 35/35（新增结构化字段保存/公开/非法条目测试）；后端 178/178、13 套件；前端 check/lint/build 通过（85 files）；Chrome 1440/390/320 无横向溢出，深色/浅色、sticky 与打印样式通过；打印导出 `/tmp/nest-resume-export.pdf` 为 3 页、约 654K；截图 `/tmp/nest-resume-unified-light.png`、`/tmp/nest-resume-unified-dark.png`、`/tmp/nest-resume-unified-mobile.png`。
 - 边界：真实站主登录后的后台编辑器保存/预览尚未在本轮浏览器验证；PDF 上传替换与正式域名未验证。
+
+## 2026-11-28 后台 Markdown 导入
+
+- 背景（m00376，原文「可以做一个 我复制md内容 解析成现在的样子。插件自带的 icon 不用理会。做好直接上线部署就可以 现在开始」）：简历正文是结构化字段，站主每次更新都要在后台逐项手改；简历来自木及简历导出的 Markdown。
+- 决策：不做 PDF 解析、不新增后端接口，只在前端加一个「粘贴 Markdown → 填草稿」的助手，仍然走原版本化 `PUT /api/site/config`，保存前仍由 `parseSiteContent` 校验。
+- 实现：`frontend/src/utils/resume-markdown.ts` 的 `parseResumeMarkdown(markdown)` 返回 `{ name, role, meta, skills, strengths, experience, projects, education, ignoredHeadings }`。忽略 `::: left/right` 容器与 `icon:*` 指令；`# 姓名 · 岗位` 拆 name/role；`工作年限：5 年` 与 `到职时间：随时` 合成 `meta`（「5 年经验 · 随时到岗」）；`## 专业技能` 的裸行或列表按 `、，,` 拆成技能组，`**小标题：** 描述` 形式归入个人优势；`## 工作经历` 用 `**公司｜岗位**` 起段落、`**2022.12 - 2026.11**` 作时间；`## 项目经历` 用 `### 名称（官网）`／`### 名称｜角色`，`**项目简介：**`、`**技术栈：**`（值可为空、续行接下）写入概述与技术标签；`## 教育经历` 的 `学校｜专业｜学历（形式）日期` 拆成三条字段，学历括号并入学校名。
+- 交互：后台「简历」顶部的「从 Markdown 导入」分组粘贴后点「解析并填入」，只改草稿的结构化字段；Markdown 里没有的板块保留原内容并在提示里说明，`pdfUrl` 与 `body` 不被覆盖，未识别章节列在提示中，解析失败显示具体原因。
+- 验证（解析器）：单独 `tsc` 编译后跑真实文件——桌面 `木及简历.md`（Web全栈版）得 5 条优势、2 段经历、4 个项目；按新版格式的完整样本得 6 组技能、4 条优势、2 段经历、4 个项目、2 条教育；逐字段比对 DTO 上限 0 处越界；解析结果合并进线上 version 25 内容后 `parseSiteContent` 通过。
+- 验证（Chrome，隔离库 27019）：临时站主登录后粘贴 md → 提示「已解析 6 组技能、4 条优势、2 段经历、4 个项目、2 条教育」，分区计数 6/4/2/4/2，预览即时出现姓名/技能/优势/经历；「保存并更新官网」→「已保存全部内容 · 版本 1」。截图 `/tmp/resume-import.png`。临时账号与隔离库已清理。
+- 静态检查：frontend `check`/`lint`/`build` 通过。
+- 部署（2026-11-28）：提交 `fb1a0de` 推送 main 后 Actions 完成部署；线上 `/admin` 引用的 `assets/admin-Ix7RLfaN.js` 含「从 Markdown 导入」「解析并填入」，`/`、`/admin`、`/resume`、`/api/site?include=resume` 均 200，站点内容仍 version 25 未变动。
+- 待办：线上登录态由站主粘一次 Markdown 复验；若粘贴的来源换了技能顺序，技能组名会按位置沿用旧标签，需要手动改名。

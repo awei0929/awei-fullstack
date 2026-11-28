@@ -1,3 +1,15 @@
+## 2026-11-28：简历 Markdown 导入（本地验证 + 线上部署）
+
+- 背景（m00376，原文「可以做一个 我复制md内容 解析成现在的样子。插件自带的 icon 不用理会。做好直接上线部署就可以 现在开始」）：简历正文是结构化字段，每次更新都要逐项手改；用户希望直接粘贴木及简历导出的 Markdown。
+- 前端：新增 `frontend/src/utils/resume-markdown.ts` 的 `parseResumeMarkdown()`（纯函数，无网络、无后端改动）；`store/site-admin.ts` 新增 `resumeImportError`/`resumeImportNotice` 与 `importResumeMarkdown()`；`pages/admin/editors.tsx` 简历分区顶部加「从 Markdown 导入」分组（textarea + 解析并填入 + 清空）；`pages/admin/style.module.less` 加 `.importArea`/`.importRow`。方案见 [SPEC-008](specs/008-public-resume.md)。
+- 解析规则：忽略 `::: left/right` 与 `icon:*`；`# 姓名 · 岗位` 写 name/role；`工作年限：5 年`+`到职时间：随时` 合成 meta「5 年经验 · 随时到岗」；`## 专业技能` 的裸行或列表按 `、，,` 拆成技能组，`**小标题：** 描述` 形式归入个人优势；`## 个人优势`/`## 工作经历`（`**公司｜岗位**`+`**2022.12 - 2026.11**`）/`## 项目经历`（`### 名称（官网）`、`### 名称｜角色`、`**项目简介：**`、`**技术栈：**` 可换行）/`## 教育经历`（`学校｜专业｜学历（形式）日期`）分别落到对应字段；Markdown 缺失的板块保留原内容，`pdfUrl` 与 `body` 不被导入覆盖，未知章节在提示里列出。
+- 验证（解析器）：把 `resume-markdown.ts` 单独 `tsc` 编译到 `/tmp/vdt2` 后用 Node 跑真实文件——桌面 `木及简历.md`（Web全栈版）得 5 条优势、2 段经历、4 个项目；按新版格式的完整样本得 6 组技能、4 条优势、2 段经历、4 个项目、2 条教育，教育含「江西理工大学（函授）」与「2019.09 – 2022.6」；逐字段比对 DTO 上限 0 处越界；把解析结果合并进线上 version 25 内容后 `parseSiteContent` 通过。
+- 验证（浏览器，隔离库）：本地后端接 `mongodb://127.0.0.1:27019/e2e` + vite dev，Chrome 以临时站主登录后进入「简历」，粘贴 md 点「解析并填入」→ 提示「已解析 6 组技能、4 条优势、2 段经历、4 个项目、2 条教育」，分区计数变为 6/4/2/4/2，右侧预览立即渲染姓名/技能/优势/经历，点「保存并更新官网」→「已保存全部内容 · 版本 1」。截图 `/tmp/resume-import.png`。临时账号与隔离库已删除，后端进程已停。
+- 静态检查：frontend `npm run check`、`npm run lint`（0 警告 0 错误，92 files）、`npm run build`（504ms）通过；`git diff --check` 通过。
+- 影响文件：`frontend/src/utils/resume-markdown.ts`（新增）、`frontend/src/store/site-admin.ts`、`frontend/src/pages/admin/editors.tsx`、`frontend/src/pages/admin/style.module.less`、`docs/specs/008-public-resume.md`。
+- 上线：提交 `fb1a0de` 已推送 main，约 10 分钟后部署完成。线上探针：`/`、`/admin`、`/resume`、`/api/site?include=resume` 均 200（约 0.15s）；入口脚本 `/assets/index-Df1cX8k4.js`，admin chunk `/assets/admin-Ix7RLfaN.js` 内含「从 Markdown 导入」「解析并填入」「Markdown 里没有」「没有识别到简历内容」；`/api/site` 仍 version 25、`updatedAt` 2026-11-28T14:01:02.375Z、pdfUrl 未变，部署未触碰数据。
+- 当前状态：Markdown 导入已上线。待办：线上登录态由站主粘贴一次 Markdown 复验（我的浏览器实操在隔离库完成，未使用线上口令）。
+
 ## 2026-11-27：对话日志详情与 Agent 执行轨迹（本地验证 + 线上部署）
 
 - 背景（m00683，原文“日志为什么没有详情呀 没有背后的agent日志呢”）：基础版日志只有轮级问答/耗时/错误，无法看到模型调用与 Agent 过程。
